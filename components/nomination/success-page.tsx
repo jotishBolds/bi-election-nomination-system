@@ -101,8 +101,8 @@ export function SuccessPage({ onGoHome }: SuccessPageProps) {
         </motion.div>
 
         {/* Application Details Card */}
-        <Card className="shadow-xl border-green-200">
-          <CardHeader className="bg-green-50">
+        <Card className="shadow-xl border-green-200 bg-green-50">
+          <CardHeader>
             <div className="flex justify-between items-start">
               <div>
                 <CardTitle className="text-lg text-green-800">
@@ -115,12 +115,12 @@ export function SuccessPage({ onGoHome }: SuccessPageProps) {
               </Badge>
             </div>
           </CardHeader>
-          <CardContent className="pt-6">
+          <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <div>
                   <p className="text-sm text-muted-foreground">
-                    Candidate Name
+                    Applicant Name
                   </p>
                   <p className="font-semibold">{formData.candidateName}</p>
                 </div>
@@ -225,14 +225,14 @@ export function SuccessPage({ onGoHome }: SuccessPageProps) {
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-          <Button variant="outline" className="gap-2">
+          {/* <Button variant="outline" className="gap-2">
             <Printer className="h-4 w-4" />
             Print Acknowledgment
           </Button>
           <Button variant="outline" className="gap-2">
             <Download className="h-4 w-4" />
             Download PDF
-          </Button>
+          </Button> */}
           <Button
             className="bg-primary hover:bg-primary-hover gap-2"
             onClick={onGoHome}

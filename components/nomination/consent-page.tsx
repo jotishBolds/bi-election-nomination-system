@@ -22,29 +22,19 @@ interface ConsentPageProps {
 }
 
 const consentItems = [
-  "I hereby declare that all information provided in this nomination form is true and correct to the best of my knowledge and belief.",
-  "I understand that providing false information may lead to rejection of my nomination and legal action as per the applicable laws.",
-  "I confirm that I am eligible to contest elections as per the provisions of the Municipality Act and Election Rules.",
-  "I agree to abide by the Model Code of Conduct and all guidelines issued by the Election Commission.",
-  "I understand that the application fee is non-refundable regardless of the outcome of my nomination.",
-  "I consent to the verification of my documents and personal information by the concerned authorities.",
-  "I acknowledge that incomplete or incorrect applications may be rejected without further notice.",
+  "All information provided is true and correct to the best of my knowledge",
+  "Providing false information may lead to rejection and legal action",
+  "I am eligible to contest elections as per Municipality Act and Election Rules",
+  "I agree to abide by the Model Code of Conduct and Election Commission guidelines",
+  "Application fee is non-refundable regardless of nomination outcome",
+  "I consent to verification of my documents and personal information",
+  "Incomplete or incorrect applications may be rejected without notice",
 ];
 
 export function ConsentPage({ onAccept, onBack }: ConsentPageProps) {
-  const [acceptedItems, setAcceptedItems] = useState<boolean[]>(
-    new Array(consentItems.length).fill(false),
-  );
   const [mainConsent, setMainConsent] = useState(false);
 
-  const allItemsAccepted = acceptedItems.every((item) => item);
-  const canProceed = allItemsAccepted && mainConsent;
-
-  const toggleItem = (index: number) => {
-    const newItems = [...acceptedItems];
-    newItems[index] = !newItems[index];
-    setAcceptedItems(newItems);
-  };
+  const canProceed = mainConsent;
 
   return (
     <motion.div
@@ -54,14 +44,18 @@ export function ConsentPage({ onAccept, onBack }: ConsentPageProps) {
       transition={{ duration: 0.3 }}
       className="min-h-screen bg-gradient-to-br from-primary-light to-white p-4 md:p-8"
     >
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="max-w-2xl mx-auto space-y-6">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center space-y-2"
         >
-          <div className="mx-auto w-16 h-16 bg-primary rounded-full flex items-center justify-center">
-            <Shield className="w-8 h-8 text-primary-foreground" />
+          <div className="mx-auto">
+            <img
+              src="/main-logo.png"
+              alt="Declaration & Consent"
+              className="h-16 w-auto mx-auto"
+            />
           </div>
           <h1 className="text-2xl font-bold text-primary">
             Declaration & Consent
@@ -78,37 +72,22 @@ export function ConsentPage({ onAccept, onBack }: ConsentPageProps) {
               Terms and Conditions
             </CardTitle>
             <CardDescription>
-              You must accept all the following declarations to proceed with
-              nomination
+              Please read and accept the terms below to proceed
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[400px] pr-4">
-              <div className="space-y-4">
+            <ScrollArea className="h-[250px] pr-4">
+              <div className="space-y-3">
                 {consentItems.map((item, index) => (
                   <motion.div
                     key={index}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className={`flex items-start space-x-3 p-4 rounded-lg border transition-colors ${
-                      acceptedItems[index]
-                        ? "bg-green-50 border-green-200"
-                        : "bg-muted/30 border-muted"
-                    }`}
+                    transition={{ delay: index * 0.05 }}
+                    className="flex items-start gap-3 text-sm"
                   >
-                    <Checkbox
-                      id={`consent-${index}`}
-                      checked={acceptedItems[index]}
-                      onCheckedChange={() => toggleItem(index)}
-                      className="mt-1"
-                    />
-                    <label
-                      htmlFor={`consent-${index}`}
-                      className="text-sm leading-relaxed cursor-pointer"
-                    >
-                      {item}
-                    </label>
+                    <span className="text-primary font-bold mt-1">•</span>
+                    <span className="leading-relaxed">{item}</span>
                   </motion.div>
                 ))}
               </div>
@@ -122,15 +101,9 @@ export function ConsentPage({ onAccept, onBack }: ConsentPageProps) {
                   onCheckedChange={(checked) =>
                     setMainConsent(checked as boolean)
                   }
-                  disabled={!allItemsAccepted}
                   className="mt-1"
                 />
-                <label
-                  htmlFor="main-consent"
-                  className={`text-sm font-medium ${
-                    !allItemsAccepted ? "text-muted-foreground" : ""
-                  }`}
-                >
+                <label htmlFor="main-consent" className="text-sm font-medium">
                   I have read, understood, and agree to all the above
                   declarations. I wish to proceed with my nomination
                   application.

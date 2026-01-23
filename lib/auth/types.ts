@@ -28,7 +28,7 @@ export interface AuthState {
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   RO: "Returning Officer",
-  CANDIDATE: "Candidate",
+  CANDIDATE: "Applicant",
   SES: "State Election Commission",
   SUPER_ADMIN: "Super Admin",
 };

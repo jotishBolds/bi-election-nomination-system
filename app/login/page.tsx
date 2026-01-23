@@ -35,12 +35,16 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-light to-white p-4">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="space-y-4 text-center">
-          <div className="mx-auto w-16 h-16 bg-primary rounded-full flex items-center justify-center">
-            <Shield className="w-8 h-8 text-primary-foreground" />
+          <div className="mx-auto">
+            <img
+              src="/main-logo.png"
+              alt="Election Nomination System"
+              className="h-16 w-auto mx-auto"
+            />
           </div>
           <div>
             <CardTitle className="text-2xl font-bold text-primary">
-              Election Management System
+              Election Nomination System
             </CardTitle>
             <CardDescription className="text-muted-foreground mt-2">
               Sign in to access your dashboard

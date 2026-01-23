@@ -1,8 +1,13 @@
 // types/nomination.ts
 export interface NominationFormData {
   // Step 1: Basic Info
+  district: string;
+  ulb: string;
   municipality: string;
   municipalWard: string;
+  wardName: string;
+  constituency: string;
+  reservation: string;
   candidateName: string;
   fatherOrHusbandName: string;
   fullPostalAddress: string;
@@ -15,11 +20,16 @@ export interface NominationFormData {
   proposerPartNo: string;
 
   // Step 3: Candidate Declaration
+  dateOfBirth: string;
   age: string;
+  politicalPartyId: string;
   politicalParty: string;
+  partySymbol: string;
+  partySymbolImage: string;
   symbolPreference1: string;
   symbolPreference2: string;
   symbolPreference3: string;
+  shuffleCount: number;
 
   // Step 4: Category Details
   category: "general" | "sc" | "st_bl" | "st_lt" | "obc_central" | "obc_state";

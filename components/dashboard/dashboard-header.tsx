@@ -27,20 +27,21 @@ export function DashboardHeader() {
         <SidebarTrigger className="-ml-1" />
         <Separator orientation="vertical" className="h-6" />
         <div className="flex items-center gap-2">
-          <span className="text-xl font-bold text-primary">ENS</span>
-          <span className="text-sm text-muted-foreground hidden sm:inline">
-            Election Nomination System
-          </span>
+          <img
+            src="/main-logo.png"
+            alt="Election Nomination System"
+            className="h-8 w-auto"
+          />
         </div>
       </div>
 
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" className="relative">
+        {/* <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
           <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center">
             3
           </span>
-        </Button>
+        </Button> */}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

@@ -17,23 +17,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import {
-  Building2,
-  Users,
-  FileCheck,
-  BarChart3,
-  Upload,
-  Vote,
-  Eye,
-  CheckCircle,
-  FileText,
-  Settings,
-  UserCog,
-  Shield,
-  Home,
-  LucideIcon,
-  Paperclip,
-} from "lucide-react";
+import { Home, LucideIcon, Paperclip, Shield } from "lucide-react";
 
 interface NavItem {
   title: string;
@@ -46,31 +30,12 @@ interface NavGroup {
   items: NavItem[];
 }
 
+// Simplified navigation - only dashboard for all roles
 const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
   RO: [
     {
       label: "Overview",
       items: [{ title: "Dashboard", icon: Home, href: "/dashboard" }],
-    },
-    {
-      label: "Station Management",
-      items: [
-        {
-          title: "Polling Stations",
-          icon: Building2,
-          href: "/dashboard/polling-stations",
-        },
-        {
-          title: "Approve Candidates",
-          icon: FileCheck,
-          href: "/dashboard/approve-candidates",
-        },
-        {
-          title: "Election Results",
-          icon: BarChart3,
-          href: "/dashboard/results",
-        },
-      ],
     },
   ],
   CANDIDATE: [
@@ -79,24 +44,9 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
       items: [{ title: "Dashboard", icon: Home, href: "/dashboard" }],
     },
     {
-      label: "My Campaign",
+      label: "Actions",
       items: [
         { title: "Submit Nomination", icon: Paperclip, href: "/nomination" },
-        {
-          title: "Election Status",
-          icon: Eye,
-          href: "/dashboard/election-status",
-        },
-        {
-          title: "Upload Documents",
-          icon: Upload,
-          href: "/dashboard/documents",
-        },
-        {
-          title: "Vote Tracking",
-          icon: Vote,
-          href: "/dashboard/vote-tracking",
-        },
       ],
     },
   ],
@@ -105,35 +55,11 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
       label: "Overview",
       items: [{ title: "Dashboard", icon: Home, href: "/dashboard" }],
     },
-    {
-      label: "Election Oversight",
-      items: [
-        { title: "Monitor Elections", icon: Eye, href: "/dashboard/monitor" },
-        {
-          title: "Approve RO Actions",
-          icon: CheckCircle,
-          href: "/dashboard/approve-actions",
-        },
-        {
-          title: "Generate Reports",
-          icon: FileText,
-          href: "/dashboard/reports",
-        },
-      ],
-    },
   ],
   SUPER_ADMIN: [
     {
       label: "Overview",
       items: [{ title: "Dashboard", icon: Home, href: "/dashboard" }],
-    },
-    {
-      label: "Administration",
-      items: [
-        { title: "User Management", icon: Users, href: "/dashboard/users" },
-        { title: "Role Assignment", icon: UserCog, href: "/dashboard/roles" },
-        { title: "System Config", icon: Settings, href: "/dashboard/settings" },
-      ],
     },
   ],
 };
@@ -150,9 +76,7 @@ export function DashboardSidebar() {
     <Sidebar className="border-r bg-white">
       <SidebarHeader className="border-b px-4 py-4">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 bg-primary rounded-lg flex items-center justify-center">
-            <Shield className="h-5 w-5 text-primary-foreground" />
-          </div>
+          <img src="/main-logo.png" alt="ENS Portal" className="h-10 w-auto" />
           <div>
             <h2 className="font-semibold text-primary">ENS Portal</h2>
             <p className="text-xs text-muted-foreground">Government of India</p>

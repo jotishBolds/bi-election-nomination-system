@@ -6,7 +6,7 @@ import { AuthProvider } from "@/lib/auth/auth-context";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Election Management System",
+  title: "Election Nomination System",
   description: "Government-grade election management dashboard",
 };
 

@@ -46,7 +46,7 @@ const guidelines = [
     icon: IndianRupee,
     title: "Application Fee",
     description:
-      "₹500 for General category, ₹250 for SC/ST candidates (non-refundable)",
+      "₹500 for General category, ₹250 for SC/ST applicants (non-refundable)",
   },
   {
     icon: Calendar,
@@ -80,8 +80,12 @@ export function StartPage({ onApplyClick }: StartPageProps) {
           transition={{ delay: 0.2 }}
           className="text-center space-y-4"
         >
-          <div className="mx-auto w-20 h-20 bg-primary rounded-full flex items-center justify-center">
-            <Shield className="w-10 h-10 text-primary-foreground" />
+          <div className="mx-auto">
+            <img
+              src="/main-logo.png"
+              alt="Election Nomination Portal"
+              className="h-20 w-auto mx-auto"
+            />
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-primary">
             Election Nomination Portal

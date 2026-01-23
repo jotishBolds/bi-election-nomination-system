@@ -5,8 +5,13 @@ import { createContext, useContext, useState, ReactNode } from "react";
 import { NominationFormData, NominationContextType } from "@/types/nomination";
 
 const initialFormData: NominationFormData = {
+  district: "",
+  ulb: "",
   municipality: "",
   municipalWard: "",
+  wardName: "",
+  constituency: "",
+  reservation: "",
   candidateName: "",
   fatherOrHusbandName: "",
   fullPostalAddress: "",
@@ -15,11 +20,16 @@ const initialFormData: NominationFormData = {
   proposerName: "",
   proposerSerialNo: "",
   proposerPartNo: "",
+  dateOfBirth: "",
   age: "",
+  politicalPartyId: "",
   politicalParty: "",
+  partySymbol: "",
+  partySymbolImage: "",
   symbolPreference1: "",
   symbolPreference2: "",
   symbolPreference3: "",
+  shuffleCount: 0,
   category: "general",
   casteTribeName: "",
 };
