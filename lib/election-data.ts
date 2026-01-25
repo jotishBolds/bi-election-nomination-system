@@ -291,14 +291,14 @@ export const politicalParties: PoliticalParty[] = [
     id: "skm",
     name: "Sikkim Krantikari Morcha",
     shortName: "SKM",
-    symbol: "Umbrella",
+    symbol: "Lamp",
     symbolImage: "/election-symbols/skm.png",
   },
   {
     id: "sdf",
     name: "Sikkim Democratic Front",
     shortName: "SDF",
-    symbol: "Umbrella with Person",
+    symbol: "Umbrella ",
     symbolImage: "/election-symbols/sdf.png",
   },
   {

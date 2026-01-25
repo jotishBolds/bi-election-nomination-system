@@ -10,13 +10,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   FileText,
-  Shield,
   Clock,
-  CheckCircle,
   AlertCircle,
   ArrowRight,
   Calendar,
@@ -35,33 +32,45 @@ const guidelines = [
     title: "Eligibility Criteria",
     description:
       "Must be a registered voter in the municipality and completed 21 years of age",
+    iconColor: "text-blue-600",
+    iconBg: "bg-blue-100",
+    cardBg: "bg-blue-50",
   },
   {
     icon: FileText,
     title: "Required Documents",
     description:
       "Valid ID proof, Address proof, Electoral roll details, and Affidavit",
+    iconColor: "text-purple-600",
+    iconBg: "bg-purple-100",
+    cardBg: "bg-purple-50",
   },
   {
     icon: IndianRupee,
     title: "Application Fee",
     description:
       "₹500 for General category, ₹250 for SC/ST applicants (non-refundable)",
+    iconColor: "text-emerald-600",
+    iconBg: "bg-emerald-100",
+    cardBg: "bg-emerald-50",
   },
   {
     icon: Calendar,
     title: "Important Dates",
     description:
       "Last date for submission: February 15, 2026. Scrutiny: February 18, 2026",
+    iconColor: "text-rose-600",
+    iconBg: "bg-rose-100",
+    cardBg: "bg-rose-50",
   },
 ];
 
 const steps = [
-  "Fill nomination form (FORM-18)",
-  "Upload required documents",
-  "Pay application fee",
-  "Receive acknowledgment",
-  "Attend scrutiny process",
+  { text: "Fill nomination form (FORM-18)", color: "bg-blue-500" },
+  { text: "Upload required documents", color: "bg-purple-500" },
+  { text: "Pay application fee", color: "bg-emerald-500" },
+  { text: "Receive acknowledgment", color: "bg-amber-500" },
+  { text: "Attend scrutiny process", color: "bg-rose-500" },
 ];
 
 export function StartPage({ onApplyClick }: StartPageProps) {
@@ -96,10 +105,10 @@ export function StartPage({ onApplyClick }: StartPageProps) {
         </motion.div>
 
         {/* Alert Banner */}
-        <Alert className="border-primary/20 bg-primary-light">
-          <AlertCircle className="h-4 w-4 text-primary" />
-          <AlertTitle className="text-primary">Important Notice</AlertTitle>
-          <AlertDescription>
+        <Alert className="border-0 bg-amber-50 shadow-sm">
+          <AlertCircle className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="text-amber-800">Important Notice</AlertTitle>
+          <AlertDescription className="text-amber-700">
             Nomination filing is open from January 20, 2026 to February 15,
             2026. Ensure all documents are ready before starting the
             application.
@@ -115,19 +124,21 @@ export function StartPage({ onApplyClick }: StartPageProps) {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3 + index * 0.1 }}
             >
-              <Card className="h-full hover:shadow-lg transition-shadow">
+              <Card
+                className={`h-full border-0 shadow-sm hover:shadow-md transition-shadow ${item.cardBg}`}
+              >
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <item.icon className="h-5 w-5 text-primary" />
+                    <div className={`p-2 rounded-lg ${item.iconBg}`}>
+                      <item.icon className={`h-5 w-5 ${item.iconColor}`} />
                     </div>
-                    <CardTitle className="text-lg">{item.title}</CardTitle>
+                    <CardTitle className="text-lg text-slate-800">
+                      {item.title}
+                    </CardTitle>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground text-sm">
-                    {item.description}
-                  </p>
+                  <p className="text-slate-600 text-sm">{item.description}</p>
                 </CardContent>
               </Card>
             </motion.div>
@@ -135,11 +146,13 @@ export function StartPage({ onApplyClick }: StartPageProps) {
         </div>
 
         {/* Process Steps */}
-        <Card>
+        <Card className="border-0 shadow-sm bg-white">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <FileCheck className="h-5 w-5 text-primary" />
-              Nomination Process
+              <div className="p-1.5 bg-indigo-100 rounded-lg">
+                <FileCheck className="h-5 w-5 text-indigo-600" />
+              </div>
+              <span className="text-slate-800">Nomination Process</span>
             </CardTitle>
             <CardDescription>
               Follow these steps to complete your nomination
@@ -153,12 +166,16 @@ export function StartPage({ onApplyClick }: StartPageProps) {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.5 + index * 0.1 }}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-muted/50"
+                  className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
                 >
-                  <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
+                  <div
+                    className={`w-8 h-8 rounded-full ${step.color} text-white flex items-center justify-center text-sm font-bold shadow-sm`}
+                  >
                     {index + 1}
                   </div>
-                  <span className="font-medium">{step}</span>
+                  <span className="font-medium text-slate-700">
+                    {step.text}
+                  </span>
                 </motion.div>
               ))}
             </div>
@@ -166,18 +183,29 @@ export function StartPage({ onApplyClick }: StartPageProps) {
         </Card>
 
         {/* SLA Information */}
-        <Card className="border-green-200 bg-green-50">
+        <Card className="border-0 bg-teal-50 shadow-sm">
           <CardContent className="pt-6">
             <div className="flex items-start gap-4">
-              <Clock className="h-6 w-6 text-green-600 mt-1" />
+              <div className="p-2 bg-teal-100 rounded-lg">
+                <Clock className="h-5 w-5 text-teal-600" />
+              </div>
               <div>
-                <h3 className="font-semibold text-green-800">
+                <h3 className="font-semibold text-teal-800">
                   Processing Timeline
                 </h3>
-                <ul className="text-sm text-green-700 mt-2 space-y-1">
-                  <li>• Application submission: Instant acknowledgment</li>
-                  <li>• Document verification: Within 48 hours</li>
-                  <li>• Scrutiny result: As per scheduled date</li>
+                <ul className="text-sm text-teal-700 mt-2 space-y-1">
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
+                    Application submission: Instant acknowledgment
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
+                    Document verification: Within 48 hours
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
+                    Scrutiny result: As per scheduled date
+                  </li>
                 </ul>
               </div>
             </div>
@@ -193,7 +221,7 @@ export function StartPage({ onApplyClick }: StartPageProps) {
         >
           <Button
             size="lg"
-            className="bg-primary hover:bg-primary-hover text-lg px-8 py-6"
+            className="bg-primary hover:bg-primary-hover text-lg px-8 py-6 shadow-md"
             onClick={onApplyClick}
           >
             Apply for Nomination

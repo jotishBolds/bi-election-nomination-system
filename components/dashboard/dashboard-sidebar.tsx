@@ -17,12 +17,25 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { Home, LucideIcon, Paperclip, Shield } from "lucide-react";
+import {
+  Home,
+  LucideIcon,
+  Paperclip,
+  Shield,
+  LayoutDashboard,
+  FileText,
+  Users,
+  Settings,
+  BarChart3,
+  ClipboardCheck,
+} from "lucide-react";
 
 interface NavItem {
   title: string;
   icon: LucideIcon;
   href: string;
+  iconColor: string;
+  iconBgColor: string;
 }
 
 interface NavGroup {
@@ -30,36 +43,74 @@ interface NavGroup {
   items: NavItem[];
 }
 
-// Simplified navigation - only dashboard for all roles
+// Navigation with colorful icons
 const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
   RO: [
     {
       label: "Overview",
-      items: [{ title: "Dashboard", icon: Home, href: "/dashboard" }],
+      items: [
+        {
+          title: "Dashboard",
+          icon: LayoutDashboard,
+          href: "/dashboard",
+          iconColor: "text-blue-600",
+          iconBgColor: "bg-blue-100",
+        },
+      ],
     },
   ],
   CANDIDATE: [
     {
       label: "Overview",
-      items: [{ title: "Dashboard", icon: Home, href: "/dashboard" }],
+      items: [
+        {
+          title: "Dashboard",
+          icon: LayoutDashboard,
+          href: "/dashboard",
+          iconColor: "text-blue-600",
+          iconBgColor: "bg-blue-100",
+        },
+      ],
     },
     {
       label: "Actions",
       items: [
-        { title: "Submit Nomination", icon: Paperclip, href: "/nomination" },
+        {
+          title: "Submit Nomination",
+          icon: FileText,
+          href: "/nomination",
+          iconColor: "text-emerald-600",
+          iconBgColor: "bg-emerald-100",
+        },
       ],
     },
   ],
   SES: [
     {
       label: "Overview",
-      items: [{ title: "Dashboard", icon: Home, href: "/dashboard" }],
+      items: [
+        {
+          title: "Dashboard",
+          icon: LayoutDashboard,
+          href: "/dashboard",
+          iconColor: "text-purple-600",
+          iconBgColor: "bg-purple-100",
+        },
+      ],
     },
   ],
   SUPER_ADMIN: [
     {
       label: "Overview",
-      items: [{ title: "Dashboard", icon: Home, href: "/dashboard" }],
+      items: [
+        {
+          title: "Dashboard",
+          icon: LayoutDashboard,
+          href: "/dashboard",
+          iconColor: "text-orange-600",
+          iconBgColor: "bg-orange-100",
+        },
+      ],
     },
   ],
 };
@@ -105,16 +156,26 @@ export function DashboardSidebar() {
                         isActive={isActive}
                         className={
                           isActive
-                            ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                            : "hover:bg-sidebar-hover"
+                            ? "bg-primary text-white hover:bg-primary/90 shadow-sm"
+                            : "hover:bg-gray-100 text-gray-700"
                         }
                       >
                         <Link
                           href={item.href}
-                          className="flex items-center gap-3"
+                          className="flex items-center gap-3 py-2"
                         >
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.title}</span>
+                          <div
+                            className={`p-1.5 rounded-lg ${
+                              isActive ? "bg-white/25" : item.iconBgColor
+                            }`}
+                          >
+                            <item.icon
+                              className={`h-4 w-4 ${
+                                isActive ? "text-white" : item.iconColor
+                              }`}
+                            />
+                          </div>
+                          <span className="font-medium">{item.title}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

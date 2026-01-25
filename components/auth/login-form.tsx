@@ -85,11 +85,9 @@ export function LoginForm() {
     setIsSubmitting(true);
 
     try {
-      // First validate credentials
       const result = await login(data);
 
       if (result.success) {
-        // After successful credential validation, require OTP
         setLoginStep("otp");
         setOtpSent(true);
       } else {
@@ -107,7 +105,6 @@ export function LoginForm() {
     setIsSubmitting(true);
 
     try {
-      // Simulate sending OTP
       await new Promise((resolve) => setTimeout(resolve, 1000));
       setPhoneNumber(data.phone);
       setLoginStep("otp");
@@ -124,10 +121,8 @@ export function LoginForm() {
     setIsSubmitting(true);
 
     try {
-      // Verify OTP (hardcoded for demo)
       if (data.otp === DEMO_OTP) {
         if (loginMethod === "phone") {
-          // For phone login, create a mock user and login
           const result = await login({
             email: "tenzin.bhutia@sikkim.gov",
             password: "applicant123",
@@ -138,7 +133,6 @@ export function LoginForm() {
             setError("Login failed after OTP verification");
           }
         } else {
-          // Email login - need to get the email from form and login properly
           const emailFormData = emailForm.getValues();
           const result = await login({
             email: emailFormData.email,
@@ -169,7 +163,6 @@ export function LoginForm() {
 
   const handleResendOtp = async () => {
     setError(null);
-    // Simulate resending OTP
     await new Promise((resolve) => setTimeout(resolve, 1000));
     setOtpSent(true);
   };
@@ -190,11 +183,11 @@ export function LoginForm() {
             >
               <TabsList className="grid w-full grid-cols-2 mb-6">
                 <TabsTrigger value="email" className="gap-2">
-                  <Mail className="h-4 w-4" />
+                  <Mail className="h-4 w-4 text-blue-500" />
                   Email
                 </TabsTrigger>
                 <TabsTrigger value="phone" className="gap-2">
-                  <Phone className="h-4 w-4" />
+                  <Phone className="h-4 w-4 text-emerald-500" />
                   Phone
                 </TabsTrigger>
               </TabsList>
@@ -220,7 +213,7 @@ export function LoginForm() {
                           <FormLabel>Email Address</FormLabel>
                           <FormControl>
                             <div className="relative">
-                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-blue-500" />
                               <Input
                                 {...field}
                                 type="email"
@@ -243,7 +236,7 @@ export function LoginForm() {
                           <FormLabel>Password</FormLabel>
                           <FormControl>
                             <div className="relative">
-                              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-amber-500" />
                               <Input
                                 {...field}
                                 type="password"
@@ -298,8 +291,8 @@ export function LoginForm() {
                           <FormControl>
                             <div className="flex">
                               <div className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-muted-foreground">
-                                <Phone className="h-4 w-4 mr-1" />
-                                <span className="text-sm">91</span>
+                                <Phone className="h-4 w-4 mr-1 text-emerald-500" />
+                                <span className="text-sm">+91</span>
                               </div>
                               <Input
                                 {...field}
@@ -355,13 +348,13 @@ export function LoginForm() {
               className="mb-4"
               onClick={handleBack}
             >
-              <ArrowLeft className="mr-2 h-4 w-4" />
+              <ArrowLeft className="mr-2 h-4 w-4 text-slate-500" />
               Back
             </Button>
 
             <div className="text-center space-y-2">
-              <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                <CheckCircle2 className="h-6 w-6 text-primary" />
+              <div className="mx-auto w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
+                <CheckCircle2 className="h-6 w-6 text-emerald-600" />
               </div>
               <h3 className="text-lg font-semibold">Verify OTP</h3>
               <p className="text-sm text-muted-foreground">
