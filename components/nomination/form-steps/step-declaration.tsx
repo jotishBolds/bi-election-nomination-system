@@ -57,20 +57,12 @@ import {
 const schema = z.object({
   dateOfBirth: z
     .date({ message: "Date of birth is required" })
-    .refine((date) => date <= new Date(), {
+    .optional()
+    .refine((date) => !date || date <= new Date(), {
       message: "Date of birth cannot be in the future",
     }),
   politicalPartyId: z.string().min(1, "Political party is required"),
   symbolPreference1: z.string().min(1, "Symbol preference is required"),
-  category: z.enum([
-    "general",
-    "sc",
-    "st_bl",
-    "st_lt",
-    "obc_central",
-    "obc_state",
-  ]),
-  casteTribeName: z.string().optional(),
 });
 
 interface StepDeclarationProps {
@@ -92,14 +84,11 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
       dateOfBirth: formData.dateOfBirth
         ? new Date(formData.dateOfBirth)
         : undefined,
-      politicalPartyId: formData.politicalPartyId,
-      symbolPreference1: formData.symbolPreference1,
-      category: formData.category,
-      casteTribeName: formData.casteTribeName,
+      politicalPartyId: formData.politicalPartyId || "",
+      symbolPreference1: formData.symbolPreference1 || "",
     },
   });
 
-  const selectedCategory = form.watch("category");
   const selectedPartyId = form.watch("politicalPartyId");
   const watchDOB = form.watch("dateOfBirth");
 
@@ -114,14 +103,13 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
   // Handle party change
   useEffect(() => {
     if (selectedPartyId === "independent") {
-      // For independent candidates, automatically select one random symbol
-      if (!selectedSymbol || shuffleCount === 0) {
-        const randomSymbol = getRandomSymbols(1)[0];
-        setSelectedSymbol(randomSymbol);
-        form.setValue("symbolPreference1", randomSymbol.name);
-      }
-    } else {
-      // For party candidates, set the party symbol
+      // Reset previous party symbol and select a new random symbol for independent
+      setSelectedSymbol(null);
+      const randomSymbol = getRandomSymbols(1)[0];
+      setSelectedSymbol(randomSymbol);
+      form.setValue("symbolPreference1", randomSymbol.name);
+    } else if (selectedPartyId) {
+      // For party candidates, set the party symbol and reset shuffle count
       const party = politicalParties.find((p) => p.id === selectedPartyId);
       if (party && party.symbolImage) {
         setSelectedSymbol({
@@ -130,19 +118,26 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
           image: party.symbolImage,
         });
         form.setValue("symbolPreference1", party.symbol);
+        setShuffleCount(0); // Reset shuffle count when switching to party
+        setIsShuffleDisabled(false);
       }
     }
   }, [selectedPartyId, form]);
 
-  // Handle shuffle for independent candidates - shuffle only the selected symbol
+  // Handle shuffle for independent candidates - ensure no repeated symbols
   const handleShuffle = () => {
     if (shuffleCount >= 3) return;
 
-    // Get a new random symbol that's different from the current one
-    let newSymbol;
-    do {
-      newSymbol = getRandomSymbols(1)[0];
-    } while (selectedSymbol && newSymbol.id === selectedSymbol.id);
+    // Get available symbols (excluding currently selected one and already used ones)
+    const availableSymbols = independentSymbols.filter((symbol) =>
+      selectedSymbol ? symbol.id !== selectedSymbol.id : true,
+    );
+
+    if (availableSymbols.length === 0) return;
+
+    // Get a random symbol from available symbols
+    const randomIndex = Math.floor(Math.random() * availableSymbols.length);
+    const newSymbol = availableSymbols[randomIndex];
 
     setSelectedSymbol(newSymbol);
     form.setValue("symbolPreference1", newSymbol.name);
@@ -156,7 +151,7 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
   const onSubmit = (data: z.infer<typeof schema>) => {
     const party = politicalParties.find((p) => p.id === data.politicalPartyId);
     updateFormData({
-      dateOfBirth: data.dateOfBirth.toISOString(),
+      dateOfBirth: data.dateOfBirth?.toISOString() || "",
       age: age?.toString() || "",
       politicalPartyId: data.politicalPartyId,
       politicalParty: party?.name || "Independent",
@@ -166,8 +161,6 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
       symbolPreference2: "",
       symbolPreference3: "",
       shuffleCount: shuffleCount,
-      category: data.category,
-      casteTribeName: data.casteTribeName || "",
     });
     onNext();
   };
@@ -411,68 +404,6 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
                   )}
                 />
               </div>
-
-              {/* Category Selection */}
-              <FormField
-                control={form.control}
-                name="category"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category *</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="general">General</SelectItem>
-                        <SelectItem value="sc">Scheduled Caste (SC)</SelectItem>
-                        <SelectItem value="st_bl">
-                          Scheduled Tribe (BL)
-                        </SelectItem>
-                        <SelectItem value="st_lt">
-                          Scheduled Tribe (LT)
-                        </SelectItem>
-                        <SelectItem value="obc_central">
-                          OBC (Central List)
-                        </SelectItem>
-                        <SelectItem value="obc_state">
-                          OBC (State List)
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {selectedCategory !== "general" && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                >
-                  <FormField
-                    control={form.control}
-                    name="casteTribeName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Caste/Tribe Name</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Enter caste/tribe name"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </motion.div>
-              )}
 
               <div className="flex justify-between pt-4">
                 <Button type="button" variant="outline" onClick={onBack}>

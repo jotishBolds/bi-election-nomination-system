@@ -43,8 +43,14 @@ const schema = z.object({
   candidateName: z.string().min(2, "Applicant name is required"),
   fatherOrHusbandName: z.string().min(2, "Father's/Husband's name is required"),
   fullPostalAddress: z.string().min(10, "Complete address is required"),
-  serialNoCandidate: z.string().min(1, "Serial number is required"),
-  partNoCandidate: z.string().min(1, "Part number is required"),
+  category: z.enum([
+    "general",
+    "sc",
+    "st_bl",
+    "st_lt",
+    "obc_central",
+    "obc_state",
+  ]),
 });
 
 interface StepBasicInfoProps {
@@ -67,8 +73,7 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
       candidateName: formData.candidateName,
       fatherOrHusbandName: formData.fatherOrHusbandName,
       fullPostalAddress: formData.fullPostalAddress,
-      serialNoCandidate: formData.serialNoCandidate,
-      partNoCandidate: formData.partNoCandidate,
+      category: formData.category || "general",
     },
   });
 
@@ -125,8 +130,10 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
       candidateName: data.candidateName,
       fatherOrHusbandName: data.fatherOrHusbandName,
       fullPostalAddress: data.fullPostalAddress,
-      serialNoCandidate: data.serialNoCandidate,
-      partNoCandidate: data.partNoCandidate,
+      serialNoCandidate: "", // Remove from basic info
+      partNoCandidate: "", // Remove part number
+      category: data.category,
+      casteTribeName: "", // Reset caste/tribe name when category changes
     });
     onNext();
   };
@@ -154,7 +161,7 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
               <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
                 <div className="flex items-center gap-2 text-sm font-medium text-primary">
                   <MapPin className="h-4 w-4" />
-                  Select Your Constituency
+                  Select your contesting area
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormField
@@ -324,29 +331,41 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                 )}
               />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <FormField
                   control={form.control}
-                  name="serialNoCandidate"
+                  name="category"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Serial No. in Electoral Roll *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter serial number" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="partNoCandidate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Part No. in Electoral Roll *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter part number" {...field} />
-                      </FormControl>
+                      <FormLabel>Category *</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="general">General</SelectItem>
+                          <SelectItem value="sc">
+                            Scheduled Caste (SC)
+                          </SelectItem>
+                          <SelectItem value="st_bl">
+                            Scheduled Tribe (BL)
+                          </SelectItem>
+                          <SelectItem value="st_lt">
+                            Scheduled Tribe (LT)
+                          </SelectItem>
+                          <SelectItem value="obc_central">
+                            OBC (Central List)
+                          </SelectItem>
+                          <SelectItem value="obc_state">
+                            OBC (State List)
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}

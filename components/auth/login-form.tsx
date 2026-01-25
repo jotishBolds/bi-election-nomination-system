@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth } from "@/lib/auth/auth-context";
@@ -50,13 +50,17 @@ type LoginStep = "credentials" | "otp";
 
 export function LoginForm() {
   const router = useRouter();
-  const { login } = useAuth();
+  const searchParams = useSearchParams();
+  const { login, verifyOtp } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginMethod, setLoginMethod] = useState<LoginMethod>("email");
   const [loginStep, setLoginStep] = useState<LoginStep>("credentials");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otpSent, setOtpSent] = useState(false);
+
+  // Check if user just registered
+  const showRegistrationSuccess = searchParams.get("registered") === "true";
 
   const emailForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -105,10 +109,19 @@ export function LoginForm() {
     setIsSubmitting(true);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setPhoneNumber(data.phone);
-      setLoginStep("otp");
-      setOtpSent(true);
+      // For phone login, use a default user account but require OTP
+      const result = await login({
+        email: "tenzin.bhutia@sikkim.gov",
+        password: "applicant123",
+      });
+
+      if (result.success && result.requiresOtp) {
+        setPhoneNumber(data.phone);
+        setLoginStep("otp");
+        setOtpSent(true);
+      } else {
+        setError(result.error || "Login failed");
+      }
     } catch {
       setError("Failed to send OTP");
     } finally {
@@ -121,31 +134,13 @@ export function LoginForm() {
     setIsSubmitting(true);
 
     try {
-      if (data.otp === DEMO_OTP) {
-        if (loginMethod === "phone") {
-          const result = await login({
-            email: "tenzin.bhutia@sikkim.gov",
-            password: "applicant123",
-          });
-          if (result.success) {
-            router.push("/dashboard");
-          } else {
-            setError("Login failed after OTP verification");
-          }
-        } else {
-          const emailFormData = emailForm.getValues();
-          const result = await login({
-            email: emailFormData.email,
-            password: emailFormData.password,
-          });
-          if (result.success) {
-            router.push("/dashboard");
-          } else {
-            setError("Login failed after OTP verification");
-          }
-        }
+      const result = await verifyOtp(data.otp);
+      if (result.success) {
+        router.push("/dashboard");
       } else {
-        setError("Invalid OTP. Please try again. (Hint: Use 123456)");
+        setError(
+          result.error || "Invalid OTP. Please try again. (Hint: Use 123456)",
+        );
       }
     } catch {
       setError("OTP verification failed");
@@ -177,6 +172,16 @@ export function LoginForm() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
           >
+            {showRegistrationSuccess && (
+              <Alert className="mb-6 border-green-200 bg-green-50">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-800">
+                  Registration completed successfully! Please login with your
+                  credentials.
+                </AlertDescription>
+              </Alert>
+            )}
+
             <Tabs
               value={loginMethod}
               onValueChange={(v) => setLoginMethod(v as LoginMethod)}
@@ -328,9 +333,22 @@ export function LoginForm() {
               </TabsContent>
             </Tabs>
 
+            <div className="text-center mt-6">
+              <p className="text-sm text-muted-foreground">
+                Don't have an account?{" "}
+                <Button
+                  variant="link"
+                  className="p-0 h-auto font-medium text-primary hover:underline"
+                  onClick={() => router.push("/register")}
+                >
+                  Register here
+                </Button>
+              </p>
+            </div>
+
             <div className="text-xs text-muted-foreground text-center space-y-1 pt-4 border-t mt-6">
-              <p className="font-medium">Demo Credentials:</p>
-              <p>Email: candidate@election.gov / candidate123</p>
+              <p className="font-medium">Applicant Credentials:</p>
+              <p>Email: tenzin.bhutia@sikkim.gov / applicant123</p>
               <p>OTP: 123456</p>
             </div>
           </motion.div>

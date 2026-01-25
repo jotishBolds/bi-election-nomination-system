@@ -130,7 +130,7 @@ export function DashboardSidebar() {
           <img src="/main-logo.png" alt="ENS Portal" className="h-10 w-auto" />
           <div>
             <h2 className="font-semibold text-primary">ENS Portal</h2>
-            <p className="text-xs text-muted-foreground">Government of India</p>
+            <p className="text-xs text-muted-foreground">Nomination System</p>
           </div>
         </div>
       </SidebarHeader>

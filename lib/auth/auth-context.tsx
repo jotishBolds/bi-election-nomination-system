@@ -19,11 +19,15 @@ import {
 interface AuthContextType extends AuthState {
   login: (
     credentials: LoginCredentials,
-  ) => Promise<{ success: boolean; error?: string }>;
+  ) => Promise<{ success: boolean; error?: string; requiresOtp?: boolean }>;
+  verifyOtp: (otp: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Temporary storage for pending login
+let pendingLogin: { user: any; credentials: LoginCredentials } | null = null;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -49,13 +53,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: false, error: "Invalid email or password" };
     }
 
-    const authUser = storeAuthUser(user);
+    // Store pending login for OTP verification
+    pendingLogin = { user, credentials };
+    return { success: true, requiresOtp: true };
+  }, []);
+
+  const verifyOtp = useCallback(async (otp: string) => {
+    // Demo OTP check
+    if (otp !== "123456") {
+      return { success: false, error: "Invalid OTP" };
+    }
+
+    if (!pendingLogin) {
+      return { success: false, error: "No pending login found" };
+    }
+
+    const authUser = storeAuthUser(pendingLogin.user);
     setState({
       user: authUser,
       isAuthenticated: true,
       isLoading: false,
     });
 
+    pendingLogin = null; // Clear pending login
     return { success: true };
   }, []);
 
@@ -70,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   return (
-    <AuthContext.Provider value={{ ...state, login, logout }}>
+    <AuthContext.Provider value={{ ...state, login, verifyOtp, logout }}>
       {children}
     </AuthContext.Provider>
   );

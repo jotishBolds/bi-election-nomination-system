@@ -6,18 +6,19 @@ import { AnimatePresence, motion } from "framer-motion";
 
 import { StartPage } from "./start-page";
 import { ConsentPage } from "./consent-page";
-import { ProgressTracker } from "./progress-tracker";
 import { StepBasicInfo } from "./form-steps/step-basic-info";
 import { StepProposerInfo } from "./form-steps/step-proposer-info";
 import { StepDeclaration } from "./form-steps/step-declaration";
 import { FormPreview } from "./form-preview";
 import { PaymentPage } from "./payment-page";
 import { SuccessPage } from "./success-page";
+import { ProgressTracker } from "./progress-tracker";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   NominationProvider,
   useNomination,
 } from "@/app/context/nomination-context";
+import { useNominationSubmission } from "@/app/context/nomination-submission-context";
 
 type FlowStep =
   | "start"
@@ -27,11 +28,12 @@ type FlowStep =
   | "payment"
   | "success";
 
-const formSteps = ["Basic Info", "Proposer", "Declaration", "Preview"];
+const formSteps = ["Basic Info", "Proposer", "Declaration"];
 
 function NominationFlowContent() {
   const [flowStep, setFlowStep] = useState<FlowStep>("start");
-  const { currentStep, setCurrentStep } = useNomination();
+  const { currentStep, setCurrentStep, formData } = useNomination();
+  const { submitNomination } = useNominationSubmission();
 
   const handleFormNext = () => {
     if (currentStep < 2) {
@@ -47,6 +49,19 @@ function NominationFlowContent() {
     } else {
       setFlowStep("consent");
     }
+  };
+
+  const handlePaymentSuccess = () => {
+    // Submit nomination data to the submission context
+    submitNomination({
+      district: formData.district || "GANGTOK",
+      ulb: formData.ulb || "Gangtok MC",
+      wardNumber: formData.municipalWard || "Ward 2",
+      wardName: formData.wardName || "Upper Burtuk",
+      reservation: formData.reservation || "UR (General)",
+      constituency: formData.constituency || "28-Upper Burtuk",
+    });
+    setFlowStep("success");
   };
 
   return (
@@ -71,11 +86,8 @@ function NominationFlowContent() {
           className="min-h-screen bg-gradient-to-br from-primary-light to-white p-4 md:p-8"
         >
           <div className="max-w-4xl mx-auto space-y-6">
-            <Card>
-              <CardContent className="pt-6">
-                <ProgressTracker steps={formSteps} currentStep={currentStep} />
-              </CardContent>
-            </Card>
+            {/* Progress Tracker */}
+            <ProgressTracker steps={formSteps} currentStep={currentStep} />
 
             <AnimatePresence mode="wait">
               {currentStep === 0 && <StepBasicInfo onNext={handleFormNext} />}
@@ -125,7 +137,7 @@ function NominationFlowContent() {
           className="min-h-screen bg-gradient-to-br from-primary-light to-white p-4 md:p-8"
         >
           <PaymentPage
-            onPaymentSuccess={() => setFlowStep("success")}
+            onPaymentSuccess={handlePaymentSuccess}
             onBack={() => setFlowStep("preview")}
           />
         </motion.div>

@@ -4,53 +4,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  FileText,
-  Upload,
-  Vote,
   CheckCircle,
   Calendar,
   IndianRupee,
   User,
-  TrendingUp,
   FileCheck,
   MapPin,
   ArrowUpRight,
   CircleDot,
   ClipboardCheck,
+  RotateCcw,
 } from "lucide-react";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  LineChart,
-  Line,
-  Cell,
-} from "recharts";
 
 import { electionData } from "@/lib/election-data";
-
-// Timeline data for application progress
-const timelineData = [
-  { date: "Jan 15", progress: 25 },
-  { date: "Jan 18", progress: 40 },
-  { date: "Jan 20", progress: 60 },
-  { date: "Jan 24", progress: 75 },
-  { date: "Feb 1", progress: 85 },
-  { date: "Feb 15", progress: 100 },
-];
-
-// Process steps data
-const processStepsData = [
-  { step: "Form", completed: 100, fill: "#22c55e" },
-  { step: "Documents", completed: 75, fill: "#6366f1" },
-  { step: "Payment", completed: 100, fill: "#22c55e" },
-  { step: "Review", completed: 30, fill: "#f59e0b" },
-  { step: "Scrutiny", completed: 0, fill: "#e2e8f0" },
-];
+import { useNominationSubmission } from "@/app/context/nomination-submission-context";
 
 // Important dates data
 const importantDates = [
@@ -61,8 +28,62 @@ const importantDates = [
 ];
 
 export function CandidatePanel() {
+  const { submissionData, resetNomination } = useNominationSubmission();
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "submitted":
+        return (
+          <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 text-xs font-medium">
+            Submitted
+          </Badge>
+        );
+      case "under_review":
+        return (
+          <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 text-xs font-medium">
+            Under Review
+          </Badge>
+        );
+      case "approved":
+        return (
+          <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-xs font-medium">
+            Approved
+          </Badge>
+        );
+      default:
+        return (
+          <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 text-xs font-medium">
+            Draft
+          </Badge>
+        );
+    }
+  };
+
+  const getPaymentBadge = (paymentStatus: string) => {
+    switch (paymentStatus) {
+      case "paid":
+        return (
+          <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 text-xs font-medium">
+            Paid
+          </Badge>
+        );
+      case "failed":
+        return (
+          <Badge className="bg-red-100 text-red-700 hover:bg-red-100 text-xs font-medium">
+            Failed
+          </Badge>
+        );
+      default:
+        return (
+          <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 text-xs font-medium">
+            Pending
+          </Badge>
+        );
+    }
+  };
+
   return (
-    <div className="space-y-5 p-6  min-h-screen">
+    <div className="space-y-5 p-6 min-h-screen">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -73,11 +94,34 @@ export function CandidatePanel() {
             {electionData.election}
           </p>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg shadow-sm">
-          <User className="h-4 w-4 text-slate-500" />
-          <span className="text-sm font-medium text-slate-700">
-            MC2026-0142
-          </span>
+        <div className="flex items-center gap-3">
+          {/* Developer Reset Button */}
+          {/* <Button
+            variant="outline"
+            size="sm"
+            onClick={resetNomination}
+            className="flex items-center gap-2 border-dashed"
+          >
+            <RotateCcw className="h-4 w-4" />
+            Dev Reset
+          </Button> */}
+          {submissionData.isSubmitted && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={resetNomination}
+              className="flex items-center gap-2"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Reset
+            </Button>
+          )}
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg shadow-sm">
+            <User className="h-4 w-4 text-slate-500" />
+            <span className="text-sm font-medium text-slate-700">
+              MC2026-0142
+            </span>
+          </div>
         </div>
       </div>
 
@@ -87,14 +131,16 @@ export function CandidatePanel() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <FileCheck className="h-5 w-5 text-amber-600" />
-              <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 text-xs font-medium">
-                Pending
-              </Badge>
+              {getStatusBadge(submissionData.status)}
             </div>
             <div className="mt-3">
-              <p className="text-2xl font-bold text-slate-800">Review</p>
+              <p className="text-2xl font-bold text-slate-800">
+                {submissionData.status === "draft" ? "Draft" : "Review"}
+              </p>
               <p className="text-xs text-slate-500 mt-1">
-                Updated Jan 20, 2026
+                {submissionData.submissionDate
+                  ? `Updated ${new Date(submissionData.submissionDate).toLocaleDateString()}`
+                  : "Not submitted yet"}
               </p>
             </div>
           </CardContent>
@@ -104,12 +150,12 @@ export function CandidatePanel() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <ClipboardCheck className="h-5 w-5 text-emerald-600" />
-              <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 text-xs font-medium">
-                Submitted
-              </Badge>
+              {getStatusBadge(submissionData.status)}
             </div>
             <div className="mt-3">
-              <p className="text-2xl font-bold text-slate-800">1/1</p>
+              <p className="text-2xl font-bold text-slate-800">
+                {submissionData.isSubmitted ? "1/1" : "0/1"}
+              </p>
               <p className="text-xs text-slate-500 mt-1">Nomination Form</p>
             </div>
           </CardContent>
@@ -132,138 +178,25 @@ export function CandidatePanel() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <IndianRupee className="h-5 w-5 text-blue-600" />
-              <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 text-xs font-medium">
-                Paid
-              </Badge>
+              {getPaymentBadge(submissionData.paymentStatus)}
             </div>
             <div className="mt-3">
-              <p className="text-2xl font-bold text-slate-800">₹500</p>
-              <p className="text-xs text-slate-500 mt-1">Application Fee</p>
+              {submissionData.paymentStatus === "paid" ? (
+                <>
+                  <p className="text-2xl font-bold text-slate-800">
+                    ₹{submissionData.applicationFee}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Application Fee Paid
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-2xl font-bold text-slate-800">--</p>
+                  <p className="text-xs text-slate-500 mt-1">Application Fee</p>
+                </>
+              )}
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="bg-white border-0 shadow-sm rounded-xl">
-          <CardHeader className="pb-2 px-4 pt-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-sky-100 rounded-lg">
-                  <TrendingUp className="h-4 w-4 text-sky-600" />
-                </div>
-                <CardTitle className="text-sm font-semibold text-slate-800">
-                  Application Progress
-                </CardTitle>
-              </div>
-              <span className="text-xs font-semibold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-md">
-                75%
-              </span>
-            </div>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={timelineData}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="#f1f5f9"
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 10, fill: "#64748b" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 10, fill: "#64748b" }}
-                  domain={[0, 100]}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip
-                  formatter={(value) => `${value}%`}
-                  contentStyle={{
-                    backgroundColor: "#fff",
-                    border: "none",
-                    borderRadius: "8px",
-                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                    fontSize: "12px",
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="progress"
-                  stroke="#0ea5e9"
-                  strokeWidth={2.5}
-                  dot={{
-                    fill: "#0ea5e9",
-                    r: 4,
-                    strokeWidth: 2,
-                    stroke: "#fff",
-                  }}
-                  activeDot={{ r: 6, strokeWidth: 0 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border-0 shadow-sm rounded-xl">
-          <CardHeader className="pb-2 px-4 pt-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-lime-100 rounded-lg">
-                  <Vote className="h-4 w-4 text-lime-600" />
-                </div>
-                <CardTitle className="text-sm font-semibold text-slate-800">
-                  Nomination Steps
-                </CardTitle>
-              </div>
-              <span className="text-xs text-slate-400">3 of 5 complete</span>
-            </div>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={processStepsData} layout="vertical">
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="#f1f5f9"
-                  horizontal={false}
-                />
-                <XAxis
-                  type="number"
-                  domain={[0, 100]}
-                  tick={{ fontSize: 10, fill: "#64748b" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  dataKey="step"
-                  type="category"
-                  tick={{ fontSize: 10, fill: "#64748b" }}
-                  width={65}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip
-                  formatter={(value) => `${value}%`}
-                  contentStyle={{
-                    backgroundColor: "#fff",
-                    border: "none",
-                    borderRadius: "8px",
-                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                    fontSize: "12px",
-                  }}
-                />
-                <Bar dataKey="completed" radius={[0, 6, 6, 0]}>
-                  {processStepsData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
@@ -340,57 +273,73 @@ export function CandidatePanel() {
                   Your Constituency
                 </CardTitle>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs text-slate-500 hover:text-slate-800"
-              >
-                Edit
-                <ArrowUpRight className="h-3 w-3 ml-1" />
-              </Button>
+              {!submissionData.isSubmitted && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-slate-500 hover:text-slate-800"
+                >
+                  Edit
+                  <ArrowUpRight className="h-3 w-3 ml-1" />
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4 space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-lg bg-blue-50">
-                <p className="text-xs text-slate-500">District</p>
-                <p className="text-base font-bold text-slate-800 mt-0.5">
-                  GANGTOK
-                </p>
-              </div>
-              <div className="p-3 rounded-lg bg-purple-50">
-                <p className="text-xs text-slate-500">ULB</p>
-                <p className="text-base font-bold text-slate-800 mt-0.5">
-                  Gangtok MC
-                </p>
-              </div>
-              <div className="p-3 rounded-lg bg-green-50">
-                <p className="text-xs text-slate-500">Ward Number</p>
-                <p className="text-base font-bold text-slate-800 mt-0.5">
-                  Ward 2
-                </p>
-              </div>
-              <div className="p-3 rounded-lg bg-orange-50">
-                <p className="text-xs text-slate-500">Reservation</p>
-                <p className="text-base font-bold text-slate-800 mt-0.5">
-                  UR (General)
-                </p>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg bg-cyan-50">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-500">Ward Name</p>
-                  <p className="text-base font-bold text-slate-800 mt-0.5">
-                    Upper Burtuk
-                  </p>
+            {submissionData.isSubmitted ? (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-lg bg-blue-50">
+                    <p className="text-xs text-slate-500">District</p>
+                    <p className="text-base font-bold text-slate-800 mt-0.5">
+                      {submissionData.district}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-purple-50">
+                    <p className="text-xs text-slate-500">ULB</p>
+                    <p className="text-base font-bold text-slate-800 mt-0.5">
+                      {submissionData.ulb}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-green-50">
+                    <p className="text-xs text-slate-500">Ward Number</p>
+                    <p className="text-base font-bold text-slate-800 mt-0.5">
+                      {submissionData.wardNumber}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-orange-50">
+                    <p className="text-xs text-slate-500">Reservation</p>
+                    <p className="text-base font-bold text-slate-800 mt-0.5">
+                      {submissionData.reservation}
+                    </p>
+                  </div>
                 </div>
-                <span className="text-xs font-medium text-cyan-700 bg-cyan-100 px-2 py-1 rounded-md">
-                  28-Upper Burtuk
-                </span>
+
+                <div className="p-3 rounded-lg bg-cyan-50">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-500">Ward Name</p>
+                      <p className="text-base font-bold text-slate-800 mt-0.5">
+                        {submissionData.wardName}
+                      </p>
+                    </div>
+                    <span className="text-xs font-medium text-cyan-700 bg-cyan-100 px-2 py-1 rounded-md">
+                      {submissionData.constituency}
+                    </span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-8">
+                <MapPin className="h-8 w-8 text-slate-300 mx-auto mb-3" />
+                <p className="text-sm text-slate-500 mb-2">
+                  No constituency selected
+                </p>
+                <p className="text-xs text-slate-400">
+                  Complete your nomination form to see constituency details
+                </p>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>

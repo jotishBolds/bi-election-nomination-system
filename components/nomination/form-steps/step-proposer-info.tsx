@@ -22,8 +22,16 @@ import { useNomination } from "@/app/context/nomination-context";
 
 const schema = z.object({
   proposerName: z.string().min(2, "Proposer name is required"),
-  proposerSerialNo: z.string().min(1, "Serial number is required"),
-  proposerPartNo: z.string().min(1, "Part number is required"),
+  proposerSerialNo: z
+    .string()
+    .min(1, "Serial number is required")
+    .max(4, "Serial number cannot exceed 4 digits")
+    .regex(/^[0-9]+$/, "Serial number must contain only numbers"),
+  proposerPartNo: z
+    .string()
+    .min(1, "Part number is required")
+    .max(4, "Part number cannot exceed 4 digits")
+    .regex(/^[0-9]+$/, "Part number must contain only numbers"),
 });
 
 interface StepProposerInfoProps {
@@ -44,7 +52,9 @@ export function StepProposerInfo({ onNext, onBack }: StepProposerInfoProps) {
   });
 
   const onSubmit = (data: z.infer<typeof schema>) => {
-    updateFormData(data);
+    updateFormData({
+      ...data,
+    });
     onNext();
   };
 
@@ -86,12 +96,17 @@ export function StepProposerInfo({ onNext, onBack }: StepProposerInfoProps) {
                     <FormItem>
                       <FormLabel>Serial No. in Electoral Roll *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter serial number" {...field} />
+                        <Input
+                          placeholder="Enter 4-digit serial number"
+                          maxLength={4}
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
                 <FormField
                   control={form.control}
                   name="proposerPartNo"
@@ -99,7 +114,11 @@ export function StepProposerInfo({ onNext, onBack }: StepProposerInfoProps) {
                     <FormItem>
                       <FormLabel>Part No. in Electoral Roll *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter part number" {...field} />
+                        <Input
+                          placeholder="Enter 4-digit part number"
+                          maxLength={4}
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

@@ -13,6 +13,8 @@ export interface NominationFormData {
   fullPostalAddress: string;
   serialNoCandidate: string;
   partNoCandidate: string;
+  category: "general" | "sc" | "st_bl" | "st_lt" | "obc_central" | "obc_state";
+  casteTribeName: string;
 
   // Step 2: Proposer Details
   proposerName: string;
@@ -30,10 +32,6 @@ export interface NominationFormData {
   symbolPreference2: string;
   symbolPreference3: string;
   shuffleCount: number;
-
-  // Step 4: Category Details
-  category: "general" | "sc" | "st_bl" | "st_lt" | "obc_central" | "obc_state";
-  casteTribeName: string;
 }
 
 export interface NominationContextType {

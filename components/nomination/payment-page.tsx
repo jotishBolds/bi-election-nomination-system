@@ -59,12 +59,7 @@ export function PaymentPage({ onPaymentSuccess, onBack }: PaymentPageProps) {
   const [paymentStep, setPaymentStep] = useState<PaymentStep>("payment");
   const [error, setError] = useState<string | null>(null);
 
-  const fee =
-    formData.category === "sc" ||
-    formData.category === "st_bl" ||
-    formData.category === "st_lt"
-      ? 250
-      : 500;
+  const fee = 500; // Fixed application fee
 
   const otpForm = useForm<OtpFormData>({
     resolver: zodResolver(otpSchema),
@@ -527,7 +522,7 @@ export function PaymentPage({ onPaymentSuccess, onBack }: PaymentPageProps) {
                   Cancel Payment
                 </Button>
                 <Button
-                  // onClick={handlePayment}
+                  onClick={handlePayment}
                   disabled={isProcessing}
                   className="bg-orange-500 hover:bg-orange-600 text-white min-w-[180px] h-11"
                 >
