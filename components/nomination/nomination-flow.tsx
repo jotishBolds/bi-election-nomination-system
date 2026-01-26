@@ -1,7 +1,7 @@
 // components/nomination/nomination-flow.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { StartPage } from "./start-page";
@@ -32,10 +32,38 @@ const formSteps = ["Basic Info", "Proposer", "Declaration"];
 
 function NominationFlowContent() {
   const [flowStep, setFlowStep] = useState<FlowStep>("start");
-  const { currentStep, setCurrentStep, formData } = useNomination();
-  const { submitNomination } = useNominationSubmission();
+  const { currentStep, setCurrentStep, formData, updateFormData } =
+    useNomination();
+  const {
+    submitNomination,
+    canSubmitMore,
+    getDraftData,
+    saveDraft,
+    submissionData,
+  } = useNominationSubmission();
+
+  // Load previous form data when entering the form flow
+  useEffect(() => {
+    if (flowStep === "consent" || flowStep === "form") {
+      const draftData = getDraftData();
+      if (draftData) {
+        // Populate form with previous data
+        updateFormData(draftData);
+      }
+    }
+  }, [flowStep]);
+
+  // Save form data as draft whenever it changes
+  useEffect(() => {
+    if (flowStep === "form" || flowStep === "preview") {
+      saveDraft(formData);
+    }
+  }, [formData, flowStep]);
 
   const handleFormNext = () => {
+    // Save current form data as draft
+    saveDraft(formData);
+
     if (currentStep < 2) {
       setCurrentStep(currentStep + 1);
     } else {
@@ -52,23 +80,36 @@ function NominationFlowContent() {
   };
 
   const handlePaymentSuccess = () => {
-    // Submit nomination data to the submission context
-    submitNomination({
-      district: formData.district || "GANGTOK",
-      ulb: formData.ulb || "Gangtok MC",
-      wardNumber: formData.municipalWard || "Ward 2",
-      wardName: formData.wardName || "Upper Burtuk",
-      reservation: formData.reservation || "UR (General)",
-      constituency: formData.constituency || "28-Upper Burtuk",
-    });
-    setFlowStep("success");
+    // Submit nomination data with full form data to the submission context
+    const result = submitNomination(
+      {
+        district: formData.district || "GANGTOK",
+        ulb: formData.ulb || "Gangtok MC",
+        wardNumber: formData.municipalWard || "Ward 2",
+        wardName: formData.wardName || "Upper Burtuk",
+        reservation: formData.reservation || "UR (General)",
+        constituency: formData.constituency || "28-Upper Burtuk",
+      },
+      formData,
+    );
+
+    if (result) {
+      setFlowStep("success");
+    }
+  };
+
+  // Check if user can apply
+  const handleApplyClick = () => {
+    if (!canSubmitMore()) {
+      // If max submissions reached, don't proceed
+      return;
+    }
+    setFlowStep("consent");
   };
 
   return (
     <AnimatePresence mode="wait">
-      {flowStep === "start" && (
-        <StartPage onApplyClick={() => setFlowStep("consent")} />
-      )}
+      {flowStep === "start" && <StartPage onApplyClick={handleApplyClick} />}
 
       {flowStep === "consent" && (
         <ConsentPage

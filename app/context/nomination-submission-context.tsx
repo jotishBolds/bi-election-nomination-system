@@ -8,6 +8,20 @@ import {
   ReactNode,
   useEffect,
 } from "react";
+import { NominationFormData } from "@/types/nomination";
+import {
+  getNominationStorageData,
+  submitNomination as storeNomination,
+  saveDraftFormData,
+  getDraftFormData,
+  getSubmissionCount,
+  canSubmitMore,
+  getCandidateSubmissions,
+  getLatestSubmission,
+  resetNominationData,
+  StoredNomination,
+  clearRONominations,
+} from "@/lib/nomination-storage";
 
 interface NominationSubmissionData {
   isSubmitted: boolean;
@@ -21,13 +35,24 @@ interface NominationSubmissionData {
   wardName: string;
   reservation: string;
   constituency: string;
+  // New fields for multiple submissions
+  submissionCount: number;
+  maxSubmissions: number;
+  applicationId: string | null;
+  submissions: StoredNomination[];
 }
 
 interface NominationSubmissionContextType {
   submissionData: NominationSubmissionData;
-  submitNomination: (data: Partial<NominationSubmissionData>) => void;
+  submitNomination: (data: Partial<NominationSubmissionData>, formData: NominationFormData) => StoredNomination | null;
   resetNomination: () => void;
+  canSubmitMore: () => boolean;
+  getDraftData: () => NominationFormData | null;
+  saveDraft: (formData: NominationFormData) => void;
+  candidateId: string;
 }
+
+const CANDIDATE_ID = "MC2026-0142"; // This would come from auth in real app
 
 const defaultSubmissionData: NominationSubmissionData = {
   isSubmitted: false,
@@ -41,6 +66,10 @@ const defaultSubmissionData: NominationSubmissionData = {
   wardName: "",
   reservation: "",
   constituency: "",
+  submissionCount: 0,
+  maxSubmissions: 3,
+  applicationId: null,
+  submissions: [],
 };
 
 const NominationSubmissionContext = createContext<
@@ -58,44 +87,60 @@ export function NominationSubmissionProvider({
   // Load data from localStorage on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("nomination_submission_data");
-      if (stored) {
-        try {
-          const parsedData = JSON.parse(stored);
-          setSubmissionData(parsedData);
-        } catch (error) {
-          console.error("Error parsing stored nomination data:", error);
-        }
-      }
+      loadStorageData();
     }
   }, []);
 
-  // Save to localStorage whenever data changes
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(
-        "nomination_submission_data",
-        JSON.stringify(submissionData),
-      );
-    }
-  }, [submissionData]);
+  const loadStorageData = () => {
+    const storageData = getNominationStorageData(CANDIDATE_ID);
+    const submissions = getCandidateSubmissions(CANDIDATE_ID);
+    const latestSubmission = getLatestSubmission(CANDIDATE_ID);
 
-  const submitNomination = (data: Partial<NominationSubmissionData>) => {
-    setSubmissionData((prev) => ({
-      ...prev,
-      ...data,
-      isSubmitted: true,
-      submissionDate: new Date().toISOString(),
-      status: "submitted",
-      paymentStatus: "paid",
-    }));
+    setSubmissionData({
+      isSubmitted: submissions.length > 0,
+      submissionDate: latestSubmission?.submittedAt || null,
+      status: latestSubmission?.status || "draft",
+      paymentStatus: latestSubmission?.paymentStatus || "pending",
+      applicationFee: 500,
+      district: latestSubmission?.formData.district || "",
+      ulb: latestSubmission?.formData.ulb || "",
+      wardNumber: latestSubmission?.formData.municipalWard || "",
+      wardName: latestSubmission?.formData.wardName || "",
+      reservation: latestSubmission?.formData.reservation || "",
+      constituency: latestSubmission?.formData.constituency || "",
+      submissionCount: submissions.length,
+      maxSubmissions: 3,
+      applicationId: latestSubmission?.applicationId || null,
+      submissions,
+    });
+  };
+
+  const submitNomination = (data: Partial<NominationSubmissionData>, formData: NominationFormData): StoredNomination | null => {
+    const result = storeNomination(CANDIDATE_ID, formData);
+    
+    if (result) {
+      loadStorageData(); // Reload all data after submission
+    }
+    
+    return result;
   };
 
   const resetNomination = () => {
+    resetNominationData(CANDIDATE_ID);
+    clearRONominations(); // Clear RO data too for testing
     setSubmissionData(defaultSubmissionData);
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("nomination_submission_data");
-    }
+  };
+
+  const checkCanSubmitMore = (): boolean => {
+    return canSubmitMore(CANDIDATE_ID);
+  };
+
+  const getDraftData = (): NominationFormData | null => {
+    return getDraftFormData(CANDIDATE_ID);
+  };
+
+  const saveDraft = (formData: NominationFormData): void => {
+    saveDraftFormData(CANDIDATE_ID, formData);
   };
 
   return (
@@ -104,6 +149,10 @@ export function NominationSubmissionProvider({
         submissionData,
         submitNomination,
         resetNomination,
+        canSubmitMore: checkCanSubmitMore,
+        getDraftData,
+        saveDraft,
+        candidateId: CANDIDATE_ID,
       }}
     >
       {children}

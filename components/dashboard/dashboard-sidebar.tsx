@@ -2,9 +2,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth/auth-context";
 import { UserRole } from "@/lib/auth/types";
+import { Suspense } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -55,6 +56,18 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
           href: "/dashboard",
           iconColor: "text-blue-600",
           iconBgColor: "bg-blue-100",
+        },
+      ],
+    },
+    {
+      label: "Management",
+      items: [
+        {
+          title: "Nomination List",
+          icon: ClipboardCheck,
+          href: "/dashboard?tab=nominations",
+          iconColor: "text-emerald-600",
+          iconBgColor: "bg-emerald-100",
         },
       ],
     },
@@ -115,9 +128,11 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
   ],
 };
 
-export function DashboardSidebar() {
+function DashboardSidebarContent() {
   const { user } = useAuth();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentTab = searchParams?.get("tab") || "";
 
   if (!user) return null;
 
@@ -144,10 +159,13 @@ export function DashboardSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => {
-                  const isActive =
-                    pathname === item.href ||
-                    (item.href !== "/dashboard" &&
-                      pathname.startsWith(item.href));
+                  const isActive = item.href.includes("tab=nominations")
+                    ? pathname === "/dashboard" && currentTab === "nominations"
+                    : item.href === "/dashboard"
+                      ? pathname === "/dashboard" && !currentTab
+                      : pathname === item.href ||
+                        (item.href !== "/dashboard" &&
+                          pathname.startsWith(item.href));
 
                   return (
                     <SidebarMenuItem key={item.title}>
@@ -193,5 +211,13 @@ export function DashboardSidebar() {
         </p>
       </SidebarFooter>
     </Sidebar>
+  );
+}
+
+export function DashboardSidebar() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <DashboardSidebarContent />
+    </Suspense>
   );
 }

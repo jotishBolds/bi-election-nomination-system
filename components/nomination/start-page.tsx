@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import {
   FileText,
   Clock,
@@ -20,7 +21,9 @@ import {
   IndianRupee,
   User,
   FileCheck,
+  AlertTriangle,
 } from "lucide-react";
+import { useNominationSubmission } from "@/app/context/nomination-submission-context";
 
 interface StartPageProps {
   onApplyClick: () => void;
@@ -74,6 +77,11 @@ const steps = [
 ];
 
 export function StartPage({ onApplyClick }: StartPageProps) {
+  const { submissionData, canSubmitMore } = useNominationSubmission();
+  const canApply = canSubmitMore();
+  const submissionCount = submissionData.submissionCount;
+  const maxSubmissions = submissionData.maxSubmissions;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -212,21 +220,99 @@ export function StartPage({ onApplyClick }: StartPageProps) {
           </CardContent>
         </Card>
 
+        {/* Submission Status Card */}
+        {submissionCount > 0 && (
+          <Card
+            className={`border-0 shadow-sm ${canApply ? "bg-blue-50" : "bg-amber-50"}`}
+          >
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`p-2 rounded-lg ${canApply ? "bg-blue-100" : "bg-amber-100"}`}
+                  >
+                    <FileCheck
+                      className={`h-5 w-5 ${canApply ? "text-blue-600" : "text-amber-600"}`}
+                    />
+                  </div>
+                  <div>
+                    <h3
+                      className={`font-semibold ${canApply ? "text-blue-800" : "text-amber-800"}`}
+                    >
+                      Your Submission Status
+                    </h3>
+                    <p
+                      className={`text-sm ${canApply ? "text-blue-600" : "text-amber-600"}`}
+                    >
+                      {submissionCount} of {maxSubmissions} nominations
+                      submitted
+                    </p>
+                  </div>
+                </div>
+                <Badge
+                  className={`text-lg px-4 py-1 ${canApply ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}
+                >
+                  {submissionCount}/{maxSubmissions}
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Max Submissions Warning */}
+        {!canApply && (
+          <Alert className="border-amber-200 bg-amber-50">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <AlertTitle className="text-amber-800">
+              Maximum Nominations Reached
+            </AlertTitle>
+            <AlertDescription className="text-amber-700">
+              You have submitted the maximum allowed {maxSubmissions} nomination
+              forms for this election. As per the election rules, candidates can
+              submit up to 3 nominations for the same ward. Please visit the
+              Dashboard to view your submitted nominations or contact the
+              Election Office for assistance.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Apply Button */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}
-          className="flex justify-center pt-4"
+          className="flex flex-col items-center gap-3 pt-4"
         >
           <Button
             size="lg"
-            className="bg-primary hover:bg-primary-hover text-lg px-8 py-6 shadow-md"
+            className={`text-lg px-8 py-6 shadow-md ${
+              canApply
+                ? "bg-primary hover:bg-primary-hover"
+                : "bg-slate-400 cursor-not-allowed"
+            }`}
             onClick={onApplyClick}
+            disabled={!canApply}
           >
-            Apply for Nomination
-            <ArrowRight className="ml-2 h-5 w-5" />
+            {canApply ? (
+              <>
+                {submissionCount > 0
+                  ? "Submit Another Nomination"
+                  : "Apply for Nomination"}
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </>
+            ) : (
+              <>
+                <AlertTriangle className="mr-2 h-5 w-5" />
+                Maximum Nominations Reached
+              </>
+            )}
           </Button>
+          {submissionCount > 0 && canApply && (
+            <p className="text-sm text-slate-500">
+              Your previous form data will be pre-filled. You can edit and
+              submit.
+            </p>
+          )}
         </motion.div>
       </div>
     </motion.div>
