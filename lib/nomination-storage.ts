@@ -1,4 +1,3 @@
-// lib/nomination-storage.ts
 // Service for storing and retrieving nomination form data
 
 import { NominationFormData } from "@/types/nomination";
@@ -24,6 +23,7 @@ export interface NominationStorageData {
 
 const STORAGE_KEY = "nomination_storage_data";
 const RO_NOMINATIONS_KEY = "ro_nominations_data";
+const SES_NOMINATION_TREND_KEY = "ses_nomination_trend";
 
 // Generate unique application ID
 export function generateApplicationId(): string {
@@ -39,9 +39,7 @@ export function generateNominationId(): string {
 export function getNominationStorageData(
   candidateId: string,
 ): NominationStorageData {
-  if (typeof window === "undefined") {
-    return getDefaultStorageData(candidateId);
-  }
+  if (typeof window === "undefined") return getDefaultStorageData(candidateId);
 
   const stored = localStorage.getItem(`${STORAGE_KEY}_${candidateId}`);
   if (stored) {
@@ -122,6 +120,9 @@ export function submitNomination(
   // Also save to RO nominations
   addToRONominations(nomination);
 
+  // Track for SES trend
+  trackNominationTrend();
+
   return nomination;
 }
 
@@ -161,7 +162,7 @@ export function resetNominationData(candidateId: string): void {
   localStorage.removeItem(`${STORAGE_KEY}_${candidateId}`);
 }
 
-// ========== RO Nominations Storage ==========
+// ==================== RO Nominations Storage ====================
 
 export interface RONominationsData {
   nominations: StoredNomination[];
@@ -233,4 +234,248 @@ export function getNominationsGroupedByCandidate(): Record<
 export function clearRONominations(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(RO_NOMINATIONS_KEY);
+}
+
+// ==================== SES (State Election Supervisor) Functions ====================
+
+// Get all nominations state-wide for SES - uses existing RO nominations
+export function getAllNominations(): StoredNomination[] {
+  return getRONominations();
+}
+
+// Get nominations grouped by status
+export function getNominationsByStatus(): {
+  submitted: number;
+  under_review: number;
+  approved: number;
+  rejected: number;
+} {
+  const nominations = getRONominations();
+  return {
+    submitted: nominations.filter((n) => n.status === "submitted").length,
+    under_review: nominations.filter((n) => n.status === "under_review").length,
+    approved: nominations.filter((n) => n.status === "approved").length,
+    rejected: nominations.filter((n) => n.status === "rejected").length,
+  };
+}
+
+// Get nominations grouped by district
+export function getNominationsByDistrict(): Record<string, StoredNomination[]> {
+  const nominations = getRONominations();
+  return nominations.reduce(
+    (acc, nomination) => {
+      const district =
+        nomination.formData?.district ||
+        nomination.formData?.municipality ||
+        "Unknown";
+      if (!acc[district]) {
+        acc[district] = [];
+      }
+      acc[district].push(nomination);
+      return acc;
+    },
+    {} as Record<string, StoredNomination[]>,
+  );
+}
+
+// Get district-wise stats for SES
+export function getDistrictWiseStats(): Array<{
+  district: string;
+  totalNominations: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  underReview: number;
+}> {
+  const byDistrict = getNominationsByDistrict();
+  return Object.entries(byDistrict).map(([district, nominations]) => ({
+    district,
+    totalNominations: nominations.length,
+    pending: nominations.filter((n) => n.status === "submitted").length,
+    approved: nominations.filter((n) => n.status === "approved").length,
+    rejected: nominations.filter((n) => n.status === "rejected").length,
+    underReview: nominations.filter((n) => n.status === "under_review").length,
+  }));
+}
+
+// Get RO performance stats
+export function getROPerformanceStats(): Array<{
+  district: string;
+  processed: number;
+  pending: number;
+}> {
+  const byDistrict = getNominationsByDistrict();
+  return Object.entries(byDistrict).map(([district, nominations]) => ({
+    district,
+    processed: nominations.filter(
+      (n) => n.status === "approved" || n.status === "rejected",
+    ).length,
+    pending: nominations.filter(
+      (n) => n.status === "submitted" || n.status === "under_review",
+    ).length,
+  }));
+}
+
+// Track nomination trend (called when a nomination is submitted)
+export function trackNominationTrend(): void {
+  if (typeof window === "undefined") return;
+
+  const today = new Date().toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+
+  const existingData = localStorage.getItem(SES_NOMINATION_TREND_KEY);
+  const trendData: Record<string, number> = existingData
+    ? JSON.parse(existingData)
+    : {};
+
+  trendData[today] = (trendData[today] || 0) + 1;
+
+  localStorage.setItem(SES_NOMINATION_TREND_KEY, JSON.stringify(trendData));
+}
+
+// Get nomination trend data for chart
+export function getNominationTrend(): Array<{
+  date: string;
+  nominations: number;
+}> {
+  if (typeof window === "undefined") return [];
+
+  const existingData = localStorage.getItem(SES_NOMINATION_TREND_KEY);
+  if (!existingData) return [];
+
+  const trendData: Record<string, number> = JSON.parse(existingData);
+  return Object.entries(trendData)
+    .map(([date, count]) => ({ date, nominations: count }))
+    .slice(-7); // Last 7 days
+}
+
+// Get cumulative nomination trend (running total)
+export function getCumulativeNominationTrend(): Array<{
+  date: string;
+  nominations: number;
+}> {
+  const trend = getNominationTrend();
+  let cumulative = 0;
+  return trend.map((item) => {
+    cumulative += item.nominations;
+    return { date: item.date, nominations: cumulative };
+  });
+}
+
+// Get pending actions for SES
+export function getPendingActions(): Array<{
+  id: number;
+  type: string;
+  ro: string;
+  district: string;
+  count: number;
+  priority: "high" | "medium" | "low";
+}> {
+  const byDistrict = getNominationsByDistrict();
+  const actions: Array<{
+    id: number;
+    type: string;
+    ro: string;
+    district: string;
+    count: number;
+    priority: "high" | "medium" | "low";
+  }> = [];
+
+  let id = 1;
+
+  Object.entries(byDistrict).forEach(([district, nominations]) => {
+    const pendingApprovals = nominations.filter(
+      (n) => n.status === "submitted",
+    ).length;
+    const underReview = nominations.filter(
+      (n) => n.status === "under_review",
+    ).length;
+
+    if (pendingApprovals > 0) {
+      actions.push({
+        id: id++,
+        type: "Nomination Approval",
+        ro: `RO-${district.toUpperCase().slice(0, 3)}`,
+        district,
+        count: pendingApprovals,
+        priority:
+          pendingApprovals > 5
+            ? "high"
+            : pendingApprovals > 2
+              ? "medium"
+              : "low",
+      });
+    }
+
+    if (underReview > 0) {
+      actions.push({
+        id: id++,
+        type: "Document Verification",
+        ro: `RO-${district.toUpperCase().slice(0, 3)}`,
+        district,
+        count: underReview,
+        priority: underReview > 3 ? "high" : "medium",
+      });
+    }
+  });
+
+  return actions.sort((a, b) => {
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
+    return priorityOrder[a.priority] - priorityOrder[b.priority];
+  });
+}
+
+// Get total pending actions count
+export function getTotalPendingActionsCount(): number {
+  const nominations = getRONominations();
+  return nominations.filter(
+    (n) => n.status === "submitted" || n.status === "under_review",
+  ).length;
+}
+
+// Get nominations by ULB/Municipality
+export function getNominationsByULB(): Record<string, StoredNomination[]> {
+  const nominations = getRONominations();
+  return nominations.reduce(
+    (acc, nomination) => {
+      const ulb = nomination.formData?.municipality || "Unknown";
+      if (!acc[ulb]) {
+        acc[ulb] = [];
+      }
+      acc[ulb].push(nomination);
+      return acc;
+    },
+    {} as Record<string, StoredNomination[]>,
+  );
+}
+
+// Get nominations by ward
+export function getNominationsByWard(): Record<string, StoredNomination[]> {
+  const nominations = getRONominations();
+  return nominations.reduce(
+    (acc, nomination) => {
+      const ward = nomination.formData?.municipalWard || "Unknown";
+      if (!acc[ward]) {
+        acc[ward] = [];
+      }
+      acc[ward].push(nomination);
+      return acc;
+    },
+    {} as Record<string, StoredNomination[]>,
+  );
+}
+
+// Clear SES trend data (for testing/reset)
+export function clearSESTrendData(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(SES_NOMINATION_TREND_KEY);
+}
+
+// Clear all data (for testing/reset)
+export function clearAllData(): void {
+  if (typeof window === "undefined") return;
+  clearRONominations();
+  clearSESTrendData();
 }

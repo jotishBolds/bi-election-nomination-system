@@ -139,8 +139,8 @@ function DashboardSidebarContent() {
   const navGroups = ROLE_NAV_CONFIG[user.role];
 
   return (
-    <Sidebar className="border-r bg-white">
-      <SidebarHeader className="border-b px-4 py-4">
+    <Sidebar className="border-r border-blue-100 bg-gradient-to-b from-blue-50 to-slate-50">
+      <SidebarHeader className="border-b border-blue-100 px-4 py-4">
         <div className="flex items-center gap-3">
           <img src="/main-logo.png" alt="ENS Portal" className="h-10 w-auto" />
           <div>
@@ -153,7 +153,7 @@ function DashboardSidebarContent() {
       <SidebarContent className="px-2 py-4">
         {navGroups.map((group) => (
           <SidebarGroup key={group.label}>
-            <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2">
+            <SidebarGroupLabel className="text-xs font-semibold text-blue-600/70 uppercase tracking-wider px-2">
               {group.label}
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -175,7 +175,7 @@ function DashboardSidebarContent() {
                         className={
                           isActive
                             ? "bg-primary text-white hover:bg-primary/90 shadow-sm"
-                            : "hover:bg-gray-100 text-gray-700"
+                            : "hover:bg-blue-100/60 text-gray-700"
                         }
                       >
                         <Link
@@ -205,7 +205,7 @@ function DashboardSidebarContent() {
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="border-t px-4 py-3">
+      <SidebarFooter className="border-t border-blue-100 px-4 py-3">
         <p className="text-xs text-muted-foreground text-center">
           © 2026 Election Commission
         </p>
