@@ -28,7 +28,7 @@ type FlowStep =
   | "payment"
   | "success";
 
-const formSteps = ["Basic Info", "Proposer", "Declaration"];
+const formSteps = ["Applicant Info", "Proposer", "Declaration"];
 
 function NominationFlowContent() {
   const [flowStep, setFlowStep] = useState<FlowStep>("start");
@@ -68,6 +68,16 @@ function NominationFlowContent() {
       setCurrentStep(currentStep + 1);
     } else {
       setFlowStep("preview");
+    }
+  };
+
+  const handlePreviewNext = () => {
+    // Check if this is the first submission (payment required) or subsequent (no payment)
+    if (submissionData.submissionCount === 0) {
+      setFlowStep("payment");
+    } else {
+      // Skip payment for subsequent submissions
+      handlePaymentSuccess();
     }
   };
 
@@ -126,7 +136,7 @@ function NominationFlowContent() {
           exit={{ opacity: 0 }}
           className="min-h-screen bg-gradient-to-br from-primary-light to-white p-4 md:p-8"
         >
-          <div className="max-w-4xl mx-auto space-y-6">
+          <div className="max-w-4xl mx-auto space-y-2">
             {/* Progress Tracker */}
             <ProgressTracker steps={formSteps} currentStep={currentStep} />
 
@@ -159,7 +169,7 @@ function NominationFlowContent() {
         >
           <div className="max-w-4xl mx-auto">
             <FormPreview
-              onProceedToPayment={() => setFlowStep("payment")}
+              onProceedToPayment={handlePreviewNext}
               onBack={() => {
                 setCurrentStep(2);
                 setFlowStep("form");

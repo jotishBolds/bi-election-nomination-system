@@ -92,9 +92,7 @@ const electionSchedule = [
 // Calculate days remaining until last nomination date
 const lastNominationDate = new Date("2026-03-08");
 const today = new Date();
-const daysRemaining = Math.ceil(
-  (lastNominationDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-);
+const daysRemaining = 7;
 
 export function CandidatePanel() {
   const { submissionData, resetNomination, canSubmitMore } =
@@ -415,7 +413,9 @@ export function CandidatePanel() {
               <p className="text-2xl font-bold text-slate-800">
                 {submissionCount}/{maxSubmissions}
               </p>
-              <p className="text-xs text-slate-500 mt-1">Forms Submitted</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Online Forms Submitted
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -430,7 +430,9 @@ export function CandidatePanel() {
               <p className="text-2xl font-bold text-slate-800">
                 {daysRemaining > 0 ? daysRemaining : 0}
               </p>
-              <p className="text-xs text-slate-500 mt-1">Days Remaining</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Days Remaining for Nomination
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -439,22 +441,27 @@ export function CandidatePanel() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <IndianRupee className="h-5 w-5 text-blue-600" />
-              {getPaymentBadge(submissionData.paymentStatus)}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500">Payment Status</span>
+                {getPaymentBadge(submissionData.paymentStatus)}
+              </div>
             </div>
             <div className="mt-3">
               {submissionData.paymentStatus === "paid" ? (
                 <>
                   <p className="text-2xl font-bold text-slate-800">
-                    ₹{submissionData.applicationFee * submissionCount}
+                    ₹{submissionData.applicationFee}
                   </p>
                   <p className="text-xs text-slate-500 mt-1">
-                    Total Fee Paid ({submissionCount} submissions)
+                    {submissionData.submissionCount > 1
+                      ? `Initial Payment (${submissionData.submissionCount} submissions)`
+                      : "Payment Completed"}
                   </p>
                 </>
               ) : (
                 <>
                   <p className="text-2xl font-bold text-slate-800">--</p>
-                  <p className="text-xs text-slate-500 mt-1">Application Fee</p>
+                  <p className="text-xs text-slate-500 mt-1"></p>
                 </>
               )}
             </div>
@@ -474,9 +481,11 @@ export function CandidatePanel() {
                 </h3>
                 <p className="text-sm text-amber-700 mt-1">
                   You have submitted the maximum allowed {maxSubmissions}{" "}
-                  nomination forms. As per election rules, candidates can submit
-                  up to 3 nominations for the same ward. If you need to make any
-                  changes, please contact the Election Office.
+                  nomination forms online. As per election rules, candidates can
+                  submit up to 3 nominations for the same ward. For any
+                  additional nominations beyond this limit, please submit them
+                  offline directly to the Returning Officer (RO) at your ward
+                  office.
                 </p>
               </div>
             </div>
@@ -502,6 +511,15 @@ export function CandidatePanel() {
               </Badge>
             </div>
           </CardHeader>
+          <div className="px-4 py-2 bg-gradient-to-r from-amber-50 to-orange-50 border-l-4 border-amber-400 rounded-r-lg -mt-1">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <p className="text-sm text-amber-800 font-medium">
+                📋 Important: Please download and save your nomination forms
+                before the scrutiny date (March 9, 2026)
+              </p>
+            </div>
+          </div>
           <CardContent className="px-4 pb-4 space-y-3">
             {submissionData.submissions.map((submission) => (
               <div
@@ -808,7 +826,7 @@ export function CandidatePanel() {
             </div>
 
             {/* Countdown */}
-            <div className="mt-3 p-4 rounded-xl bg-slate-800">
+            <div className="mt-3 p-4 rounded-xl bg-primary">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-slate-400">Nomination Deadline</p>
@@ -836,7 +854,7 @@ export function CandidatePanel() {
                   <MapPin className="h-4 w-4 text-cyan-600" />
                 </div>
                 <CardTitle className="text-sm font-semibold text-slate-800">
-                  Your Constituency
+                  Your Contesting Area
                 </CardTitle>
               </div>
               {!submissionData.isSubmitted && (

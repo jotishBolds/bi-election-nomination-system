@@ -94,10 +94,10 @@ export function RegisterForm() {
 
     try {
       if (data.otp === DEMO_OTP) {
-        // Complete registration and redirect to login
+        // Complete registration and show success modal
         await new Promise((resolve) => setTimeout(resolve, 1000));
         setError(null);
-        router.push("/login?registered=true");
+        router.push("/register?success=true");
       } else {
         setError("Invalid OTP. Please try again. (Hint: Use 123456)");
       }

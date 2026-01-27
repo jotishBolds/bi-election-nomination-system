@@ -47,6 +47,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useNomination } from "@/app/context/nomination-context";
+import { useNominationSubmission } from "@/app/context/nomination-submission-context";
 import {
   politicalParties,
   independentSymbols,
@@ -72,11 +73,15 @@ interface StepDeclarationProps {
 
 export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
   const { formData, updateFormData } = useNomination();
+  const { submissionData } = useNominationSubmission();
   const [age, setAge] = useState<number | null>(null);
   const [shuffleCount, setShuffleCount] = useState(formData.shuffleCount || 0);
   const [selectedSymbol, setSelectedSymbol] =
     useState<IndependentSymbol | null>(null);
   const [isShuffleDisabled, setIsShuffleDisabled] = useState(false);
+
+  // Check if party symbol is locked (for subsequent submissions)
+  const isPartyLocked = submissionData.submissionCount > 0;
 
   const form = useForm({
     resolver: zodResolver(schema),
@@ -102,6 +107,39 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
 
   // Handle party change
   useEffect(() => {
+    if (isPartyLocked) {
+      // For subsequent submissions, use locked party data
+      if (submissionData.lockedPoliticalPartyId === "independent") {
+        // For independent, set the locked symbol
+        setSelectedSymbol({
+          id: "locked",
+          name: submissionData.lockedPartySymbol,
+          image: submissionData.lockedPartySymbolImage,
+        });
+        form.setValue("politicalPartyId", "independent");
+        form.setValue("symbolPreference1", submissionData.lockedPartySymbol);
+      } else {
+        // For party candidates, set the locked party
+        const party = politicalParties.find(
+          (p) => p.id === submissionData.lockedPoliticalPartyId,
+        );
+        if (party) {
+          setSelectedSymbol({
+            id: party.id,
+            name: party.symbol,
+            image: party.symbolImage,
+          });
+          form.setValue(
+            "politicalPartyId",
+            submissionData.lockedPoliticalPartyId,
+          );
+          form.setValue("symbolPreference1", party.symbol);
+        }
+      }
+      setIsShuffleDisabled(true);
+      return;
+    }
+
     if (selectedPartyId === "independent") {
       // Reset previous party symbol and select a new random symbol for independent
       setSelectedSymbol(null);
@@ -122,7 +160,7 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
         setIsShuffleDisabled(false);
       }
     }
-  }, [selectedPartyId, form]);
+  }, [selectedPartyId, form, isPartyLocked, submissionData]);
 
   // Handle shuffle for independent candidates - ensure no repeated symbols
   const handleShuffle = () => {
@@ -263,6 +301,7 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
                     <Select
                       onValueChange={field.onChange}
                       defaultValue={field.value}
+                      disabled={isPartyLocked}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -282,6 +321,11 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
                       </SelectContent>
                     </Select>
                     <FormMessage />
+                    {isPartyLocked && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        Party and symbol are locked from your first submission
+                      </p>
+                    )}
                   </FormItem>
                 )}
               />
@@ -349,7 +393,11 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
                               variant="outline"
                               size="sm"
                               onClick={handleShuffle}
-                              disabled={isShuffleDisabled || shuffleCount >= 3}
+                              disabled={
+                                isShuffleDisabled ||
+                                shuffleCount >= 3 ||
+                                isPartyLocked
+                              }
                             >
                               <Shuffle className="mr-2 h-4 w-4" />
                               Shuffle Symbol ({3 - shuffleCount} left)

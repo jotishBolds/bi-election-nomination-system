@@ -435,9 +435,7 @@ export function SESPanel() {
               <span className="text-xs text-slate-500">Mar 8, 2026</span>
             </div>
             <div className="mt-3">
-              <p className="text-2xl font-bold text-slate-800">
-                {daysRemaining > 0 ? daysRemaining : 0}
-              </p>
+              <p className="text-2xl font-bold text-slate-800">7</p>
               <p className="text-xs text-slate-500 mt-1">Days to Deadline</p>
             </div>
           </CardContent>
@@ -935,9 +933,7 @@ export function SESPanel() {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-3xl font-bold text-white">
-                    {daysRemaining > 0 ? daysRemaining : 0}
-                  </p>
+                  <p className="text-3xl font-bold text-white">7</p>
                   <p className="text-xs text-slate-400">days left</p>
                 </div>
               </div>

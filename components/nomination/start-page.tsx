@@ -268,10 +268,11 @@ export function StartPage({ onApplyClick }: StartPageProps) {
             </AlertTitle>
             <AlertDescription className="text-amber-700">
               You have submitted the maximum allowed {maxSubmissions} nomination
-              forms for this election. As per the election rules, candidates can
-              submit up to 3 nominations for the same ward. Please visit the
-              Dashboard to view your submitted nominations or contact the
-              Election Office for assistance.
+              forms online for this election. As per the election rules,
+              candidates can submit up to 3 nominations for the same ward. For
+              any additional nominations beyond this limit, please submit them
+              offline directly to the Returning Officer (RO) at your ward
+              office.
             </AlertDescription>
           </Alert>
         )}
@@ -296,8 +297,8 @@ export function StartPage({ onApplyClick }: StartPageProps) {
             {canApply ? (
               <>
                 {submissionCount > 0
-                  ? "Submit Another Nomination"
-                  : "Apply for Nomination"}
+                  ? `Update & Submit Nomination (${Math.min(submissionCount + 1, maxSubmissions)}/3)`
+                  : "Apply for Nomination (1/3)"}
                 <ArrowRight className="ml-2 h-5 w-5" />
               </>
             ) : (
@@ -309,8 +310,9 @@ export function StartPage({ onApplyClick }: StartPageProps) {
           </Button>
           {submissionCount > 0 && canApply && (
             <p className="text-sm text-slate-500">
-              Your previous form data will be pre-filled. You can edit and
-              submit.
+              {submissionCount === 1
+                ? "Payment completed! Update your form and resubmit at no additional cost."
+                : "Update your nomination form and resubmit. No payment required for updates."}
             </p>
           )}
         </motion.div>

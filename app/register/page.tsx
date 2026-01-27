@@ -13,12 +13,22 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 function RegisterContent() {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showSuccess, setShowSuccess] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -28,11 +38,7 @@ function RegisterContent() {
 
   useEffect(() => {
     if (searchParams.get("success") === "true") {
-      setShowSuccess(true);
-      const timeout = setTimeout(() => {
-        setShowSuccess(false);
-      }, 5000);
-      return () => clearTimeout(timeout);
+      setDialogOpen(true);
     }
   }, [searchParams]);
 
@@ -57,7 +63,7 @@ function RegisterContent() {
           </div>
           <div>
             <CardTitle className="text-2xl font-bold text-primary">
-              Create Account
+              Registration
             </CardTitle>
             <CardDescription className="text-muted-foreground mt-2">
               Register for the Election Nomination System
@@ -65,18 +71,32 @@ function RegisterContent() {
           </div>
         </CardHeader>
         <CardContent>
-          {showSuccess && (
-            <Alert className="mb-6 border-green-200 bg-green-50">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-800">
-                Registration completed successfully! You can now login with your
-                credentials.
-              </AlertDescription>
-            </Alert>
-          )}
           <RegisterForm />
         </CardContent>
       </Card>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="border-green-200 bg-green-50">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-6 w-6 text-green-600" />
+              <DialogTitle className="text-green-800">
+                You have registered
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-green-700">
+              Your account has been created successfully.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              onClick={() => router.push("/login")}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              Click to login
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

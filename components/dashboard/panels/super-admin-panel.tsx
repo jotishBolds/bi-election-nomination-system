@@ -440,7 +440,7 @@ export function SuperAdminPanel() {
       </div>
 
       {/* Top Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card className="bg-indigo-50 border-0 shadow-sm rounded-xl">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -501,7 +501,7 @@ export function SuperAdminPanel() {
           </CardContent>
         </Card>
 
-        <Card className="bg-amber-50 border-0 shadow-sm rounded-xl">
+        {/* <Card className="bg-amber-50 border-0 shadow-sm rounded-xl">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <Database className="h-5 w-5 text-amber-600" />
@@ -512,7 +512,7 @@ export function SuperAdminPanel() {
               <p className="text-xs text-slate-500 mt-1">Backups</p>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
 
         <Card className="bg-rose-50 border-0 shadow-sm rounded-xl">
           <CardContent className="p-4">
@@ -521,9 +521,7 @@ export function SuperAdminPanel() {
               <span className="text-xs text-slate-500">Mar 8</span>
             </div>
             <div className="mt-3">
-              <p className="text-2xl font-bold text-slate-800">
-                {daysRemaining > 0 ? daysRemaining : 0}
-              </p>
+              <p className="text-2xl font-bold text-slate-800">7</p>
               <p className="text-xs text-slate-500 mt-1">Days to Deadline</p>
             </div>
           </CardContent>

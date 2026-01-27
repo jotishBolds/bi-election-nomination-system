@@ -40,11 +40,18 @@ interface NominationSubmissionData {
   maxSubmissions: number;
   applicationId: string | null;
   submissions: StoredNomination[];
+  // Locked party data from first submission
+  lockedPoliticalPartyId: string;
+  lockedPartySymbol: string;
+  lockedPartySymbolImage: string;
 }
 
 interface NominationSubmissionContextType {
   submissionData: NominationSubmissionData;
-  submitNomination: (data: Partial<NominationSubmissionData>, formData: NominationFormData) => StoredNomination | null;
+  submitNomination: (
+    data: Partial<NominationSubmissionData>,
+    formData: NominationFormData,
+  ) => StoredNomination | null;
   resetNomination: () => void;
   canSubmitMore: () => boolean;
   getDraftData: () => NominationFormData | null;
@@ -70,6 +77,9 @@ const defaultSubmissionData: NominationSubmissionData = {
   maxSubmissions: 3,
   applicationId: null,
   submissions: [],
+  lockedPoliticalPartyId: "",
+  lockedPartySymbol: "",
+  lockedPartySymbolImage: "",
 };
 
 const NominationSubmissionContext = createContext<
@@ -95,12 +105,14 @@ export function NominationSubmissionProvider({
     const storageData = getNominationStorageData(CANDIDATE_ID);
     const submissions = getCandidateSubmissions(CANDIDATE_ID);
     const latestSubmission = getLatestSubmission(CANDIDATE_ID);
+    const firstSubmission = submissions.length > 0 ? submissions[0] : null;
 
     setSubmissionData({
       isSubmitted: submissions.length > 0,
       submissionDate: latestSubmission?.submittedAt || null,
       status: latestSubmission?.status || "draft",
-      paymentStatus: latestSubmission?.paymentStatus || "pending",
+      // Payment is considered "paid" after first submission
+      paymentStatus: submissions.length > 0 ? "paid" : "pending",
       applicationFee: 500,
       district: latestSubmission?.formData.district || "",
       ulb: latestSubmission?.formData.ulb || "",
@@ -112,16 +124,23 @@ export function NominationSubmissionProvider({
       maxSubmissions: 3,
       applicationId: latestSubmission?.applicationId || null,
       submissions,
+      // Locked party data from first submission
+      lockedPoliticalPartyId: firstSubmission?.formData.politicalPartyId || "",
+      lockedPartySymbol: firstSubmission?.formData.partySymbol || "",
+      lockedPartySymbolImage: firstSubmission?.formData.partySymbolImage || "",
     });
   };
 
-  const submitNomination = (data: Partial<NominationSubmissionData>, formData: NominationFormData): StoredNomination | null => {
+  const submitNomination = (
+    data: Partial<NominationSubmissionData>,
+    formData: NominationFormData,
+  ): StoredNomination | null => {
     const result = storeNomination(CANDIDATE_ID, formData);
-    
+
     if (result) {
       loadStorageData(); // Reload all data after submission
     }
-    
+
     return result;
   };
 

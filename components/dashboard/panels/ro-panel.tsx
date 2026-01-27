@@ -80,6 +80,29 @@ const wardsPerDistrict = electionData.districts.map((district) => {
   };
 });
 
+// Wards per constituency for chart
+const wardsPerConstituency = () => {
+  const constituencyMap = new Map<string, number>();
+
+  electionData.districts.forEach((district) => {
+    district.ulbs.forEach((ulb) => {
+      ulb.wards.forEach((ward) => {
+        if (ward.constituency) {
+          constituencyMap.set(
+            ward.constituency,
+            (constituencyMap.get(ward.constituency) || 0) + 1,
+          );
+        }
+      });
+    });
+  });
+
+  return Array.from(constituencyMap.entries()).map(([name, wards]) => ({
+    name,
+    wards,
+  }));
+};
+
 // Election schedule with dates
 const electionSchedule = [
   {
@@ -893,9 +916,7 @@ export function ROPanel() {
               <span className="text-xs text-slate-500">Mar 8, 2026</span>
             </div>
             <div className="mt-3">
-              <p className="text-2xl font-bold text-slate-800">
-                {daysRemaining > 0 ? daysRemaining : 0}
-              </p>
+              <p className="text-2xl font-bold text-slate-800">7</p>
               <p className="text-xs text-slate-500 mt-1">Days Remaining</p>
             </div>
           </CardContent>
@@ -939,7 +960,7 @@ export function ROPanel() {
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Wards by District */}
+        {/* Wards by Constituency */}
         <Card className="bg-white border-0 shadow-sm rounded-xl">
           <CardHeader className="pb-2 px-4 pt-4">
             <div className="flex items-center justify-between">
@@ -948,17 +969,17 @@ export function ROPanel() {
                   <MapPin className="h-4 w-4 text-indigo-600" />
                 </div>
                 <CardTitle className="text-sm font-semibold text-slate-800">
-                  Wards by District
+                  Wards by Constituency
                 </CardTitle>
               </div>
               <span className="text-xs text-slate-400">
-                {electionData.totalWards} total
+                {wardsPerConstituency().length} constituencies
               </span>
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4">
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={wardsPerDistrict}>
+              <BarChart data={wardsPerConstituency()}>
                 <CartesianGrid
                   strokeDasharray="3 3"
                   stroke="#f1f5f9"
@@ -966,9 +987,13 @@ export function ROPanel() {
                 />
                 <XAxis
                   dataKey="name"
-                  tick={{ fontSize: 10, fill: "#64748b" }}
+                  tick={{ fontSize: 8, fill: "#64748b" }}
                   axisLine={false}
                   tickLine={false}
+                  angle={-45}
+                  textAnchor="end"
+                  height={60}
+                  interval={0}
                 />
                 <YAxis
                   tick={{ fontSize: 10, fill: "#64748b" }}
@@ -1184,7 +1209,7 @@ export function ROPanel() {
                 ))}
               </div>
               {/* Countdown */}
-              <div className="mt-3 p-3 rounded-xl bg-slate-800">
+              <div className="mt-3 p-3 rounded-xl bg-primary">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-slate-400">
@@ -1195,9 +1220,7 @@ export function ROPanel() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-2xl font-bold text-white">
-                      {daysRemaining > 0 ? daysRemaining : 0}
-                    </p>
+                    <p className="text-2xl font-bold text-white">7</p>
                     <p className="text-xs text-slate-400">days left</p>
                   </div>
                 </div>
@@ -1206,7 +1229,8 @@ export function ROPanel() {
           </Card>
 
           {/* District Quick Stats */}
-          <Card className="bg-white border-0 shadow-sm rounded-xl">
+          {/* District Overview */}
+          {/* <Card className="bg-white border-0 shadow-sm rounded-xl">
             <CardHeader className="pb-2 px-4 pt-4">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 bg-cyan-100 rounded-lg">
@@ -1247,7 +1271,7 @@ export function ROPanel() {
                 })}
               </div>
             </CardContent>
-          </Card>
+          </Card> */}
         </div>
       </div>
     </div>

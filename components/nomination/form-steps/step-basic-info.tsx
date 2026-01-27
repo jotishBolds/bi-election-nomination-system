@@ -337,7 +337,7 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                   name="category"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Category *</FormLabel>
+                      <FormLabel>Community Category *</FormLabel>
                       <Select
                         onValueChange={field.onChange}
                         defaultValue={field.value}

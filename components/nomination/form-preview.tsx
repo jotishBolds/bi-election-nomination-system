@@ -16,8 +16,10 @@ import {
   FileText,
   Download,
   Loader2,
+  CheckCircle2,
 } from "lucide-react";
 import { useNomination } from "@/app/context/nomination-context";
+import { useNominationSubmission } from "@/app/context/nomination-submission-context";
 
 interface FormPreviewProps {
   onProceedToPayment: () => void;
@@ -26,6 +28,7 @@ interface FormPreviewProps {
 
 export function FormPreview({ onProceedToPayment, onBack }: FormPreviewProps) {
   const { formData } = useNomination();
+  const { submissionData } = useNominationSubmission();
   const printRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -645,8 +648,22 @@ export function FormPreview({ onProceedToPayment, onBack }: FormPreviewProps) {
           className="bg-primary hover:bg-primary-hover"
           onClick={onProceedToPayment}
         >
-          <CreditCard className="mr-2 h-4 w-4" />
-          Proceed to Payment
+          {submissionData.submissionCount === 0 ? (
+            <>
+              <CreditCard className="mr-2 h-4 w-4" />
+              Proceed to Payment
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="mr-2 h-4 w-4" />
+              Submit Nomination (
+              {Math.min(
+                submissionData.submissionCount + 1,
+                submissionData.maxSubmissions,
+              )}
+              /3)
+            </>
+          )}
         </Button>
       </div>
     </motion.div>
