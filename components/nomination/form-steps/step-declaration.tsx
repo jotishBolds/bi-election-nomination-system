@@ -78,7 +78,13 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
   const [shuffleCount, setShuffleCount] = useState(formData.shuffleCount || 0);
   const [selectedSymbol, setSelectedSymbol] =
     useState<IndependentSymbol | null>(null);
-  const [isShuffleDisabled, setIsShuffleDisabled] = useState(false);
+  // Initialize shuffled symbols from saved formData if available
+  const [shuffledSymbols, setShuffledSymbols] = useState<IndependentSymbol[]>(
+    formData.shuffledSymbols || [],
+  );
+  const [isShuffleDisabled, setIsShuffleDisabled] = useState(
+    formData.shuffleCount >= 3,
+  );
 
   // Check if party symbol is locked (for subsequent submissions)
   const isPartyLocked = submissionData.submissionCount > 0;
@@ -110,12 +116,32 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
     if (isPartyLocked) {
       // For subsequent submissions, use locked party data
       if (submissionData.lockedPoliticalPartyId === "independent") {
-        // For independent, set the locked symbol
-        setSelectedSymbol({
-          id: "locked",
-          name: submissionData.lockedPartySymbol,
-          image: submissionData.lockedPartySymbolImage,
-        });
+        // For independent, restore all shuffled symbols from formData if available
+        if (formData.shuffledSymbols && formData.shuffledSymbols.length > 0) {
+          setShuffledSymbols(formData.shuffledSymbols);
+          setShuffleCount(
+            formData.shuffleCount || formData.shuffledSymbols.length,
+          );
+          // Find and set the previously selected symbol from the shuffled symbols
+          const previouslySelected = formData.shuffledSymbols.find(
+            (s) => s.name === submissionData.lockedPartySymbol,
+          );
+          if (previouslySelected) {
+            setSelectedSymbol(previouslySelected);
+          } else {
+            // Fallback to first symbol if not found
+            setSelectedSymbol(formData.shuffledSymbols[0]);
+          }
+        } else {
+          // Fallback to single locked symbol if no shuffled symbols saved
+          const lockedSymbol = {
+            id: "locked",
+            name: submissionData.lockedPartySymbol,
+            image: submissionData.lockedPartySymbolImage,
+          };
+          setShuffledSymbols([lockedSymbol]);
+          setSelectedSymbol(lockedSymbol);
+        }
         form.setValue("politicalPartyId", "independent");
         form.setValue("symbolPreference1", submissionData.lockedPartySymbol);
       } else {
@@ -141,11 +167,32 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
     }
 
     if (selectedPartyId === "independent") {
-      // Reset previous party symbol and select a new random symbol for independent
-      setSelectedSymbol(null);
-      const randomSymbol = getRandomSymbols(1)[0];
-      setSelectedSymbol(randomSymbol);
-      form.setValue("symbolPreference1", randomSymbol.name);
+      // Check if we have saved shuffled symbols to restore
+      if (formData.shuffledSymbols && formData.shuffledSymbols.length > 0) {
+        setShuffledSymbols(formData.shuffledSymbols);
+        setShuffleCount(
+          formData.shuffleCount || formData.shuffledSymbols.length,
+        );
+        setIsShuffleDisabled(formData.shuffleCount >= 3);
+        // Find and set the selected symbol
+        if (formData.partySymbol) {
+          const savedSelected = formData.shuffledSymbols.find(
+            (s) => s.name === formData.partySymbol,
+          );
+          if (savedSelected) {
+            setSelectedSymbol(savedSelected);
+          }
+        }
+      } else {
+        // First time selecting independent - show first random symbol
+        setSelectedSymbol(null);
+        setShuffledSymbols([]);
+        const randomSymbol = getRandomSymbols(1)[0];
+        setShuffledSymbols([randomSymbol]);
+        setSelectedSymbol(randomSymbol);
+        form.setValue("symbolPreference1", randomSymbol.name);
+        setShuffleCount(1); // First symbol counts as first shuffle
+      }
     } else if (selectedPartyId) {
       // For party candidates, set the party symbol and reset shuffle count
       const party = politicalParties.find((p) => p.id === selectedPartyId);
@@ -157,18 +204,28 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
         });
         form.setValue("symbolPreference1", party.symbol);
         setShuffleCount(0); // Reset shuffle count when switching to party
+        setShuffledSymbols([]);
         setIsShuffleDisabled(false);
       }
     }
-  }, [selectedPartyId, form, isPartyLocked, submissionData]);
+  }, [
+    selectedPartyId,
+    form,
+    isPartyLocked,
+    submissionData,
+    formData.shuffledSymbols,
+    formData.shuffleCount,
+    formData.partySymbol,
+  ]);
 
-  // Handle shuffle for independent candidates - ensure no repeated symbols
+  // Handle shuffle for independent candidates - add new symbol to the list
   const handleShuffle = () => {
     if (shuffleCount >= 3) return;
 
-    // Get available symbols (excluding currently selected one and already used ones)
-    const availableSymbols = independentSymbols.filter((symbol) =>
-      selectedSymbol ? symbol.id !== selectedSymbol.id : true,
+    // Get available symbols (excluding already shuffled ones)
+    const usedIds = shuffledSymbols.map((s) => s.id);
+    const availableSymbols = independentSymbols.filter(
+      (symbol) => !usedIds.includes(symbol.id),
     );
 
     if (availableSymbols.length === 0) return;
@@ -177,13 +234,27 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
     const randomIndex = Math.floor(Math.random() * availableSymbols.length);
     const newSymbol = availableSymbols[randomIndex];
 
-    setSelectedSymbol(newSymbol);
-    form.setValue("symbolPreference1", newSymbol.name);
+    // Add to shuffled symbols list
+    const updatedShuffledSymbols = [...shuffledSymbols, newSymbol];
+    setShuffledSymbols(updatedShuffledSymbols);
     setShuffleCount((prev) => prev + 1);
+
+    // Auto-select the new symbol if no selection yet
+    if (!selectedSymbol) {
+      setSelectedSymbol(newSymbol);
+      form.setValue("symbolPreference1", newSymbol.name);
+    }
 
     if (shuffleCount + 1 >= 3) {
       setIsShuffleDisabled(true);
     }
+  };
+
+  // Handle symbol selection from shuffled list
+  const handleSymbolSelect = (symbol: IndependentSymbol) => {
+    if (isPartyLocked) return;
+    setSelectedSymbol(symbol);
+    form.setValue("symbolPreference1", symbol.name);
   };
 
   const onSubmit = (data: z.infer<typeof schema>) => {
@@ -199,6 +270,7 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
       symbolPreference2: "",
       symbolPreference3: "",
       shuffleCount: shuffleCount,
+      shuffledSymbols: shuffledSymbols, // Save all shuffled symbols for persistence
     });
     onNext();
   };
@@ -375,17 +447,18 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
                           <Alert>
                             <AlertCircle className="h-4 w-4" />
                             <AlertDescription>
-                              Independent candidates can randomize party symbols{" "}
-                              <strong>three times only</strong>. Select one
-                              symbol from the options below.
+                              Independent candidates can shuffle up to{" "}
+                              <strong>3 symbols</strong>. Each shuffle reveals a
+                              new symbol. After all 3 shuffles, select one
+                              symbol from the list below.
                             </AlertDescription>
                           </Alert>
 
                           <div className="flex items-center justify-between">
                             <p className="text-sm text-muted-foreground">
-                              Shuffles remaining:{" "}
+                              Symbols revealed:{" "}
                               <span className="font-bold text-primary">
-                                {3 - shuffleCount}
+                                {shuffleCount}/3
                               </span>
                             </p>
                             <Button
@@ -400,48 +473,83 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
                               }
                             >
                               <Shuffle className="mr-2 h-4 w-4" />
-                              Shuffle Symbol ({3 - shuffleCount} left)
+                              {shuffleCount >= 3
+                                ? "All Symbols Revealed"
+                                : `Reveal Next Symbol (${3 - shuffleCount} left)`}
                             </Button>
                           </div>
 
-                          {/* Single Symbol Display */}
-                          {selectedSymbol && (
-                            <div className="flex justify-center">
-                              <motion.div
-                                key={selectedSymbol.id}
-                                initial={{ scale: 0.8, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                transition={{ duration: 0.3 }}
-                                className="relative p-6 border-2 border-primary bg-primary/5 rounded-lg w-40"
-                              >
-                                <div className="relative w-full aspect-square mb-3">
-                                  <Image
-                                    src={selectedSymbol.image}
-                                    alt={selectedSymbol.name}
-                                    fill
-                                    className="object-contain"
-                                  />
-                                </div>
-                                <p className="text-sm text-center font-medium">
-                                  {selectedSymbol.name}
-                                </p>
-                                <div className="absolute top-2 right-2">
-                                  <CheckCircle2 className="h-5 w-5 text-primary" />
-                                </div>
-                                <Badge
-                                  variant="outline"
-                                  className="w-full mt-2 justify-center"
-                                >
-                                  Selected Symbol
-                                </Badge>
-                              </motion.div>
+                          {/* Display All Shuffled Symbols */}
+                          {shuffledSymbols.length > 0 && (
+                            <div className="space-y-3">
+                              <p className="text-sm font-medium text-muted-foreground">
+                                {shuffleCount >= 3
+                                  ? "Select one symbol from the options below:"
+                                  : "Your revealed symbols (keep shuffling to see more):"}
+                              </p>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {shuffledSymbols.map((symbol, index) => (
+                                  <motion.div
+                                    key={symbol.id}
+                                    initial={{ scale: 0.8, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    transition={{
+                                      duration: 0.3,
+                                      delay: index * 0.1,
+                                    }}
+                                    className={cn(
+                                      "relative p-4 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md",
+                                      selectedSymbol?.id === symbol.id
+                                        ? "border-primary bg-primary/5 ring-2 ring-primary/30"
+                                        : "border-muted hover:border-primary/50",
+                                    )}
+                                    onClick={() => handleSymbolSelect(symbol)}
+                                  >
+                                    <div className="relative w-full aspect-square mb-3">
+                                      <Image
+                                        src={symbol.image}
+                                        alt={symbol.name}
+                                        fill
+                                        className="object-contain"
+                                      />
+                                    </div>
+                                    <p className="text-sm text-center font-medium">
+                                      {symbol.name}
+                                    </p>
+                                    {selectedSymbol?.id === symbol.id && (
+                                      <div className="absolute top-2 right-2">
+                                        <CheckCircle2 className="h-5 w-5 text-primary" />
+                                      </div>
+                                    )}
+                                    <Badge
+                                      variant={
+                                        selectedSymbol?.id === symbol.id
+                                          ? "default"
+                                          : "outline"
+                                      }
+                                      className="w-full mt-2 justify-center"
+                                    >
+                                      {selectedSymbol?.id === symbol.id
+                                        ? "Selected"
+                                        : `Option ${index + 1}`}
+                                    </Badge>
+                                  </motion.div>
+                                ))}
+                              </div>
                             </div>
                           )}
 
                           {shuffleCount >= 3 && (
                             <p className="text-xs text-muted-foreground text-center">
-                              Maximum shuffles reached. This is your final
-                              symbol.
+                              All 3 symbols revealed. Please select your
+                              preferred symbol above.
+                            </p>
+                          )}
+
+                          {shuffleCount < 3 && shuffleCount > 0 && (
+                            <p className="text-xs text-amber-600 text-center">
+                              Click &quot;Reveal Next Symbol&quot; to see more
+                              options before making your final selection.
                             </p>
                           )}
                         </div>

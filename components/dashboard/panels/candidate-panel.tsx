@@ -33,7 +33,10 @@ import html2PDF from "jspdf-html2canvas";
 
 import { electionData } from "@/lib/election-data";
 import { useNominationSubmission } from "@/app/context/nomination-submission-context";
-import { StoredNomination } from "@/lib/nomination-storage";
+import {
+  StoredNomination,
+  getUniqueCandidateNomination,
+} from "@/lib/nomination-storage";
 
 // Important dates data with election schedule
 const electionSchedule = [
@@ -95,7 +98,7 @@ const today = new Date();
 const daysRemaining = 7;
 
 export function CandidatePanel() {
-  const { submissionData, resetNomination, canSubmitMore } =
+  const { submissionData, resetNomination, canSubmitMore, candidateId } =
     useNominationSubmission();
   const [selectedSubmission, setSelectedSubmission] =
     useState<StoredNomination | null>(null);
@@ -110,6 +113,12 @@ export function CandidatePanel() {
             Submitted
           </Badge>
         );
+      case "received":
+        return (
+          <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 text-xs font-medium">
+            Received
+          </Badge>
+        );
       case "under_review":
         return (
           <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 text-xs font-medium">
@@ -119,7 +128,25 @@ export function CandidatePanel() {
       case "approved":
         return (
           <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-xs font-medium">
-            Approved
+            Accepted
+          </Badge>
+        );
+      case "rejected":
+        return (
+          <Badge className="bg-red-100 text-red-700 hover:bg-red-100 text-xs font-medium">
+            Rejected
+          </Badge>
+        );
+      case "withdrawn":
+        return (
+          <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100 text-xs font-medium">
+            Withdrawn
+          </Badge>
+        );
+      case "contesting":
+        return (
+          <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100 text-xs font-medium">
+            Contesting
           </Badge>
         );
       default:
@@ -375,15 +402,49 @@ export function CandidatePanel() {
 
       {/* Top Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-amber-50 border-0 shadow-sm rounded-xl">
+        <Card
+          className={`border-0 shadow-sm rounded-xl ${
+            submissionData.status === "approved" ||
+            submissionData.status === "contesting"
+              ? "bg-green-50"
+              : submissionData.status === "rejected"
+                ? "bg-red-50"
+                : submissionData.status === "received"
+                  ? "bg-blue-50"
+                  : "bg-amber-50"
+          }`}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <FileCheck className="h-5 w-5 text-amber-600" />
+              <FileCheck
+                className={`h-5 w-5 ${
+                  submissionData.status === "approved" ||
+                  submissionData.status === "contesting"
+                    ? "text-green-600"
+                    : submissionData.status === "rejected"
+                      ? "text-red-600"
+                      : submissionData.status === "received"
+                        ? "text-blue-600"
+                        : "text-amber-600"
+                }`}
+              />
               {getStatusBadge(submissionData.status)}
             </div>
             <div className="mt-3">
               <p className="text-2xl font-bold text-slate-800">
-                {submissionData.status === "draft" ? "Draft" : "Review"}
+                {submissionData.status === "draft"
+                  ? "Draft"
+                  : submissionData.status === "submitted"
+                    ? "Submitted"
+                    : submissionData.status === "received"
+                      ? "Received"
+                      : submissionData.status === "approved"
+                        ? "Accepted"
+                        : submissionData.status === "rejected"
+                          ? "Rejected"
+                          : submissionData.status === "contesting"
+                            ? "Contesting"
+                            : "Review"}
               </p>
               <p className="text-xs text-slate-500 mt-1">
                 {submissionData.submissionDate
@@ -493,8 +554,8 @@ export function CandidatePanel() {
         </Card>
       )}
 
-      {/* Submissions List / Draft Card */}
-      {submissionData.submissions.length > 0 ? (
+      {/* Latest Nomination / Draft Card */}
+      {getUniqueCandidateNomination(candidateId) ? (
         <Card className="bg-white border-0 shadow-sm rounded-xl">
           <CardHeader className="pb-2 px-4 pt-4">
             <div className="flex items-center justify-between">
@@ -503,11 +564,11 @@ export function CandidatePanel() {
                   <FileText className="h-4 w-4 text-indigo-600" />
                 </div>
                 <CardTitle className="text-sm font-semibold text-slate-800">
-                  Your Nominations
+                  Your Nomination
                 </CardTitle>
               </div>
               <Badge className="bg-indigo-100 text-indigo-700 text-xs">
-                {submissionData.submissions.length} submitted
+                Latest Submission
               </Badge>
             </div>
           </CardHeader>
@@ -515,244 +576,101 @@ export function CandidatePanel() {
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-amber-600" />
               <p className="text-sm text-amber-800 font-medium">
-                📋 Important: Please download and save your nomination forms
+                📋 Important: Please download and save your nomination form
                 before the scrutiny date (March 9, 2026)
               </p>
             </div>
           </div>
           <CardContent className="px-4 pb-4 space-y-3">
-            {submissionData.submissions.map((submission) => (
-              <div
-                key={submission.id}
-                className="flex items-center justify-between p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                    <span className="text-emerald-700 font-bold">
-                      {submission.submissionNumber}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-800">
-                      Nomination #{submission.submissionNumber}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {submission.applicationId} • Submitted{" "}
-                      {new Date(submission.submittedAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {getStatusBadge(submission.status)}
+            {(() => {
+              const latestSubmission =
+                getUniqueCandidateNomination(candidateId);
+              if (!latestSubmission) return null;
 
-                  {/* View Dialog */}
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 text-xs"
-                        onClick={() => setSelectedSubmission(submission)}
-                      >
-                        <Eye className="h-3 w-3 mr-1" />
-                        View
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                      <DialogHeader>
-                        <DialogTitle>
-                          Nomination Form Preview - #
-                          {submission.submissionNumber}
-                        </DialogTitle>
-                      </DialogHeader>
-                      <div
-                        id={`preview-content-${submission.id}`}
-                        className="p-6 bg-white"
-                        style={{
-                          fontFamily: "'Times New Roman', Times, serif",
-                          fontSize: "12pt",
-                          lineHeight: "1.6",
-                        }}
-                      >
-                        {/* Form Header */}
-                        <div
-                          style={{ textAlign: "center", marginBottom: "24px" }}
+              return (
+                <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                      <span className="text-emerald-700 font-bold">
+                        {latestSubmission.submissionNumber}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">
+                        Nomination Application
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {latestSubmission.applicationId} • Submitted{" "}
+                        {new Date(
+                          latestSubmission.submittedAt,
+                        ).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {getStatusBadge(latestSubmission.status)}
+
+                    {/* View Dialog */}
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs"
+                          onClick={() =>
+                            setSelectedSubmission(latestSubmission)
+                          }
                         >
-                          <h1
-                            style={{
-                              fontSize: "18pt",
-                              fontWeight: "bold",
-                              margin: "0 0 8px 0",
-                            }}
-                          >
-                            FORM-18
-                          </h1>
-                          <p
-                            style={{
-                              fontSize: "10pt",
-                              color: "#666666",
-                              margin: "0 0 8px 0",
-                            }}
-                          >
-                            [See sub-rule (3) of rule 25]
-                          </p>
-                          <h2
-                            style={{
-                              fontSize: "14pt",
-                              fontWeight: "bold",
-                              textDecoration: "underline",
-                              margin: "0 0 8px 0",
-                            }}
-                          >
-                            NOMINATION PAPER
-                          </h2>
-                          <p
-                            style={{
-                              fontSize: "11pt",
-                              color: "#666666",
-                              margin: "0",
-                            }}
-                          >
-                            Municipality Election 2026
-                          </p>
-                        </div>
-
-                        <hr
-                          style={{
-                            border: "none",
-                            borderTop: "1px solid #e0e0e0",
-                            margin: "20px 0",
-                          }}
-                        />
-
-                        {/* Candidate Details */}
-                        <div style={{ marginBottom: "24px" }}>
-                          <p style={{ margin: "12px 0" }}>
-                            * I nominate as an applicant for election to the{" "}
-                            <strong>{submission.formData.municipality}</strong>{" "}
-                            Municipality from the{" "}
-                            <strong>{submission.formData.municipalWard}</strong>{" "}
-                            Municipal ward.
-                          </p>
-
-                          <p style={{ margin: "12px 0" }}>
-                            Applicant&apos;s name:{" "}
-                            <strong>{submission.formData.candidateName}</strong>
-                          </p>
-
-                          <p style={{ margin: "12px 0" }}>
-                            Father&apos;s / Husband&apos;s name:{" "}
-                            <strong>
-                              {submission.formData.fatherOrHusbandName}
-                            </strong>
-                          </p>
-
-                          <p style={{ margin: "12px 0" }}>
-                            Full postal address:{" "}
-                            <strong>
-                              {submission.formData.fullPostalAddress}
-                            </strong>
-                          </p>
-
-                          <p style={{ margin: "16px 0" }}>
-                            Proposer name:{" "}
-                            <strong>{submission.formData.proposerName}</strong>{" "}
-                            at Serial No.{" "}
-                            <strong>
-                              {submission.formData.proposerSerialNo}
-                            </strong>{" "}
-                            in Part No.{" "}
-                            <strong>
-                              {submission.formData.proposerPartNo}
-                            </strong>{" "}
-                            of the electoral roll.
-                          </p>
-
-                          <p style={{ margin: "12px 0" }}>
-                            Date of Birth:{" "}
-                            <strong>{submission.formData.dateOfBirth}</strong> |
-                            Age: <strong>{submission.formData.age}</strong>{" "}
-                            years
-                          </p>
-
-                          <p style={{ margin: "12px 0" }}>
-                            Political Party:{" "}
-                            <strong>
-                              {submission.formData.politicalParty}
-                            </strong>
-                          </p>
-
-                          <p style={{ margin: "12px 0" }}>
-                            Symbol:{" "}
-                            <strong>{submission.formData.partySymbol}</strong>
-                          </p>
-
-                          {submission.formData.category !== "general" && (
-                            <p style={{ margin: "12px 0" }}>
-                              Category:{" "}
-                              <strong>
-                                {getCategoryLabel(submission.formData.category)}
-                              </strong>{" "}
-                              - {submission.formData.casteTribeName}
-                            </p>
-                          )}
-                        </div>
-
-                        <hr
-                          style={{
-                            border: "none",
-                            borderTop: "1px solid #e0e0e0",
-                            margin: "20px 0",
-                          }}
-                        />
-
-                        {/* Application Details */}
+                          <Eye className="h-3 w-3 mr-1" />
+                          View
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>
+                            Nomination Form - {latestSubmission.applicationId}
+                          </DialogTitle>
+                        </DialogHeader>
                         <div
+                          className="p-6 bg-white"
                           style={{
-                            padding: "16px",
-                            backgroundColor: "#f0fdf4",
-                            borderRadius: "8px",
-                            marginTop: "20px",
+                            fontFamily: "'Times New Roman', Times, serif",
+                            fontSize: "12pt",
+                            lineHeight: "1.6",
                           }}
                         >
-                          <p style={{ margin: "8px 0" }}>
-                            <strong>Application ID:</strong>{" "}
-                            {submission.applicationId}
-                          </p>
-                          <p style={{ margin: "8px 0" }}>
-                            <strong>Submission #:</strong>{" "}
-                            {submission.submissionNumber} of {maxSubmissions}
-                          </p>
-                          <p style={{ margin: "8px 0" }}>
-                            <strong>Submitted:</strong>{" "}
-                            {new Date(submission.submittedAt).toLocaleString()}
-                          </p>
-                          <p style={{ margin: "8px 0" }}>
-                            <strong>Status:</strong> {submission.status}
-                          </p>
+                          <div
+                            dangerouslySetInnerHTML={{
+                              __html: generateFormHTML(
+                                latestSubmission.formData,
+                                latestSubmission.submissionNumber,
+                                latestSubmission.applicationId,
+                              ),
+                            }}
+                          />
                         </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                      </DialogContent>
+                    </Dialog>
 
-                  {/* Download Button */}
-                  <Button
-                    size="sm"
-                    className="h-8 text-xs bg-slate-800 hover:bg-slate-700"
-                    onClick={() => generatePDF(submission)}
-                    disabled={isGeneratingPdf}
-                  >
-                    {isGeneratingPdf &&
-                    selectedSubmission?.id === submission.id ? (
-                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    ) : (
-                      <Download className="h-3 w-3 mr-1" />
-                    )}
-                    PDF
-                  </Button>
+                    {/* Download Button */}
+                    <Button
+                      size="sm"
+                      className="h-8 text-xs bg-slate-800 hover:bg-slate-700"
+                      onClick={() => generatePDF(latestSubmission)}
+                      disabled={isGeneratingPdf}
+                    >
+                      {isGeneratingPdf &&
+                      selectedSubmission?.id === latestSubmission.id ? (
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      ) : (
+                        <Download className="h-3 w-3 mr-1" />
+                      )}
+                      PDF
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })()}
           </CardContent>
         </Card>
       ) : (

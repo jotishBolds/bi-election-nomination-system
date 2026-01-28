@@ -29,6 +29,11 @@ import {
   Settings,
   BarChart3,
   ClipboardCheck,
+  ClipboardList,
+  FileSearch,
+  UserX,
+  Trophy,
+  FileBarChart,
 } from "lucide-react";
 
 interface NavItem {
@@ -63,11 +68,44 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
       label: "Management",
       items: [
         {
-          title: "Nomination List",
-          icon: ClipboardCheck,
-          href: "/dashboard?tab=nominations",
+          title: "Application List",
+          icon: ClipboardList,
+          href: "/dashboard?tab=applications",
           iconColor: "text-emerald-600",
           iconBgColor: "bg-emerald-100",
+        },
+        {
+          title: "Scrutiny",
+          icon: FileSearch,
+          href: "/dashboard?tab=scrutiny",
+          iconColor: "text-amber-600",
+          iconBgColor: "bg-amber-100",
+        },
+        {
+          title: "Withdraw",
+          icon: UserX,
+          href: "/dashboard?tab=withdraw",
+          iconColor: "text-rose-600",
+          iconBgColor: "bg-rose-100",
+        },
+        {
+          title: "Contest List",
+          icon: Trophy,
+          href: "/dashboard?tab=contest",
+          iconColor: "text-purple-600",
+          iconBgColor: "bg-purple-100",
+        },
+      ],
+    },
+    {
+      label: "Reports",
+      items: [
+        {
+          title: "Reports",
+          icon: FileBarChart,
+          href: "/dashboard?tab=reports",
+          iconColor: "text-indigo-600",
+          iconBgColor: "bg-indigo-100",
         },
       ],
     },
@@ -159,8 +197,13 @@ function DashboardSidebarContent() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => {
-                  const isActive = item.href.includes("tab=nominations")
-                    ? pathname === "/dashboard" && currentTab === "nominations"
+                  // Extract tab from href if present
+                  const itemTab = item.href.includes("tab=")
+                    ? new URL(item.href, "http://dummy").searchParams.get("tab")
+                    : null;
+
+                  const isActive = itemTab
+                    ? pathname === "/dashboard" && currentTab === itemTab
                     : item.href === "/dashboard"
                       ? pathname === "/dashboard" && !currentTab
                       : pathname === item.href ||

@@ -45,6 +45,7 @@ import html2PDF from "jspdf-html2canvas";
 import { electionData } from "@/lib/election-data";
 import {
   getAllNominations,
+  getUniqueNominations,
   getNominationsByStatus,
   getDistrictWiseStats,
   getTotalPendingActionsCount,
@@ -150,7 +151,7 @@ export function SESPanel() {
   const loadData = () => {
     setIsLoading(true);
     try {
-      setNominations(getAllNominations());
+      setNominations(getUniqueNominations());
       setNominationStatus(getNominationsByStatus());
       setDistrictStats(getDistrictWiseStats());
       setTotalPendingCount(getTotalPendingActionsCount());

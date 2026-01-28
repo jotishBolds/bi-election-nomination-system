@@ -2,15 +2,32 @@
 
 import { NominationFormData } from "@/types/nomination";
 
+export type NominationStatus =
+  | "draft"
+  | "submitted"
+  | "received"
+  | "under_review"
+  | "approved"
+  | "rejected"
+  | "withdrawn"
+  | "contesting";
+
 export interface StoredNomination {
   id: string;
   formData: NominationFormData;
   submissionNumber: number; // 1, 2, or 3
   submittedAt: string;
-  status: "draft" | "submitted" | "under_review" | "approved" | "rejected";
+  status: NominationStatus;
   paymentStatus: "pending" | "paid" | "failed";
   applicationId: string;
   candidateId: string;
+  // Additional fields for tracking
+  receivedAt?: string;
+  scrutinyDate?: string;
+  scrutinyResult?: "accepted" | "rejected";
+  scrutinyRemarks?: string;
+  withdrawnAt?: string;
+  withdrawnReason?: string;
 }
 
 export interface NominationStorageData {
@@ -90,7 +107,7 @@ export function getDraftFormData(
   return data.currentDraft;
 }
 
-// Submit a nomination (adds to submissions array)
+// Submit a nomination (updates existing or creates new)
 export function submitNomination(
   candidateId: string,
   formData: NominationFormData,
@@ -101,6 +118,12 @@ export function submitNomination(
     return null; // Max submissions reached
   }
 
+  // Get or generate application ID - use the same ID for all submissions of a candidate
+  const existingApplicationId =
+    data.submissions.length > 0
+      ? data.submissions[0].applicationId
+      : generateApplicationId();
+
   const nomination: StoredNomination = {
     id: generateNominationId(),
     formData,
@@ -108,7 +131,7 @@ export function submitNomination(
     submittedAt: new Date().toISOString(),
     status: "submitted",
     paymentStatus: "paid",
-    applicationId: generateApplicationId(),
+    applicationId: existingApplicationId, // Use same application ID
     candidateId,
   };
 
@@ -230,17 +253,161 @@ export function getNominationsGroupedByCandidate(): Record<
   );
 }
 
+// Get unique nominations (grouped by applicationId, showing only latest submission)
+export function getUniqueNominations(): StoredNomination[] {
+  const nominations = getRONominations();
+  const groupedByApplicationId = nominations.reduce(
+    (acc, nomination) => {
+      const appId = nomination.applicationId;
+      if (
+        !acc[appId] ||
+        nomination.submissionNumber > acc[appId].submissionNumber
+      ) {
+        acc[appId] = nomination;
+      }
+      return acc;
+    },
+    {} as Record<string, StoredNomination>,
+  );
+
+  return Object.values(groupedByApplicationId);
+}
+
+// Get unique candidate nominations for a specific candidate (latest submission only)
+export function getUniqueCandidateNomination(
+  candidateId: string,
+): StoredNomination | null {
+  const data = getNominationStorageData(candidateId);
+  if (data.submissions.length === 0) return null;
+
+  // Return the latest submission (highest submission number)
+  return data.submissions.reduce((latest, current) =>
+    current.submissionNumber > latest.submissionNumber ? current : latest,
+  );
+}
+
 // Clear all RO nominations (for testing/reset)
 export function clearRONominations(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(RO_NOMINATIONS_KEY);
 }
 
+// Update nomination status
+export function updateNominationStatus(
+  nominationId: string,
+  status: NominationStatus,
+  additionalData?: Partial<StoredNomination>,
+): boolean {
+  if (typeof window === "undefined") return false;
+
+  const nominations = getRONominations();
+  const index = nominations.findIndex((n) => n.id === nominationId);
+
+  if (index === -1) return false;
+
+  nominations[index] = {
+    ...nominations[index],
+    status,
+    ...additionalData,
+  };
+
+  const data: RONominationsData = {
+    nominations,
+    lastUpdated: new Date().toISOString(),
+  };
+
+  localStorage.setItem(RO_NOMINATIONS_KEY, JSON.stringify(data));
+
+  // Also update the candidate's own storage
+  updateCandidateNominationStatus(
+    nominations[index].candidateId,
+    nominationId,
+    status,
+    additionalData,
+  );
+
+  return true;
+}
+
+// Update status in candidate's storage
+function updateCandidateNominationStatus(
+  candidateId: string,
+  nominationId: string,
+  status: NominationStatus,
+  additionalData?: Partial<StoredNomination>,
+): void {
+  if (typeof window === "undefined") return;
+
+  const data = getNominationStorageData(candidateId);
+  const index = data.submissions.findIndex((s) => s.id === nominationId);
+
+  if (index !== -1) {
+    data.submissions[index] = {
+      ...data.submissions[index],
+      status,
+      ...additionalData,
+    };
+    data.lastUpdated = new Date().toISOString();
+    saveNominationStorageData(data);
+  }
+}
+
+// Get nominations by status
+export function getNominationsByStatusFilter(
+  status: NominationStatus | NominationStatus[],
+): StoredNomination[] {
+  const nominations = getRONominations();
+  const statusArray = Array.isArray(status) ? status : [status];
+  return nominations.filter((n) => statusArray.includes(n.status));
+}
+
+// Get nominations by ward
+export function getNominationsByWardFilter(
+  wardName: string,
+): StoredNomination[] {
+  const nominations = getRONominations();
+  return nominations.filter((n) =>
+    n.formData?.municipalWard?.includes(wardName),
+  );
+}
+
+// Get received nominations (for scrutiny)
+export function getReceivedNominations(): StoredNomination[] {
+  return getNominationsByStatusFilter("received");
+}
+
+// Get accepted nominations (for withdraw and contest)
+export function getAcceptedNominations(): StoredNomination[] {
+  return getNominationsByStatusFilter("approved");
+}
+
+// Get withdrawn nominations
+export function getWithdrawnNominations(): StoredNomination[] {
+  return getNominationsByStatusFilter("withdrawn");
+}
+
+// Get contesting candidates (approved and not withdrawn)
+export function getContestingCandidates(): StoredNomination[] {
+  return getNominationsByStatusFilter("contesting");
+}
+
+// Get all unique wards from nominations
+export function getAllWardsFromNominations(): string[] {
+  const nominations = getRONominations();
+  const wards = new Set<string>();
+  nominations.forEach((n) => {
+    if (n.formData?.municipalWard) {
+      wards.add(n.formData.municipalWard);
+    }
+  });
+  return Array.from(wards).sort();
+}
+
 // ==================== SES (State Election Supervisor) Functions ====================
 
 // Get all nominations state-wide for SES - uses existing RO nominations
 export function getAllNominations(): StoredNomination[] {
-  return getRONominations();
+  return getUniqueNominations();
 }
 
 // Get nominations grouped by status

@@ -11,6 +11,14 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Building2,
   Users,
@@ -22,7 +30,6 @@ import {
   CircleDot,
   Clock,
   ClipboardList,
-  AlertCircle,
   TrendingUp,
   User,
   Eye,
@@ -30,6 +37,16 @@ import {
   Loader2,
   FileText,
   ArrowLeft,
+  Search,
+  Filter,
+  CheckCircle2,
+  XCircle,
+  Phone,
+  FileSearch,
+  UserX,
+  Trophy,
+  FileBarChart,
+  MoreVertical,
 } from "lucide-react";
 import {
   Dialog,
@@ -37,7 +54,21 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
 import {
   ResponsiveContainer,
   BarChart,
@@ -55,11 +86,17 @@ import html2PDF from "jspdf-html2canvas";
 import { electionData } from "@/lib/election-data";
 import {
   getRONominations,
+  getUniqueNominations,
   getUniqueCandidatesCount,
   getTotalNominationsCount,
-  getNominationsGroupedByCandidate,
   StoredNomination,
+  NominationStatus,
+  updateNominationStatus,
+  getAllWardsFromNominations,
 } from "@/lib/nomination-storage";
+
+// Mock OTP for demo
+const MOCK_OTP = "123456";
 
 // Calculate stats from election data
 const totalDistricts = electionData.districts.length;
@@ -67,18 +104,6 @@ const totalULBs = electionData.districts.reduce(
   (sum, d) => sum + d.ulbs.length,
   0,
 );
-
-// Wards per district for chart
-const wardsPerDistrict = electionData.districts.map((district) => {
-  const totalWards = district.ulbs.reduce(
-    (sum, ulb) => sum + ulb.wards.length,
-    0,
-  );
-  return {
-    name: district.district,
-    wards: totalWards,
-  };
-});
 
 // Wards per constituency for chart
 const wardsPerConstituency = () => {
@@ -149,19 +174,89 @@ const electionSchedule = [
   },
 ];
 
-// Calculate days remaining
-const lastNominationDate = new Date("2026-03-08");
-const today = new Date();
-const daysRemaining = Math.ceil(
-  (lastNominationDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-);
-// Important dates
-const importantDates = [
-  { event: "Nomination Opens", date: "Jan 20, 2026", status: "completed" },
-  { event: "Last Date", date: "Mar 8, 2026", status: "upcoming" },
-  { event: "Scrutiny", date: "Mar 9, 2026", status: "upcoming" },
-  { event: "Election Day", date: "Mar 31, 2026", status: "upcoming" },
-];
+// OTP Verification Dialog Component
+function OTPVerificationDialog({
+  open,
+  onOpenChange,
+  onVerify,
+  title,
+  description,
+  isLoading,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onVerify: (otp: string) => void;
+  title: string;
+  description: string;
+  isLoading: boolean;
+}) {
+  const [otp, setOtp] = useState("");
+  const [error, setError] = useState("");
+
+  const handleVerify = () => {
+    if (otp.length !== 6) {
+      setError("Please enter a valid 6-digit OTP");
+      return;
+    }
+    if (otp !== MOCK_OTP) {
+      setError("Invalid OTP. Use 123456 for demo.");
+      return;
+    }
+    setError("");
+    onVerify(otp);
+  };
+
+  useEffect(() => {
+    if (!open) {
+      setOtp("");
+      setError("");
+    }
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Phone className="h-5 w-5 text-primary" />
+            {title}
+          </DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="flex flex-col items-center gap-4">
+            <p className="text-sm text-muted-foreground text-center">
+              Enter the 6-digit OTP sent to your registered mobile number
+            </p>
+            <InputOTP maxLength={6} value={otp} onChange={setOtp}>
+              <InputOTPGroup>
+                <InputOTPSlot index={0} />
+                <InputOTPSlot index={1} />
+                <InputOTPSlot index={2} />
+                <InputOTPSlot index={3} />
+                <InputOTPSlot index={4} />
+                <InputOTPSlot index={5} />
+              </InputOTPGroup>
+            </InputOTP>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <p className="text-xs text-muted-foreground">
+              Demo OTP: <span className="font-mono font-bold">123456</span>
+            </p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleVerify} disabled={isLoading}>
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Verify & Confirm
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export function ROPanel() {
   const searchParams = useSearchParams();
@@ -174,42 +269,151 @@ export function ROPanel() {
     useState<StoredNomination | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [wardFilter, setWardFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [availableWards, setAvailableWards] = useState<string[]>([]);
+
+  // OTP Dialog states
+  const [otpDialogOpen, setOtpDialogOpen] = useState(false);
+  const [otpAction, setOtpAction] = useState<{
+    type: string;
+    nominationId: string;
+    newStatus: NominationStatus;
+  } | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+
   // Load nominations data
   useEffect(() => {
     const loadNominations = () => {
-      const allNominations = getRONominations();
+      const allNominations = getUniqueNominations();
       setNominations(allNominations);
       setUniqueCandidates(getUniqueCandidatesCount());
       setTotalSubmissions(getTotalNominationsCount());
+      setAvailableWards(getAllWardsFromNominations());
     };
 
     loadNominations();
-    // Refresh every 5 seconds to catch new submissions
     const interval = setInterval(loadNominations, 5000);
     return () => clearInterval(interval);
   }, []);
 
-  // Dynamic nomination status based on actual data
+  // Filter nominations
+  const getFilteredNominations = (
+    allowedStatuses?: NominationStatus | NominationStatus[],
+  ) => {
+    let filtered = nominations;
+
+    // Apply allowed status filter (from tab requirements)
+    if (allowedStatuses) {
+      const statusArray = Array.isArray(allowedStatuses)
+        ? allowedStatuses
+        : [allowedStatuses];
+      filtered = filtered.filter((n) => statusArray.includes(n.status));
+    }
+
+    // Apply user-selected status filter
+    if (statusFilter && statusFilter !== "all") {
+      filtered = filtered.filter((n) => n.status === statusFilter);
+    }
+
+    // Apply ward filter
+    if (wardFilter && wardFilter !== "all") {
+      filtered = filtered.filter(
+        (n) => n.formData?.municipalWard === wardFilter,
+      );
+    }
+
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (n) =>
+          n.formData?.candidateName?.toLowerCase().includes(query) ||
+          n.applicationId?.toLowerCase().includes(query) ||
+          n.formData?.municipalWard?.toLowerCase().includes(query),
+      );
+    }
+
+    return filtered;
+  };
+
+  // Handle status update with OTP
+  const handleStatusUpdate = (
+    nominationId: string,
+    newStatus: NominationStatus,
+    actionType: string,
+  ) => {
+    setOtpAction({ type: actionType, nominationId, newStatus });
+    setOtpDialogOpen(true);
+  };
+
+  const handleOtpVerify = () => {
+    if (!otpAction) return;
+
+    setIsProcessing(true);
+
+    // Simulate processing
+    setTimeout(() => {
+      const additionalData: Partial<StoredNomination> = {};
+
+      if (otpAction.newStatus === "received") {
+        additionalData.receivedAt = new Date().toISOString();
+      } else if (otpAction.newStatus === "approved") {
+        additionalData.scrutinyDate = new Date().toISOString();
+        additionalData.scrutinyResult = "accepted";
+      } else if (otpAction.newStatus === "rejected") {
+        additionalData.scrutinyDate = new Date().toISOString();
+        additionalData.scrutinyResult = "rejected";
+      } else if (otpAction.newStatus === "withdrawn") {
+        additionalData.withdrawnAt = new Date().toISOString();
+      }
+
+      const success = updateNominationStatus(
+        otpAction.nominationId,
+        otpAction.newStatus,
+        additionalData,
+      );
+
+      if (success) {
+        // Reload nominations
+        const allNominations = getUniqueNominations();
+        setNominations(allNominations);
+      }
+
+      setIsProcessing(false);
+      setOtpDialogOpen(false);
+      setOtpAction(null);
+    }, 1000);
+  };
+
+  // Dynamic nomination status data
   const nominationStatusData = [
     {
       name: "Submitted",
-      value: nominations.filter((n) => n.status === "submitted").length || 0,
+      value: nominations.filter((n) => n.status === "submitted").length,
       color: "#22c55e",
     },
     {
-      name: "Under Review",
-      value: nominations.filter((n) => n.status === "under_review").length || 0,
-      color: "#6366f1",
+      name: "Received",
+      value: nominations.filter((n) => n.status === "received").length,
+      color: "#3b82f6",
     },
     {
       name: "Approved",
-      value: nominations.filter((n) => n.status === "approved").length || 0,
+      value: nominations.filter((n) => n.status === "approved").length,
       color: "#f59e0b",
     },
     {
       name: "Rejected",
-      value: nominations.filter((n) => n.status === "rejected").length || 0,
+      value: nominations.filter((n) => n.status === "rejected").length,
       color: "#ef4444",
+    },
+    {
+      name: "Contesting",
+      value: nominations.filter((n) => n.status === "contesting").length,
+      color: "#8b5cf6",
     },
   ];
 
@@ -225,8 +429,53 @@ export function ROPanel() {
     return labels[category] || category;
   };
 
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "submitted":
+        return (
+          <Badge className="bg-emerald-100 text-emerald-700 text-xs">
+            Submitted
+          </Badge>
+        );
+      case "received":
+        return (
+          <Badge className="bg-blue-100 text-blue-700 text-xs">Received</Badge>
+        );
+      case "under_review":
+        return (
+          <Badge className="bg-amber-100 text-amber-700 text-xs">
+            Under Review
+          </Badge>
+        );
+      case "approved":
+        return (
+          <Badge className="bg-green-100 text-green-700 text-xs">
+            Accepted
+          </Badge>
+        );
+      case "rejected":
+        return (
+          <Badge className="bg-red-100 text-red-700 text-xs">Rejected</Badge>
+        );
+      case "withdrawn":
+        return (
+          <Badge className="bg-gray-100 text-gray-700 text-xs">Withdrawn</Badge>
+        );
+      case "contesting":
+        return (
+          <Badge className="bg-purple-100 text-purple-700 text-xs">
+            Contesting
+          </Badge>
+        );
+      default:
+        return (
+          <Badge className="bg-slate-100 text-slate-700 text-xs">Draft</Badge>
+        );
+    }
+  };
+
   const generateFormHTML = (
-    formData: any,
+    formData: NominationFormData,
     submissionNumber: number,
     applicationId: string,
   ) => {
@@ -237,84 +486,28 @@ export function ROPanel() {
     });
 
     return `
-      <!-- Form Header -->
       <div style="text-align: center; margin-bottom: 24px;">
         <h1 style="font-size: 18pt; font-weight: bold; margin: 0 0 8px 0;">FORM-18</h1>
         <p style="font-size: 10pt; color: #666666; margin: 0 0 8px 0;">[See sub-rule (3) of rule 25]</p>
         <h2 style="font-size: 14pt; font-weight: bold; text-decoration: underline; margin: 0 0 8px 0;">NOMINATION PAPER</h2>
         <p style="font-size: 11pt; color: #666666; margin: 0;">Municipality Election 2026</p>
       </div>
-
       <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;" />
-
-      <!-- Proposer Section -->
       <div style="margin-bottom: 24px;">
-        <p style="margin: 12px 0;">* I nominate as an applicant for election to the <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 200px;">${formData.municipality || ""}</span> Municipality from the <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 150px;">${formData.municipalWard || ""}</span> Municipal ward.</p>
-
-        <p style="margin: 12px 0;">Applicant's name: <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 280px;">${formData.candidateName || ""}</span></p>
-
-        <p style="margin: 12px 0;">Father's / Husband's name: <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 230px;">${formData.fatherOrHusbandName || ""}</span></p>
-
-        <p style="margin: 12px 0;">Full postal address: <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 300px;">${formData.fullPostalAddress || ""}</span></p>
-
-        <p style="margin: 16px 0;">My name is <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 120px;">${formData.proposerName || ""}</span> and it is entered at Serial No. <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 60px;">${formData.proposerSerialNo || ""}</span> in Part No. <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 60px;">${formData.proposerPartNo || ""}</span> of the electoral roll of the Municipality.</p>
-
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 24px;">
-          <p style="margin: 0;">Date: <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 140px;">${currentDate}</span></p>
-          <div style="text-align: center;">
-            <div style="border-top: 1px solid #000; width: 200px; padding-top: 5px; margin-top: 30px;">
-              <span style="font-size: 10pt;">(Signature of the proposer)</span>
-            </div>
-          </div>
-        </div>
-
-        <p style="font-style: italic; font-size: 10pt; margin-top: 12px;">* Appropriate particulars of the election to be inserted here.</p>
+        <p style="margin: 12px 0;">* I nominate as an applicant for election to the <strong>${formData.municipality || ""}</strong> Municipality from the <strong>${formData.municipalWard || ""}</strong> Municipal ward.</p>
+        <p style="margin: 12px 0;">Applicant's name: <strong>${formData.candidateName || ""}</strong></p>
+        <p style="margin: 12px 0;">Father's / Husband's name: <strong>${formData.fatherOrHusbandName || ""}</strong></p>
+        <p style="margin: 12px 0;">Full postal address: <strong>${formData.fullPostalAddress || ""}</strong></p>
+        <p style="margin: 16px 0;">Proposer name: <strong>${formData.proposerName || ""}</strong> at Serial No. <strong>${formData.proposerSerialNo || ""}</strong> in Part No. <strong>${formData.proposerPartNo || ""}</strong></p>
+        <p style="margin: 12px 0;">Date of Birth: <strong>${formData.dateOfBirth || ""}</strong> | Age: <strong>${formData.age || ""}</strong> years</p>
+        <p style="margin: 12px 0;">Political Party: <strong>${formData.politicalParty || ""}</strong></p>
+        <p style="margin: 12px 0;">Symbol: <strong>${formData.partySymbol || ""}</strong></p>
+        ${formData.category && formData.category !== "general" ? `<p style="margin: 12px 0;">Category: <strong>${getCategoryLabel(formData.category)}</strong></p>` : ""}
       </div>
-
-      <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;" />
-
-      <!-- Applicant Declaration Section -->
-      <div style="margin-bottom: 24px;">
-        <p style="font-weight: 500; margin-bottom: 16px;">I, the above mentioned applicant, assent to this nomination and hereby declare:-</p>
-
-        <div style="margin-left: 20px;">
-          <p style="margin: 10px 0;">(a) that I have completed <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 40px;">${formData.age || ""}</span> years of age.</p>
-
-          <p style="margin: 10px 0;">(b) that the symbol I have chosen is:</p>
-
-          <div style="display: flex; align-items: center; gap: 16px; margin: 12px 0 12px 30px; padding: 12px; background-color: #f5f5f5; border-radius: 6px;">
-            ${formData.partySymbolImage ? `<img src="${formData.partySymbolImage}" alt="${formData.partySymbol || ""}" style="width: 60px; height: 60px; object-fit: contain; border: 1px solid #ddd; background-color: white; padding: 4px; border-radius: 4px;" />` : ""}
-            <div>
-              <p style="font-weight: 600; margin: 0 0 4px 0;">${formData.partySymbol || ""}</p>
-              <span style="display: inline-block; padding: 2px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 10pt; background-color: #fff;">${formData.politicalParty || ""}</span>
-            </div>
-          </div>
-
-          <p style="margin: 10px 0;">(c) that I am set up at this election by <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 180px;">${formData.politicalParty || ""}</span> Political Party.</p>
-
-          <p style="margin: 10px 0;">(d) that my name and my *father's / husband's name have been correctly spelt out above;</p>
-
-          <p style="margin: 10px 0;">(e) that to the best of my knowledge and belief, I am qualified and not also disqualified for being chosen to fill the seat in the <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 200px;">${formData.municipality || ""}</span> Municipality.</p>
-
-          ${formData.category && formData.category !== "general" ? `<p style="margin: 10px 0;">* I further declare that I am a member of the <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 150px;">${formData.casteTribeName || ""}</span> caste/tribe, which is a <strong>${getCategoryLabel(formData.category)}</strong> of the State of Sikkim.</p>` : ""}
-        </div>
-
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 24px;">
-          <p style="margin: 0;">Date: <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 140px;">${currentDate}</span></p>
-          <div style="text-align: center;">
-            <div style="border-top: 1px solid #000; width: 200px; padding-top: 5px; margin-top: 30px;">
-              <span style="font-size: 10pt;">(Signature of applicant)</span>
-            </div>
-          </div>
-        </div>
-
-        <p style="font-style: italic; font-size: 10pt; margin-top: 12px;">* Strike out whatever is not applicable.</p>
-      </div>
-
-      <!-- Footer -->
-      <div style="margin-top: 40px; text-align: center; font-size: 10pt; color: #666;">
-        <p style="margin: 0;">Application ID: ${applicationId} | Submission: ${submissionNumber}/3</p>
-        <p style="margin: 4px 0 0 0;">Generated on: ${currentDate}</p>
+      <div style="padding: 16px; background-color: #f0fdf4; border-radius: 8px; margin-top: 20px;">
+        <p style="margin: 8px 0;"><strong>Application ID:</strong> ${applicationId}</p>
+        <p style="margin: 8px 0;"><strong>Submission #:</strong> ${submissionNumber} of 3</p>
+        <p style="margin: 8px 0;"><strong>Generated:</strong> ${currentDate}</p>
       </div>
     `;
   };
@@ -323,12 +516,11 @@ export function ROPanel() {
     setSelectedSubmission(nomination);
     setIsGeneratingPdf(true);
 
-    // Create temporary element for PDF generation
     const tempDiv = document.createElement("div");
     tempDiv.style.position = "absolute";
     tempDiv.style.left = "-9999px";
     tempDiv.style.top = "-9999px";
-    tempDiv.style.width = "794px"; // A4 width in pixels
+    tempDiv.style.width = "794px";
     tempDiv.style.fontFamily = "'Times New Roman', Times, serif";
     tempDiv.style.fontSize = "12pt";
     tempDiv.style.lineHeight = "1.6";
@@ -336,7 +528,6 @@ export function ROPanel() {
     tempDiv.style.color = "#000000";
     tempDiv.style.padding = "40px";
 
-    // Generate the form content
     tempDiv.innerHTML = generateFormHTML(
       nomination.formData,
       nomination.submissionNumber,
@@ -347,11 +538,7 @@ export function ROPanel() {
 
     try {
       await html2PDF(tempDiv, {
-        jsPDF: {
-          unit: "pt",
-          format: "a4",
-          orientation: "portrait",
-        },
+        jsPDF: { unit: "pt", format: "a4", orientation: "portrait" },
         html2canvas: {
           scale: 2,
           useCORS: true,
@@ -362,12 +549,7 @@ export function ROPanel() {
         },
         imageType: "image/jpeg",
         imageQuality: 0.98,
-        margin: {
-          top: 40,
-          right: 40,
-          bottom: 40,
-          left: 40,
-        },
+        margin: { top: 40, right: 40, bottom: 40, left: 40 },
         autoResize: true,
         output: `FORM-18_${nomination.formData.candidateName?.replace(/\s+/g, "_") || "Nomination"}_${nomination.applicationId}.pdf`,
       });
@@ -379,42 +561,122 @@ export function ROPanel() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "submitted":
-        return (
-          <Badge className="bg-emerald-100 text-emerald-700 text-xs">
-            Submitted
-          </Badge>
-        );
-      case "under_review":
-        return (
-          <Badge className="bg-amber-100 text-amber-700 text-xs">
-            Under Review
-          </Badge>
-        );
-      case "approved":
-        return (
-          <Badge className="bg-green-100 text-green-700 text-xs">
-            Approved
-          </Badge>
-        );
-      case "rejected":
-        return (
-          <Badge className="bg-red-100 text-red-700 text-xs">Rejected</Badge>
-        );
-      default:
-        return (
-          <Badge className="bg-slate-100 text-slate-700 text-xs">Draft</Badge>
-        );
-    }
-  };
+  // Professional Filter/Search Component
+  const FilterBar = ({
+    showStatusFilter = false,
+    statusOptions = [] as { value: string; label: string }[],
+  }) => (
+    <div className="p-4 mb-4 bg-slate-50 rounded-xl border border-slate-200">
+      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-indigo-100 rounded-lg">
+            <Filter className="h-4 w-4 text-indigo-600" />
+          </div>
+          <span className="text-sm font-medium text-slate-700">Filters</span>
+        </div>
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3 w-full">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search candidate, ID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 bg-white"
+            />
+          </div>
+          <Select value={wardFilter} onValueChange={setWardFilter}>
+            <SelectTrigger className="bg-white">
+              <MapPin className="h-4 w-4 mr-2 text-slate-500" />
+              <SelectValue placeholder="Select Ward" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Wards</SelectItem>
+              {availableWards.map((ward) => (
+                <SelectItem key={ward} value={ward}>
+                  {ward}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {showStatusFilter && statusOptions.length > 0 ? (
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="bg-white">
+                <CircleDot className="h-4 w-4 mr-2 text-slate-500" />
+                <SelectValue placeholder="Filter Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                {statusOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="flex items-center gap-2 text-sm text-slate-600 px-3 py-2 bg-white rounded-md border border-slate-200">
+              <Badge variant="outline" className="bg-slate-50">
+                {wardFilter === "all" ? "All Wards" : wardFilter}
+              </Badge>
+              <span className="text-slate-400">•</span>
+              <span className="text-xs text-slate-500">
+                {searchQuery
+                  ? `Searching: "${searchQuery}"`
+                  : "No search filter"}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
-  // Nomination List View
-  if (activeTab === "nominations") {
+  // Nomination Card Component
+  const NominationCard = ({
+    nomination,
+    actions,
+  }: {
+    nomination: StoredNomination;
+    actions?: React.ReactNode;
+  }) => (
+    <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors">
+      <div className="flex items-center gap-4">
+        <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+          <User className="h-5 w-5 text-indigo-600" />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-slate-800">
+            {nomination.formData.candidateName || "Unknown Candidate"}
+          </p>
+          <p className="text-xs text-slate-500">
+            {nomination.applicationId} • {nomination.formData.municipality} -{" "}
+            {nomination.formData.municipalWard}
+          </p>
+          <p className="text-xs text-slate-400">
+            Submitted: {new Date(nomination.submittedAt).toLocaleString()} • #
+            {nomination.submissionNumber}/3
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        {getStatusBadge(nomination.status)}
+        {actions}
+      </div>
+    </div>
+  );
+
+  // Import NominationFormData type
+  type NominationFormData = StoredNomination["formData"];
+
+  // ==================== APPLICATION LIST VIEW ====================
+  if (activeTab === "applications") {
+    const filteredNominations = getFilteredNominations([
+      "submitted",
+      "received",
+    ]);
+
     return (
       <div className="space-y-5 p-6 min-h-screen">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button
@@ -428,10 +690,10 @@ export function ROPanel() {
             </Button>
             <div>
               <h1 className="text-xl font-semibold text-slate-800">
-                Nomination List
+                Application List
               </h1>
               <p className="text-sm text-slate-500 mt-0.5">
-                {electionData.election} - All Submitted Nominations
+                {electionData.election} - All Submitted Applications
               </p>
             </div>
           </div>
@@ -444,7 +706,7 @@ export function ROPanel() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="bg-emerald-50 border-0 shadow-sm rounded-xl">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -461,7 +723,6 @@ export function ROPanel() {
               </div>
             </CardContent>
           </Card>
-
           <Card className="bg-blue-50 border-0 shadow-sm rounded-xl">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -478,20 +739,35 @@ export function ROPanel() {
               </div>
             </CardContent>
           </Card>
-
           <Card className="bg-amber-50 border-0 shadow-sm rounded-xl">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <Clock className="h-5 w-5 text-amber-600" />
                 <Badge className="bg-amber-100 text-amber-700 text-xs">
-                  Pending
+                  New
                 </Badge>
               </div>
               <div className="mt-3">
                 <p className="text-2xl font-bold text-slate-800">
                   {nominations.filter((n) => n.status === "submitted").length}
                 </p>
-                <p className="text-xs text-slate-500 mt-1">Pending Review</p>
+                <p className="text-xs text-slate-500 mt-1">Pending Receipt</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-indigo-50 border-0 shadow-sm rounded-xl">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <CheckCircle className="h-5 w-5 text-indigo-600" />
+                <Badge className="bg-indigo-100 text-indigo-700 text-xs">
+                  Received
+                </Badge>
+              </div>
+              <div className="mt-3">
+                <p className="text-2xl font-bold text-slate-800">
+                  {nominations.filter((n) => n.status === "received").length}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Marked Received</p>
               </div>
             </CardContent>
           </Card>
@@ -506,325 +782,1227 @@ export function ROPanel() {
                   <ClipboardList className="h-4 w-4 text-indigo-600" />
                 </div>
                 <CardTitle className="text-sm font-semibold text-slate-800">
-                  All Nominations
+                  All Applications
                 </CardTitle>
               </div>
               <Badge className="bg-indigo-100 text-indigo-700 text-xs">
-                {nominations.length} records
+                {filteredNominations.length} records
               </Badge>
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            {nominations.length === 0 ? (
+            <FilterBar
+              showStatusFilter={true}
+              statusOptions={[
+                { value: "submitted", label: "Submitted" },
+                { value: "received", label: "Received" },
+              ]}
+            />
+
+            {filteredNominations.length === 0 ? (
               <div className="text-center py-12">
                 <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
                 <h3 className="font-semibold text-slate-600 mb-2">
-                  No Nominations Yet
+                  No Applications Found
                 </h3>
                 <p className="text-sm text-slate-400">
-                  Nominations will appear here once candidates submit their
-                  forms.
+                  No applications match your search criteria.
                 </p>
               </div>
             ) : (
               <div className="space-y-3">
-                {nominations.map((nomination) => (
+                {filteredNominations.map((nomination) => (
+                  <NominationCard
+                    key={nomination.id}
+                    nomination={nomination}
+                    actions={
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <DropdownMenuItem
+                                onSelect={(e) => e.preventDefault()}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                              <DialogHeader>
+                                <DialogTitle>
+                                  Nomination Form -{" "}
+                                  {nomination.formData.candidateName}
+                                </DialogTitle>
+                              </DialogHeader>
+                              <div
+                                className="p-6 bg-white"
+                                style={{
+                                  fontFamily: "'Times New Roman', Times, serif",
+                                  fontSize: "12pt",
+                                  lineHeight: "1.6",
+                                }}
+                              >
+                                <div
+                                  dangerouslySetInnerHTML={{
+                                    __html: generateFormHTML(
+                                      nomination.formData,
+                                      nomination.submissionNumber,
+                                      nomination.applicationId,
+                                    ),
+                                  }}
+                                />
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                          <DropdownMenuItem
+                            onClick={() => generatePDF(nomination)}
+                            disabled={isGeneratingPdf}
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Download PDF
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {nomination.status === "submitted" && (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleStatusUpdate(
+                                  nomination.id,
+                                  "received",
+                                  "Mark as Received",
+                                )
+                              }
+                              className="text-blue-600"
+                            >
+                              <CheckCircle2 className="h-4 w-4 mr-2" />
+                              Mark as Received
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* OTP Dialog */}
+        <OTPVerificationDialog
+          open={otpDialogOpen}
+          onOpenChange={setOtpDialogOpen}
+          onVerify={handleOtpVerify}
+          title="Verify Status Change"
+          description="Please verify with OTP to mark this application as received."
+          isLoading={isProcessing}
+        />
+      </div>
+    );
+  }
+
+  // ==================== SCRUTINY VIEW ====================
+  if (activeTab === "scrutiny") {
+    const receivedNominations = getFilteredNominations("received");
+
+    return (
+      <div className="space-y-5 p-6 min-h-screen">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => window.history.back()}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <div>
+              <h1 className="text-xl font-semibold text-slate-800">Scrutiny</h1>
+              <p className="text-sm text-slate-500 mt-0.5">
+                Review and verify received nominations
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="bg-blue-50 border-0 shadow-sm rounded-xl">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <FileSearch className="h-5 w-5 text-blue-600" />
+                <Badge className="bg-blue-100 text-blue-700 text-xs">
+                  Pending
+                </Badge>
+              </div>
+              <div className="mt-3">
+                <p className="text-2xl font-bold text-slate-800">
+                  {nominations.filter((n) => n.status === "received").length}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Awaiting Scrutiny</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-green-50 border-0 shadow-sm rounded-xl">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <Badge className="bg-green-100 text-green-700 text-xs">
+                  Accepted
+                </Badge>
+              </div>
+              <div className="mt-3">
+                <p className="text-2xl font-bold text-slate-800">
+                  {nominations.filter((n) => n.status === "approved").length}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Nominations Accepted
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-red-50 border-0 shadow-sm rounded-xl">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <XCircle className="h-5 w-5 text-red-600" />
+                <Badge className="bg-red-100 text-red-700 text-xs">
+                  Rejected
+                </Badge>
+              </div>
+              <div className="mt-3">
+                <p className="text-2xl font-bold text-slate-800">
+                  {nominations.filter((n) => n.status === "rejected").length}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Nominations Rejected
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Scrutiny List */}
+        <Card className="bg-white border-0 shadow-sm rounded-xl">
+          <CardHeader className="pb-2 px-4 pt-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-amber-100 rounded-lg">
+                  <FileSearch className="h-4 w-4 text-amber-600" />
+                </div>
+                <CardTitle className="text-sm font-semibold text-slate-800">
+                  Scrutiny Queue
+                </CardTitle>
+              </div>
+              <Badge className="bg-amber-100 text-amber-700 text-xs">
+                {receivedNominations.length} pending
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <FilterBar
+              showStatusFilter={true}
+              statusOptions={[
+                { value: "received", label: "Pending Scrutiny" },
+                { value: "approved", label: "Accepted" },
+                { value: "rejected", label: "Rejected" },
+              ]}
+            />
+
+            {receivedNominations.length === 0 ? (
+              <div className="text-center py-12">
+                <FileSearch className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                <h3 className="font-semibold text-slate-600 mb-2">
+                  No Nominations for Scrutiny
+                </h3>
+                <p className="text-sm text-slate-400">
+                  All received nominations have been processed.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {receivedNominations.map((nomination) => (
+                  <NominationCard
+                    key={nomination.id}
+                    nomination={nomination}
+                    actions={
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <DropdownMenuItem
+                                onSelect={(e) => e.preventDefault()}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                              <DialogHeader>
+                                <DialogTitle>
+                                  Nomination Form -{" "}
+                                  {nomination.formData.candidateName}
+                                </DialogTitle>
+                              </DialogHeader>
+                              <div
+                                className="p-6 bg-white"
+                                style={{
+                                  fontFamily: "'Times New Roman', Times, serif",
+                                  fontSize: "12pt",
+                                  lineHeight: "1.6",
+                                }}
+                              >
+                                <div
+                                  dangerouslySetInnerHTML={{
+                                    __html: generateFormHTML(
+                                      nomination.formData,
+                                      nomination.submissionNumber,
+                                      nomination.applicationId,
+                                    ),
+                                  }}
+                                />
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                          <DropdownMenuSeparator />
+                          {nomination.status === "received" && (
+                            <>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleStatusUpdate(
+                                    nomination.id,
+                                    "approved",
+                                    "Accept Nomination",
+                                  )
+                                }
+                                className="text-green-600"
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Accept Nomination
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleStatusUpdate(
+                                    nomination.id,
+                                    "rejected",
+                                    "Reject Nomination",
+                                  )
+                                }
+                                className="text-red-600"
+                              >
+                                <XCircle className="h-4 w-4 mr-2" />
+                                Reject Nomination
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <OTPVerificationDialog
+          open={otpDialogOpen}
+          onOpenChange={setOtpDialogOpen}
+          onVerify={handleOtpVerify}
+          title="Verify Scrutiny Decision"
+          description="Please verify with OTP to confirm the scrutiny decision."
+          isLoading={isProcessing}
+        />
+      </div>
+    );
+  }
+
+  // ==================== WITHDRAW VIEW ====================
+  if (activeTab === "withdraw") {
+    const acceptedNominations = getFilteredNominations("approved");
+    const withdrawnNominations = getFilteredNominations("withdrawn");
+
+    return (
+      <div className="space-y-5 p-6 min-h-screen">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => window.history.back()}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <div>
+              <h1 className="text-xl font-semibold text-slate-800">
+                Withdraw Management
+              </h1>
+              <p className="text-sm text-slate-500 mt-0.5">
+                Process withdrawal requests from accepted candidates
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className="bg-green-50 border-0 shadow-sm rounded-xl">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <Badge className="bg-green-100 text-green-700 text-xs">
+                  Active
+                </Badge>
+              </div>
+              <div className="mt-3">
+                <p className="text-2xl font-bold text-slate-800">
+                  {acceptedNominations.length}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Accepted Nominations
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gray-50 border-0 shadow-sm rounded-xl">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <UserX className="h-5 w-5 text-gray-600" />
+                <Badge className="bg-gray-100 text-gray-700 text-xs">
+                  Withdrawn
+                </Badge>
+              </div>
+              <div className="mt-3">
+                <p className="text-2xl font-bold text-slate-800">
+                  {withdrawnNominations.length}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Total Withdrawals</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Accepted Candidates for Withdrawal */}
+        <Card className="bg-white border-0 shadow-sm rounded-xl">
+          <CardHeader className="pb-2 px-4 pt-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-green-100 rounded-lg">
+                  <UserX className="h-4 w-4 text-green-600" />
+                </div>
+                <CardTitle className="text-sm font-semibold text-slate-800">
+                  Accepted Candidates
+                </CardTitle>
+              </div>
+              <Badge className="bg-green-100 text-green-700 text-xs">
+                {acceptedNominations.length} active
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <FilterBar
+              showStatusFilter={true}
+              statusOptions={[
+                { value: "approved", label: "Accepted / Active" },
+                { value: "withdrawn", label: "Withdrawn" },
+              ]}
+            />
+
+            {acceptedNominations.length === 0 ? (
+              <div className="text-center py-12">
+                <UserX className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                <h3 className="font-semibold text-slate-600 mb-2">
+                  No Accepted Nominations
+                </h3>
+                <p className="text-sm text-slate-400">
+                  Accepted nominations will appear here for withdrawal
+                  processing.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {acceptedNominations.map((nomination) => (
+                  <NominationCard
+                    key={nomination.id}
+                    nomination={nomination}
+                    actions={
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <DropdownMenuItem
+                                onSelect={(e) => e.preventDefault()}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                              <DialogHeader>
+                                <DialogTitle>
+                                  Nomination Form -{" "}
+                                  {nomination.formData.candidateName}
+                                </DialogTitle>
+                              </DialogHeader>
+                              <div
+                                className="p-6 bg-white"
+                                style={{
+                                  fontFamily: "'Times New Roman', Times, serif",
+                                  fontSize: "12pt",
+                                  lineHeight: "1.6",
+                                }}
+                              >
+                                <div
+                                  dangerouslySetInnerHTML={{
+                                    __html: generateFormHTML(
+                                      nomination.formData,
+                                      nomination.submissionNumber,
+                                      nomination.applicationId,
+                                    ),
+                                  }}
+                                />
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                          <DropdownMenuSeparator />
+                          {nomination.status === "approved" && (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleStatusUpdate(
+                                  nomination.id,
+                                  "withdrawn",
+                                  "Process Withdrawal",
+                                )
+                              }
+                              className="text-amber-600"
+                            >
+                              <UserX className="h-4 w-4 mr-2" />
+                              Process Withdrawal
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Withdrawn List */}
+        {withdrawnNominations.length > 0 && (
+          <Card className="bg-white border-0 shadow-sm rounded-xl">
+            <CardHeader className="pb-2 px-4 pt-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-gray-100 rounded-lg">
+                    <UserX className="h-4 w-4 text-gray-600" />
+                  </div>
+                  <CardTitle className="text-sm font-semibold text-slate-800">
+                    Withdrawn Candidates
+                  </CardTitle>
+                </div>
+                <Badge className="bg-gray-100 text-gray-700 text-xs">
+                  {withdrawnNominations.length} withdrawn
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="px-4 pb-4">
+              <div className="space-y-3">
+                {withdrawnNominations.map((nomination) => (
+                  <NominationCard key={nomination.id} nomination={nomination} />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <OTPVerificationDialog
+          open={otpDialogOpen}
+          onOpenChange={setOtpDialogOpen}
+          onVerify={handleOtpVerify}
+          title="Verify Withdrawal"
+          description="Please verify with OTP to process the withdrawal request."
+          isLoading={isProcessing}
+        />
+      </div>
+    );
+  }
+
+  // ==================== CONTEST LIST VIEW ====================
+  if (activeTab === "contest") {
+    const acceptedNominations = getFilteredNominations("approved");
+    const contestingCandidates = getFilteredNominations("contesting");
+
+    return (
+      <div className="space-y-5 p-6 min-h-screen">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => window.history.back()}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <div>
+              <h1 className="text-xl font-semibold text-slate-800">
+                Contest List
+              </h1>
+              <p className="text-sm text-slate-500 mt-0.5">
+                Final list of contesting candidates
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className="bg-green-50 border-0 shadow-sm rounded-xl">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <Badge className="bg-green-100 text-green-700 text-xs">
+                  Accepted
+                </Badge>
+              </div>
+              <div className="mt-3">
+                <p className="text-2xl font-bold text-slate-800">
+                  {acceptedNominations.length}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Ready for Contest</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-purple-50 border-0 shadow-sm rounded-xl">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <Trophy className="h-5 w-5 text-purple-600" />
+                <Badge className="bg-purple-100 text-purple-700 text-xs">
+                  Final
+                </Badge>
+              </div>
+              <div className="mt-3">
+                <p className="text-2xl font-bold text-slate-800">
+                  {contestingCandidates.length}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Contesting Candidates
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Accepted Candidates - Ready to Contest */}
+        <Card className="bg-white border-0 shadow-sm rounded-xl">
+          <CardHeader className="pb-2 px-4 pt-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-green-100 rounded-lg">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                </div>
+                <CardTitle className="text-sm font-semibold text-slate-800">
+                  Accepted Candidates - Ready to Finalize
+                </CardTitle>
+              </div>
+              <Badge className="bg-green-100 text-green-700 text-xs">
+                {acceptedNominations.length} pending
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <FilterBar
+              showStatusFilter={true}
+              statusOptions={[
+                { value: "approved", label: "Ready to Finalize" },
+                { value: "contesting", label: "Finalized / Contesting" },
+              ]}
+            />
+
+            {acceptedNominations.length === 0 ? (
+              <div className="text-center py-12">
+                <Trophy className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                <h3 className="font-semibold text-slate-600 mb-2">
+                  No Candidates Ready
+                </h3>
+                <p className="text-sm text-slate-400">
+                  Accepted candidates who haven&apos;t withdrawn will appear
+                  here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {acceptedNominations.map((nomination) => (
+                  <NominationCard
+                    key={nomination.id}
+                    nomination={nomination}
+                    actions={
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <DropdownMenuItem
+                                onSelect={(e) => e.preventDefault()}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                              <DialogHeader>
+                                <DialogTitle>
+                                  Nomination Form -{" "}
+                                  {nomination.formData.candidateName}
+                                </DialogTitle>
+                              </DialogHeader>
+                              <div
+                                className="p-6 bg-white"
+                                style={{
+                                  fontFamily: "'Times New Roman', Times, serif",
+                                  fontSize: "12pt",
+                                  lineHeight: "1.6",
+                                }}
+                              >
+                                <div
+                                  dangerouslySetInnerHTML={{
+                                    __html: generateFormHTML(
+                                      nomination.formData,
+                                      nomination.submissionNumber,
+                                      nomination.applicationId,
+                                    ),
+                                  }}
+                                />
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                          <DropdownMenuSeparator />
+                          {nomination.status === "approved" && (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleStatusUpdate(
+                                  nomination.id,
+                                  "contesting",
+                                  "Finalize as Contesting",
+                                )
+                              }
+                              className="text-purple-600"
+                            >
+                              <Trophy className="h-4 w-4 mr-2" />
+                              Finalize as Contesting
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Final Contesting Candidates */}
+        {contestingCandidates.length > 0 && (
+          <Card className="bg-white border-0 shadow-sm rounded-xl border-purple-200">
+            <CardHeader className="pb-2 px-4 pt-4 bg-purple-50 rounded-t-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-purple-100 rounded-lg">
+                    <Trophy className="h-4 w-4 text-purple-600" />
+                  </div>
+                  <CardTitle className="text-sm font-semibold text-slate-800">
+                    Final Contesting Candidates
+                  </CardTitle>
+                </div>
+                <Badge className="bg-purple-100 text-purple-700 text-xs">
+                  {contestingCandidates.length} contesting
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="px-4 pb-4">
+              <div className="space-y-3">
+                {contestingCandidates.map((nomination) => (
                   <div
                     key={nomination.id}
-                    className="flex items-center justify-between p-4 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
+                    className="flex items-center justify-between p-4 rounded-lg bg-purple-50 border border-purple-200"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                        <User className="h-5 w-5 text-indigo-600" />
+                      <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                        <Trophy className="h-5 w-5 text-purple-600" />
                       </div>
                       <div>
                         <p className="text-sm font-medium text-slate-800">
-                          {nomination.formData.candidateName ||
-                            "Unknown Candidate"}
+                          {nomination.formData.candidateName}
                         </p>
                         <p className="text-xs text-slate-500">
-                          {nomination.applicationId} •{" "}
-                          {nomination.formData.municipality} -{" "}
-                          {nomination.formData.municipalWard}
+                          {nomination.formData.politicalParty} •{" "}
+                          {nomination.formData.partySymbol}
                         </p>
                         <p className="text-xs text-slate-400">
-                          Submitted:{" "}
-                          {new Date(nomination.submittedAt).toLocaleString()} •
-                          Submission #{nomination.submissionNumber}/3
+                          {nomination.formData.municipality} -{" "}
+                          {nomination.formData.municipalWard}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      {nomination.formData.partySymbolImage && (
+                        <img
+                          src={nomination.formData.partySymbolImage}
+                          alt={nomination.formData.partySymbol}
+                          className="w-10 h-10 object-contain rounded border bg-white p-1"
+                        />
+                      )}
                       {getStatusBadge(nomination.status)}
-
-                      {/* View Dialog */}
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 text-xs"
-                            onClick={() => setSelectedSubmission(nomination)}
-                          >
-                            <Eye className="h-3 w-3 mr-1" />
-                            View
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                          <DialogHeader>
-                            <DialogTitle>
-                              Nomination Form -{" "}
-                              {nomination.formData.candidateName}
-                            </DialogTitle>
-                          </DialogHeader>
-                          <div
-                            id={`ro-preview-content-${nomination.id}`}
-                            className="p-6 bg-white"
-                            style={{
-                              fontFamily: "'Times New Roman', Times, serif",
-                              fontSize: "12pt",
-                              lineHeight: "1.6",
-                            }}
-                          >
-                            {/* Form Header */}
-                            <div
-                              style={{
-                                textAlign: "center",
-                                marginBottom: "24px",
-                              }}
-                            >
-                              <h1
-                                style={{
-                                  fontSize: "18pt",
-                                  fontWeight: "bold",
-                                  margin: "0 0 8px 0",
-                                }}
-                              >
-                                FORM-18
-                              </h1>
-                              <p
-                                style={{
-                                  fontSize: "10pt",
-                                  color: "#666666",
-                                  margin: "0 0 8px 0",
-                                }}
-                              >
-                                [See sub-rule (3) of rule 25]
-                              </p>
-                              <h2
-                                style={{
-                                  fontSize: "14pt",
-                                  fontWeight: "bold",
-                                  textDecoration: "underline",
-                                  margin: "0 0 8px 0",
-                                }}
-                              >
-                                NOMINATION PAPER
-                              </h2>
-                              <p
-                                style={{
-                                  fontSize: "11pt",
-                                  color: "#666666",
-                                  margin: "0",
-                                }}
-                              >
-                                Municipality Election 2026
-                              </p>
-                            </div>
-
-                            <hr
-                              style={{
-                                border: "none",
-                                borderTop: "1px solid #e0e0e0",
-                                margin: "20px 0",
-                              }}
-                            />
-
-                            {/* Candidate Details */}
-                            <div style={{ marginBottom: "24px" }}>
-                              <p style={{ margin: "12px 0" }}>
-                                * I nominate as an applicant for election to the{" "}
-                                <strong>
-                                  {nomination.formData.municipality}
-                                </strong>{" "}
-                                Municipality from the{" "}
-                                <strong>
-                                  {nomination.formData.municipalWard}
-                                </strong>{" "}
-                                Municipal ward.
-                              </p>
-
-                              <p style={{ margin: "12px 0" }}>
-                                Applicant&apos;s name:{" "}
-                                <strong>
-                                  {nomination.formData.candidateName}
-                                </strong>
-                              </p>
-
-                              <p style={{ margin: "12px 0" }}>
-                                Father&apos;s / Husband&apos;s name:{" "}
-                                <strong>
-                                  {nomination.formData.fatherOrHusbandName}
-                                </strong>
-                              </p>
-
-                              <p style={{ margin: "12px 0" }}>
-                                Full postal address:{" "}
-                                <strong>
-                                  {nomination.formData.fullPostalAddress}
-                                </strong>
-                              </p>
-
-                              <p style={{ margin: "16px 0" }}>
-                                Proposer name:{" "}
-                                <strong>
-                                  {nomination.formData.proposerName}
-                                </strong>{" "}
-                                at Serial No.{" "}
-                                <strong>
-                                  {nomination.formData.proposerSerialNo}
-                                </strong>{" "}
-                                in Part No.{" "}
-                                <strong>
-                                  {nomination.formData.proposerPartNo}
-                                </strong>{" "}
-                                of the electoral roll.
-                              </p>
-
-                              <p style={{ margin: "12px 0" }}>
-                                Date of Birth:{" "}
-                                <strong>
-                                  {nomination.formData.dateOfBirth}
-                                </strong>{" "}
-                                | Age:{" "}
-                                <strong>{nomination.formData.age}</strong> years
-                              </p>
-
-                              <p style={{ margin: "12px 0" }}>
-                                Political Party:{" "}
-                                <strong>
-                                  {nomination.formData.politicalParty}
-                                </strong>
-                              </p>
-
-                              <p style={{ margin: "12px 0" }}>
-                                Symbol:{" "}
-                                <strong>
-                                  {nomination.formData.partySymbol}
-                                </strong>
-                              </p>
-
-                              {nomination.formData.partySymbolImage && (
-                                <div
-                                  style={{
-                                    margin: "12px 0",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "12px",
-                                  }}
-                                >
-                                  <span>Symbol Image:</span>
-                                  <img
-                                    src={nomination.formData.partySymbolImage}
-                                    alt="Party Symbol"
-                                    style={{
-                                      width: "60px",
-                                      height: "60px",
-                                      objectFit: "contain",
-                                      border: "1px solid #ddd",
-                                      borderRadius: "4px",
-                                    }}
-                                  />
-                                </div>
-                              )}
-
-                              {nomination.formData.category !== "general" && (
-                                <p style={{ margin: "12px 0" }}>
-                                  Category:{" "}
-                                  <strong>
-                                    {getCategoryLabel(
-                                      nomination.formData.category,
-                                    )}
-                                  </strong>{" "}
-                                  - {nomination.formData.casteTribeName}
-                                </p>
-                              )}
-                            </div>
-
-                            <hr
-                              style={{
-                                border: "none",
-                                borderTop: "1px solid #e0e0e0",
-                                margin: "20px 0",
-                              }}
-                            />
-
-                            {/* Application Details */}
-                            <div
-                              style={{
-                                padding: "16px",
-                                backgroundColor: "#f0fdf4",
-                                borderRadius: "8px",
-                                marginTop: "20px",
-                              }}
-                            >
-                              <p style={{ margin: "8px 0" }}>
-                                <strong>Application ID:</strong>{" "}
-                                {nomination.applicationId}
-                              </p>
-                              <p style={{ margin: "8px 0" }}>
-                                <strong>Candidate ID:</strong>{" "}
-                                {nomination.candidateId}
-                              </p>
-                              <p style={{ margin: "8px 0" }}>
-                                <strong>Submission #:</strong>{" "}
-                                {nomination.submissionNumber} of 3
-                              </p>
-                              <p style={{ margin: "8px 0" }}>
-                                <strong>Submitted:</strong>{" "}
-                                {new Date(
-                                  nomination.submittedAt,
-                                ).toLocaleString()}
-                              </p>
-                              <p style={{ margin: "8px 0" }}>
-                                <strong>Status:</strong> {nomination.status}
-                              </p>
-                              <p style={{ margin: "8px 0" }}>
-                                <strong>Payment:</strong>{" "}
-                                {nomination.paymentStatus}
-                              </p>
-                            </div>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-
-                      {/* Download PDF Button */}
-                      <Button
-                        size="sm"
-                        className="h-8 text-xs bg-slate-800 hover:bg-slate-700"
-                        onClick={() => generatePDF(nomination)}
-                        disabled={isGeneratingPdf}
-                      >
-                        {isGeneratingPdf &&
-                        selectedSubmission?.id === nomination.id ? (
-                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                        ) : (
-                          <Download className="h-3 w-3 mr-1" />
-                        )}
-                        PDF
-                      </Button>
                     </div>
                   </div>
                 ))}
               </div>
-            )}
+            </CardContent>
+          </Card>
+        )}
+
+        <OTPVerificationDialog
+          open={otpDialogOpen}
+          onOpenChange={setOtpDialogOpen}
+          onVerify={handleOtpVerify}
+          title="Finalize Contesting Candidate"
+          description="Please verify with OTP to finalize this candidate as contesting."
+          isLoading={isProcessing}
+        />
+      </div>
+    );
+  }
+
+  // ==================== REPORTS VIEW ====================
+  if (activeTab === "reports") {
+    // Report definitions with simple, professional descriptions
+    const reportForms = [
+      {
+        id: "form19",
+        formTitle: "Nomination List",
+        description:
+          "Complete list of all nominations received for the election. Includes all candidates who have submitted their nomination papers.",
+        color: "blue",
+        icon: FileText,
+        statusFilter: ["submitted", "received"] as NominationStatus[],
+        filterLabel: "Total Nominations",
+        buttonLabel: "Generate Report",
+      },
+      {
+        id: "form20",
+        formTitle: "Valid Candidates",
+        description:
+          "List of candidates whose nominations have been verified and accepted after the scrutiny process.",
+        color: "green",
+        icon: CheckCircle,
+        statusFilter: ["approved", "contesting"] as NominationStatus[],
+        filterLabel: "Accepted Nominations",
+        buttonLabel: "Generate Report",
+      },
+      {
+        id: "form22",
+        formTitle: "Withdrawal Notice",
+        description:
+          "Record of candidates who have officially withdrawn their candidature from the election.",
+        color: "amber",
+        icon: UserX,
+        statusFilter: ["withdrawn"] as NominationStatus[],
+        filterLabel: "Withdrawn Candidates",
+        buttonLabel: "Generate Report",
+      },
+      {
+        id: "form23",
+        formTitle: "Contesting Candidates",
+        description:
+          "Final list of candidates who will be contesting in the election after all withdrawals.",
+        color: "purple",
+        icon: Trophy,
+        statusFilter: ["contesting"] as NominationStatus[],
+        filterLabel: "Final Contestants",
+        buttonLabel: "Generate Report",
+      },
+    ];
+
+    const getColorClasses = (color: string) => {
+      const colors: Record<
+        string,
+        {
+          bg: string;
+          border: string;
+          text: string;
+          iconBg: string;
+          btnBg: string;
+        }
+      > = {
+        blue: {
+          bg: "bg-blue-50",
+          border: "border-blue-200",
+          text: "text-blue-700",
+          iconBg: "bg-blue-100",
+          btnBg: "bg-blue-600 hover:bg-blue-700",
+        },
+        green: {
+          bg: "bg-green-50",
+          border: "border-green-200",
+          text: "text-green-700",
+          iconBg: "bg-green-100",
+          btnBg: "bg-green-600 hover:bg-green-700",
+        },
+        amber: {
+          bg: "bg-amber-50",
+          border: "border-amber-200",
+          text: "text-amber-700",
+          iconBg: "bg-amber-100",
+          btnBg: "bg-amber-600 hover:bg-amber-700",
+        },
+        purple: {
+          bg: "bg-purple-50",
+          border: "border-purple-200",
+          text: "text-purple-700",
+          iconBg: "bg-purple-100",
+          btnBg: "bg-purple-600 hover:bg-purple-700",
+        },
+      };
+      return colors[color] || colors.blue;
+    };
+
+    // Get nominations filtered by status and ward
+    const getReportNominations = (statusFilter: NominationStatus[]) => {
+      let filtered = nominations.filter((n) => statusFilter.includes(n.status));
+      if (wardFilter && wardFilter !== "all") {
+        filtered = filtered.filter(
+          (n) => n.formData?.municipalWard === wardFilter,
+        );
+      }
+      return filtered;
+    };
+
+    // Group nominations by ward for ward-wise reporting
+    const nominationsByWard = nominations.reduce(
+      (acc, nom) => {
+        const ward = nom.formData?.municipalWard || "Unknown";
+        if (!acc[ward]) acc[ward] = [];
+        acc[ward].push(nom);
+        return acc;
+      },
+      {} as Record<string, StoredNomination[]>,
+    );
+
+    // Mock report generation (opens PDF or shows alert for demo)
+    const generateReport = (
+      formId: string,
+      formTitle: string,
+      statusFilter: NominationStatus[],
+    ) => {
+      const reportData = getReportNominations(statusFilter);
+      if (reportData.length === 0) {
+        alert(
+          `No data available for ${formTitle}. Please select a ward with relevant nominations.`,
+        );
+        return;
+      }
+      // For demo, open the corresponding blank form PDF
+      window.open(
+        `/forms/FORM ${formId.replace("form", "").toUpperCase()}.pdf`,
+        "_blank",
+      );
+    };
+
+    return (
+      <div className="space-y-5 p-6 min-h-screen">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => window.history.back()}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <div>
+              <h1 className="text-xl font-semibold text-slate-800">
+                Reports Generation
+              </h1>
+              <p className="text-sm text-slate-500 mt-0.5">
+                Generate election reports as per ward selection
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Professional Filter Bar */}
+        <Card className="bg-white border shadow-sm rounded-xl">
+          <CardContent className="p-4">
+            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-indigo-100 rounded-lg">
+                  <Filter className="h-4 w-4 text-indigo-600" />
+                </div>
+                <span className="text-sm font-medium text-slate-700">
+                  Filter Reports
+                </span>
+              </div>
+              <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Select value={wardFilter} onValueChange={setWardFilter}>
+                  <SelectTrigger className="bg-white">
+                    <MapPin className="h-4 w-4 mr-2 text-slate-500" />
+                    <SelectValue placeholder="Select Ward" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Wards</SelectItem>
+                    {availableWards.map((ward) => (
+                      <SelectItem key={ward} value={ward}>
+                        {ward}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search candidate..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 bg-white"
+                  />
+                </div>
+                <div className="flex items-center gap-2 text-sm text-slate-600">
+                  <Badge variant="outline" className="bg-slate-50">
+                    {wardFilter === "all" ? "All Wards" : wardFilter}
+                  </Badge>
+                  <span>•</span>
+                  <span>{nominations.length} Total Records</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Report Forms Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {reportForms.map((form) => {
+            const colors = getColorClasses(form.color);
+            const reportData = getReportNominations(form.statusFilter);
+
+            return (
+              <Card
+                key={form.id}
+                className={`${colors.bg} ${colors.border} border shadow-sm rounded-xl overflow-hidden p-0`}
+              >
+                {/* Form Header */}
+                <div
+                  className={`px-4 py-3 ${colors.iconBg} border-b ${colors.border}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 bg-white rounded-lg shadow-sm`}>
+                        <form.icon className={`h-5 w-5 ${colors.text}`} />
+                      </div>
+                      <h3 className="font-semibold text-slate-800">
+                        {form.formTitle}
+                      </h3>
+                    </div>
+                    <Badge
+                      className={`${colors.iconBg} ${colors.text} text-xs font-semibold`}
+                    >
+                      {reportData.length} Records
+                    </Badge>
+                  </div>
+                </div>
+
+                <CardContent className="p-4 space-y-4">
+                  {/* Form Description */}
+                  <p className="text-sm text-slate-600">{form.description}</p>
+
+                  {/* Quick Stats */}
+                  <div className="flex items-center justify-between text-sm p-3 bg-white rounded-lg border border-slate-200">
+                    <span className="text-slate-600">{form.filterLabel}</span>
+                    <span className={`font-semibold ${colors.text}`}>
+                      {wardFilter === "all"
+                        ? `${reportData.length} across all wards`
+                        : `${reportData.length} in ${wardFilter}`}
+                    </span>
+                  </div>
+
+                  {/* Preview List (top 3) */}
+                  {reportData.length > 0 && (
+                    <div className="space-y-2">
+                      {reportData.slice(0, 3).map((nom) => (
+                        <div
+                          key={nom.id}
+                          className="flex items-center justify-between p-2 bg-white rounded-md text-xs"
+                        >
+                          <span className="font-medium text-slate-700">
+                            {nom.formData.candidateName}
+                          </span>
+                          <span className="text-slate-500">
+                            {nom.formData.municipalWard}
+                          </span>
+                        </div>
+                      ))}
+                      {reportData.length > 3 && (
+                        <p className="text-xs text-slate-500 text-center">
+                          + {reportData.length - 3} more
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Generate Button */}
+                  <Button
+                    className={`w-full ${colors.btnBg} text-white`}
+                    onClick={() =>
+                      generateReport(form.id, form.formTitle, form.statusFilter)
+                    }
+                    disabled={reportData.length === 0}
+                  >
+                    <FileBarChart className="h-4 w-4 mr-2" />
+                    {form.buttonLabel}
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Ward-wise Summary Table */}
+        <Card className="bg-white border-0 shadow-sm rounded-xl">
+          <CardHeader className="pb-2 px-4 pt-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-indigo-100 rounded-lg">
+                  <FileBarChart className="h-4 w-4 text-indigo-600" />
+                </div>
+                <CardTitle className="text-sm font-semibold text-slate-800">
+                  Ward-wise Summary
+                </CardTitle>
+              </div>
+              <Badge variant="outline">
+                {Object.keys(nominationsByWard).length} Wards
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-4 font-semibold text-slate-700">
+                      Ward
+                    </th>
+                    <th className="text-center py-3 px-4 font-semibold text-slate-700">
+                      Total
+                    </th>
+                    <th className="text-center py-3 px-4 font-semibold text-slate-700">
+                      Submitted
+                    </th>
+                    <th className="text-center py-3 px-4 font-semibold text-slate-700">
+                      Received
+                    </th>
+                    <th className="text-center py-3 px-4 font-semibold text-slate-700">
+                      Accepted
+                    </th>
+                    <th className="text-center py-3 px-4 font-semibold text-slate-700">
+                      Rejected
+                    </th>
+                    <th className="text-center py-3 px-4 font-semibold text-slate-700">
+                      Withdrawn
+                    </th>
+                    <th className="text-center py-3 px-4 font-semibold text-slate-700">
+                      Contesting
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(nominationsByWard).map(([ward, noms]) => (
+                    <tr key={ward} className="border-b hover:bg-slate-50">
+                      <td className="py-3 px-4 font-medium">{ward}</td>
+                      <td className="text-center py-3 px-4">{noms.length}</td>
+                      <td className="text-center py-3 px-4">
+                        {noms.filter((n) => n.status === "submitted").length}
+                      </td>
+                      <td className="text-center py-3 px-4">
+                        {noms.filter((n) => n.status === "received").length}
+                      </td>
+                      <td className="text-center py-3 px-4 text-green-600 font-medium">
+                        {noms.filter((n) => n.status === "approved").length}
+                      </td>
+                      <td className="text-center py-3 px-4 text-red-600 font-medium">
+                        {noms.filter((n) => n.status === "rejected").length}
+                      </td>
+                      <td className="text-center py-3 px-4 text-gray-600">
+                        {noms.filter((n) => n.status === "withdrawn").length}
+                      </td>
+                      <td className="text-center py-3 px-4 text-purple-600 font-medium">
+                        {noms.filter((n) => n.status === "contesting").length}
+                      </td>
+                    </tr>
+                  ))}
+                  {Object.keys(nominationsByWard).length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={8}
+                        className="text-center py-8 text-slate-400"
+                      >
+                        No nominations data available
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  // Default Dashboard View
+  // ==================== DEFAULT DASHBOARD VIEW ====================
   return (
     <div className="space-y-5 p-6 min-h-screen">
       {/* Header */}
@@ -887,7 +2065,7 @@ export function ROPanel() {
               <p className="text-2xl font-bold text-slate-800">
                 {nominations.filter((n) => n.status === "submitted").length}
               </p>
-              <p className="text-xs text-slate-500 mt-1">Pending Approvals</p>
+              <p className="text-xs text-slate-500 mt-1">Pending Receipt</p>
             </div>
           </CardContent>
         </Card>
@@ -916,14 +2094,14 @@ export function ROPanel() {
               <span className="text-xs text-slate-500">Mar 8, 2026</span>
             </div>
             <div className="mt-3">
-              <p className="text-2xl font-bold text-slate-800">7</p>
+              <p className="text-2xl font-bold text-slate-800">40</p>
               <p className="text-xs text-slate-500 mt-1">Days Remaining</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Nomination Submitted Card */}
+      {/* Quick Actions */}
       {totalSubmissions > 0 && (
         <Card className="bg-indigo-50 border-indigo-200 border shadow-sm rounded-xl">
           <CardContent className="p-4">
@@ -934,10 +2112,10 @@ export function ROPanel() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-indigo-800">
-                    Nominations Received
+                    Applications Received
                   </h3>
                   <p className="text-sm text-indigo-600">
-                    {totalSubmissions} nomination(s) from {uniqueCandidates}{" "}
+                    {totalSubmissions} application(s) from {uniqueCandidates}{" "}
                     candidate(s)
                   </p>
                 </div>
@@ -947,7 +2125,7 @@ export function ROPanel() {
                 size="sm"
                 className="border-indigo-300 text-indigo-700 hover:bg-indigo-100"
                 onClick={() =>
-                  (window.location.href = "/dashboard?tab=nominations")
+                  (window.location.href = "/dashboard?tab=applications")
                 }
               >
                 View All
@@ -1027,7 +2205,9 @@ export function ROPanel() {
                   Nomination Status
                 </CardTitle>
               </div>
-              <span className="text-xs text-slate-400">63 total</span>
+              <span className="text-xs text-slate-400">
+                {totalSubmissions} total
+              </span>
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4">
@@ -1057,7 +2237,7 @@ export function ROPanel() {
                 />
               </PieChart>
             </ResponsiveContainer>
-            <div className="flex justify-center gap-4 mt-2">
+            <div className="flex flex-wrap justify-center gap-4 mt-2">
               {nominationStatusData.map((item, index) => (
                 <div key={index} className="flex items-center gap-1.5 text-xs">
                   <span
@@ -1077,7 +2257,7 @@ export function ROPanel() {
 
       {/* Bottom Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Recent Nominations / Pending Approvals */}
+        {/* Recent Nominations */}
         <Card className="bg-white border-0 shadow-sm rounded-xl">
           <CardHeader className="pb-2 px-4 pt-4">
             <div className="flex items-center justify-between">
@@ -1086,7 +2266,7 @@ export function ROPanel() {
                   <ClipboardList className="h-4 w-4 text-amber-600" />
                 </div>
                 <CardTitle className="text-sm font-semibold text-slate-800">
-                  Recent Nominations
+                  Recent Applications
                 </CardTitle>
               </div>
               <Badge className="bg-amber-100 text-amber-700 text-xs">
@@ -1099,9 +2279,9 @@ export function ROPanel() {
             {nominations.length === 0 ? (
               <div className="text-center py-8">
                 <FileText className="h-8 w-8 text-slate-300 mx-auto mb-3" />
-                <p className="text-sm text-slate-500">No nominations yet</p>
+                <p className="text-sm text-slate-500">No applications yet</p>
                 <p className="text-xs text-slate-400">
-                  Nominations will appear here when submitted
+                  Applications will appear here when submitted
                 </p>
               </div>
             ) : (
@@ -1131,7 +2311,7 @@ export function ROPanel() {
                         size="sm"
                         className="h-7 text-xs bg-slate-800 hover:bg-slate-700"
                         onClick={() =>
-                          (window.location.href = "/dashboard?tab=nominations")
+                          (window.location.href = "/dashboard?tab=applications")
                         }
                       >
                         Review
@@ -1144,10 +2324,10 @@ export function ROPanel() {
                     variant="ghost"
                     className="w-full mt-2 text-slate-600"
                     onClick={() =>
-                      (window.location.href = "/dashboard?tab=nominations")
+                      (window.location.href = "/dashboard?tab=applications")
                     }
                   >
-                    View All ({nominations.length}) Nominations
+                    View All ({nominations.length}) Applications
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 )}
@@ -1156,123 +2336,65 @@ export function ROPanel() {
           </CardContent>
         </Card>
 
-        {/* Important Dates & District Overview */}
-        <div className="space-y-4">
-          {/* Election Schedule */}
-          <Card className="bg-white border-0 shadow-sm rounded-xl">
-            <CardHeader className="pb-2 px-4 pt-4">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-pink-100 rounded-lg">
-                  <Calendar className="h-4 w-4 text-pink-600" />
-                </div>
-                <CardTitle className="text-sm font-semibold text-slate-800">
-                  Election Schedule
-                </CardTitle>
+        {/* Election Schedule */}
+        <Card className="bg-white border-0 shadow-sm rounded-xl">
+          <CardHeader className="pb-2 px-4 pt-4">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-pink-100 rounded-lg">
+                <Calendar className="h-4 w-4 text-pink-600" />
               </div>
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                {electionSchedule.map((item, index) => (
-                  <div
-                    key={index}
-                    className={`flex items-center justify-between p-2.5 rounded-lg transition-all ${
-                      item.highlight
-                        ? "bg-rose-100 border-2 border-rose-300"
-                        : "bg-slate-50 hover:bg-slate-100"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="w-5 text-xs font-medium text-slate-500">
-                        {item.slNo}
-                      </span>
-                      {item.highlight ? (
-                        <Clock className="h-4 w-4 text-rose-600" />
-                      ) : (
-                        <CircleDot className="h-4 w-4 text-slate-400" />
-                      )}
-                      <span
-                        className={`text-xs ${item.highlight ? "text-rose-800 font-semibold" : "text-slate-700"}`}
-                      >
-                        {item.event}
-                      </span>
-                    </div>
+              <CardTitle className="text-sm font-semibold text-slate-800">
+                Election Schedule
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+              {electionSchedule.map((item, index) => (
+                <div
+                  key={index}
+                  className={`flex items-center justify-between p-2.5 rounded-lg transition-all ${item.highlight ? "bg-rose-100 border-2 border-rose-300" : "bg-slate-50 hover:bg-slate-100"}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 text-xs font-medium text-slate-500">
+                      {item.slNo}
+                    </span>
+                    {item.highlight ? (
+                      <Clock className="h-4 w-4 text-rose-600" />
+                    ) : (
+                      <CircleDot className="h-4 w-4 text-slate-400" />
+                    )}
                     <span
-                      className={`text-xs font-medium px-2 py-0.5 rounded-md ${
-                        item.highlight
-                          ? "bg-rose-200 text-rose-800"
-                          : "bg-slate-100 text-slate-600"
-                      }`}
+                      className={`text-xs ${item.highlight ? "text-rose-800 font-semibold" : "text-slate-700"}`}
                     >
-                      {item.date}
+                      {item.event}
                     </span>
                   </div>
-                ))}
-              </div>
-              {/* Countdown */}
-              <div className="mt-3 p-3 rounded-xl bg-primary">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-slate-400">
-                      Nomination Deadline
-                    </p>
-                    <p className="text-sm font-medium text-white mt-0.5">
-                      March 8, 2026
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-white">7</p>
-                    <p className="text-xs text-slate-400">days left</p>
-                  </div>
+                  <span
+                    className={`text-xs font-medium px-2 py-0.5 rounded-md ${item.highlight ? "bg-rose-200 text-rose-800" : "bg-slate-100 text-slate-600"}`}
+                  >
+                    {item.date}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {/* Countdown */}
+            <div className="mt-3 p-3 rounded-xl bg-primary">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-slate-400">Nomination Deadline</p>
+                  <p className="text-sm font-medium text-white mt-0.5">
+                    March 8, 2026
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-white">40</p>
+                  <p className="text-xs text-slate-400">days left</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* District Quick Stats */}
-          {/* District Overview */}
-          {/* <Card className="bg-white border-0 shadow-sm rounded-xl">
-            <CardHeader className="pb-2 px-4 pt-4">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-cyan-100 rounded-lg">
-                  <Building2 className="h-4 w-4 text-cyan-600" />
-                </div>
-                <CardTitle className="text-sm font-semibold text-slate-800">
-                  District Overview
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="grid grid-cols-2 gap-2">
-                {electionData.districts.slice(0, 4).map((district, index) => {
-                  const colors = [
-                    "bg-blue-50 text-blue-700",
-                    "bg-purple-50 text-purple-700",
-                    "bg-emerald-50 text-emerald-700",
-                    "bg-rose-50 text-rose-700",
-                  ];
-                  const wardCount = district.ulbs.reduce(
-                    (sum, ulb) => sum + ulb.wards.length,
-                    0,
-                  );
-                  return (
-                    <div
-                      key={district.district}
-                      className={`p-3 rounded-lg ${colors[index]}`}
-                    >
-                      <p className="text-xs opacity-70">
-                        {district.ulbs.length} ULB
-                      </p>
-                      <p className="text-base font-bold mt-0.5">
-                        {district.district}
-                      </p>
-                      <p className="text-xs mt-1">{wardCount} Wards</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card> */}
-        </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -21,12 +21,13 @@ import {
   resetNominationData,
   StoredNomination,
   clearRONominations,
+  NominationStatus,
 } from "@/lib/nomination-storage";
 
 interface NominationSubmissionData {
   isSubmitted: boolean;
   submissionDate: string | null;
-  status: "draft" | "submitted" | "under_review" | "approved" | "rejected";
+  status: NominationStatus;
   paymentStatus: "pending" | "paid" | "failed";
   applicationFee: number;
   district: string;

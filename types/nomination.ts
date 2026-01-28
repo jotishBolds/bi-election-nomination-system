@@ -1,4 +1,12 @@
 // types/nomination.ts
+
+// Symbol type for storing shuffled symbols
+export interface ShuffledSymbol {
+  id: string;
+  name: string;
+  image: string;
+}
+
 export interface NominationFormData {
   // Step 1: Basic Info
   district: string;
@@ -32,6 +40,7 @@ export interface NominationFormData {
   symbolPreference2: string;
   symbolPreference3: string;
   shuffleCount: number;
+  shuffledSymbols?: ShuffledSymbol[]; // Store all shuffled symbols for persistence
 }
 
 export interface NominationContextType {
