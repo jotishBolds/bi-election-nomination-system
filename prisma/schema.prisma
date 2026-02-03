@@ -10,21 +10,21 @@ datasource db {
 enum Role {
   RO
   CANDIDATE
-  SES
+  SEC
   SUPER_ADMIN
 }
 
 model User {
-  id            String    @id @default(cuid())
-  epicNumber    String    @unique
-  email         String    @unique
-  phone         String    @unique
-  password      String
-  role          Role      @default(CANDIDATE)
-  isVerified    Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  otps          Otp[]
+  id         String   @id @default(cuid())
+  epicNumber String?   @unique
+  email      String   @unique
+  phone      String   @unique
+  password   String
+  role       Role     @default(CANDIDATE)
+  isVerified Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  otps       Otp[]
 
   @@index([email])
   @@index([phone])
@@ -53,4 +53,88 @@ model RateLimit {
   updatedAt DateTime @updatedAt
 
   @@index([key])
+}
+
+// ***** The heirarchical structure is as follows according to my research: *****
+
+// State
+// ├── District (6 total)
+// │   └── ULB (Municipal Corporation, Council, or Nagar Panchayat)
+// │       └── Ward (smallest unit for urban elections)
+// │
+// ├── Assembly Constituency (32 total, can span districts)
+// │   └── [Separate electoral structure]
+// │
+// └── Junction Table: Constituency ↔ ULB (many-to-many mapping)
+//     (To handle cases like Salghari-Zoom spanning Gyalshing + Namchi)
+
+model District {
+  id         Int    @id @default(autoincrement())
+  code       String @unique
+  districtNo Int?   @unique
+  name       String
+
+  ulbs                  Ulb[]
+  constituencyDistricts ConstituencyDistrict[]
+}
+
+enum UlbType {
+  MUNICIPAL_CORPORATION
+  MUNICIPAL_COUNCIL
+  NAGAR_PANCHAYAT
+}
+
+model Ulb {
+  id    Int     @id @default(autoincrement())
+  ulbNo Int     @unique
+  name  String
+  type  UlbType // MUNICIPAL_CORP | MUNICIPAL_COUNCIL | NAGAR_PANCHAYAT
+
+  districtId Int
+  district   District @relation(fields: [districtId], references: [id])
+
+  wards UlbWard[]
+}
+
+model UlbWard {
+  id     Int    @id @default(autoincrement())
+  wardNo Int
+  name   String
+
+  ulbId Int
+  ulb   Ulb @relation(fields: [ulbId], references: [id])
+
+  // Reservation display only
+  reservationCategory ReservationCategory @default(UR)
+  womenReserved       Boolean             @default(false)
+  pwdReserved         Boolean             @default(false)
+
+  @@unique([ulbId, wardNo]) // ward numbers unique within a ULB
+}
+
+enum ReservationCategory {
+  UR
+  SC
+  ST
+  OBC_C
+  OBC_S
+  BL
+}
+
+model Constituency {
+  id             Int    @id @default(autoincrement())
+  constituencyNo Int    @unique
+  name           String
+
+  districts ConstituencyDistrict[]
+}
+
+model ConstituencyDistrict {
+  constituencyId Int
+  districtId     Int
+
+  constituency Constituency @relation(fields: [constituencyId], references: [id])
+  district     District     @relation(fields: [districtId], references: [id])
+
+  @@id([constituencyId, districtId])
 }

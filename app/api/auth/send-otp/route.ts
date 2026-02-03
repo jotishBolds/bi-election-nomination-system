@@ -5,8 +5,8 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { z } from "zod/v4";
 
 const sendOtpSchema = z.object({
-  identifier: z.string().min(1, "Email or phone is required"),
-  type: z.enum(["email", "phone"]),
+  identifier: z.string().min(1, "Email, phone or epic number is required"),
+  type: z.enum(["email", "phone", "epicNumber"]),
 });
 
 export async function POST(request: NextRequest) {
@@ -39,8 +39,19 @@ export async function POST(request: NextRequest) {
 
     const { identifier, type } = validation.data;
 
+    // const user = await prisma.user.findFirst({
+    //   where: type === "email" ? { email: identifier } : { phone: identifier },
+    // });
+
+    const whereClause =
+      type === "email"
+        ? { email: identifier }
+        : type === "phone"
+          ? { phone: identifier }
+          : { epicNumber: identifier };
+
     const user = await prisma.user.findFirst({
-      where: type === "email" ? { email: identifier } : { phone: identifier },
+      where: whereClause,
     });
 
     if (!user) {
@@ -65,10 +76,34 @@ export async function POST(request: NextRequest) {
 
     console.log(`[OTP SENT] To ${type}: ${identifier}, Code: ${otp}`);
 
+    let maskedIdentifier = "";
+
+    if (type === "phone") {
+      maskedIdentifier = user.phone.slice(-4).padStart(user.phone.length, "*");
+    }
+
+    if (type === "email") {
+      const [name, domain] = user.email.split("@");
+      maskedIdentifier = `${name.slice(0, 2)}***@${domain}`;
+    }
+
+    if (type === "epicNumber") {
+      maskedIdentifier = maskMiddle(user.epicNumber, 4, 3);
+    }
+
+    // return NextResponse.json(
+    //   {
+    //     message: "OTP sent successfully",
+    //     phone: user.phone.slice(-4).padStart(user.phone.length, "*"),
+    //     remaining: rateLimit.remaining,
+    //   },
+    //   { status: 200 },
+    // );
+
     return NextResponse.json(
       {
         message: "OTP sent successfully",
-        phone: user.phone.slice(-4).padStart(user.phone.length, "*"),
+        to: maskedIdentifier,
         remaining: rateLimit.remaining,
       },
       { status: 200 },
@@ -80,4 +115,21 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
+}
+
+function maskMiddle(
+  value: string,
+  visibleStart = 3,
+  visibleEnd = 3,
+  maskChar = "*",
+) {
+  if (value.length <= visibleStart + visibleEnd) {
+    return value;
+  }
+
+  const start = value.slice(0, visibleStart);
+  const end = value.slice(-visibleEnd);
+  const maskedLength = value.length - (visibleStart + visibleEnd);
+
+  return start + maskChar.repeat(maskedLength) + end;
 }

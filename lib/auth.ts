@@ -133,6 +133,49 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
+    CredentialsProvider({
+      id: "epicNumber-otp",
+      name: "Epic Number OTP",
+      credentials: {
+        epicNumber: { label: "Epic Number", type: "text" },
+        otp: { label: "OTP", type: "text" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.epicNumber || !credentials?.otp) {
+          throw new Error("Epic Number and OTP are required");
+        }
+
+        const user = await prisma.user.findUnique({
+          where: { epicNumber: credentials.epicNumber as string },
+        });
+
+        if (!user) {
+          throw new Error("User not found");
+        }
+
+        const isValidOtp = await verifyOtp(user.id, credentials.otp as string);
+
+        if (!isValidOtp) {
+          throw new Error("Invalid or expired OTP");
+        }
+
+        if (!user.isVerified) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { isVerified: true },
+          });
+        }
+
+        return {
+          id: user.id,
+          email: user.email,
+          phone: user.phone,
+          epicNumber: user.epicNumber,
+          role: user.role,
+          isVerified: true,
+        };
+      },
+    }),
   ],
   callbacks: {
     async jwt({ token, user }) {
