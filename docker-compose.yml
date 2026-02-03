@@ -1,0 +1,124 @@
+version: "3.8"
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: bi-election-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bi_election_db
+      POSTGRES_USER: bi_election_user
+      POSTGRES_PASSWORD: secure_password_123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - bi-election-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bi_election_user -d bi_election_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: bi-election-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - bi-election-network
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Next.js Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bi-election-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Database
+      DATABASE_URL: "postgresql://bi_election_user:secure_password_123@postgres:5432/bi_election_db"
+
+      # Redis
+      REDIS_URL: "redis://redis:6379"
+
+      # NextAuth.js
+      NEXTAUTH_SECRET: "your-super-secret-key-here-change-in-production"
+      NEXTAUTH_URL: "http://localhost:3000"
+
+      # App Environment
+      NODE_ENV: "production"
+
+      # File Upload (if using local storage)
+      UPLOAD_DIR: "/app/public/uploads"
+
+      # OTP Settings
+      OTP_EXPIRY_MINUTES: "15"
+
+      # Election Configuration
+      ELECTION_NAME: "Sikkim Municipality Election 2026"
+      ELECTION_YEAR: "2026"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - bi-election-network
+    volumes:
+      - app_uploads:/app/public/uploads
+
+    # Run database migrations on startup
+    command: >
+      sh -c "
+        npx prisma migrate deploy &&
+        node server.js
+      "
+
+  # Optional: PgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: bi-election-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@bi-election.local
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres
+    networks:
+      - bi-election-network
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    profiles:
+      - tools
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  app_uploads:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  bi-election-network:
+    driver: bridge

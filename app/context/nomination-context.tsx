@@ -5,9 +5,12 @@ import { createContext, useContext, useState, ReactNode } from "react";
 import { NominationFormData, NominationContextType } from "@/types/nomination";
 
 const initialFormData: NominationFormData = {
+  districtId: "",
   district: "",
+  ulbId: "",
   ulb: "",
   municipality: "",
+  wardId: "",
   municipalWard: "",
   wardName: "",
   constituency: "",

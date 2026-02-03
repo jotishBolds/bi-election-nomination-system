@@ -39,9 +39,6 @@ import {
   otpSchema,
 } from "@/lib/auth/validations/auth";
 
-// Hardcoded OTP for demo
-const DEMO_OTP = "123456";
-
 type RegistrationStep = "form" | "otp";
 
 export function RegisterForm() {
@@ -52,6 +49,7 @@ export function RegisterForm() {
     useState<RegistrationStep>("form");
   const [registrationData, setRegistrationData] =
     useState<RegistrationFormData | null>(null);
+  const [devOtp, setDevOtp] = useState<string | null>(null);
 
   const registrationForm = useForm<RegistrationFormData>({
     resolver: zodResolver(registrationSchema),
@@ -77,12 +75,30 @@ export function RegisterForm() {
     setIsSubmitting(true);
 
     try {
-      // Mock registration process
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setRegistrationData(data);
-      setRegistrationStep("otp");
+      // Call API to send OTP
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "send-otp",
+          data,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setRegistrationData(data);
+        setRegistrationStep("otp");
+        // Show dev OTP if available
+        if (result.devOtp) {
+          setDevOtp(result.devOtp);
+        }
+      } else {
+        setError(result.error || "Registration failed");
+      }
     } catch {
-      setError("Registration failed");
+      setError("Registration failed. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -93,16 +109,34 @@ export function RegisterForm() {
     setIsSubmitting(true);
 
     try {
-      if (data.otp === DEMO_OTP) {
-        // Complete registration and show success modal
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        setError(null);
-        router.push("/register?success=true");
+      if (!registrationData) {
+        setError("Registration data not found. Please start over.");
+        setRegistrationStep("form");
+        return;
+      }
+
+      // Call API to verify OTP and complete registration
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "verify-otp",
+          phone: registrationData.phone,
+          otp: data.otp,
+          registrationData,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Registration successful, redirect to login
+        router.push("/login?registered=true");
       } else {
-        setError("Invalid OTP. Please try again. (Hint: Use 123456)");
+        setError(result.error || "OTP verification failed");
       }
     } catch {
-      setError("OTP verification failed");
+      setError("OTP verification failed. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -111,6 +145,7 @@ export function RegisterForm() {
   const handleBack = () => {
     setRegistrationStep("form");
     setError(null);
+    setDevOtp(null);
     otpForm.reset();
   };
 
@@ -304,10 +339,6 @@ export function RegisterForm() {
                 </Button>
               </p>
             </div>
-
-            <div className="text-xs text-muted-foreground text-center space-y-1 pt-4 border-t mt-6">
-              <p className="font-medium">Demo OTP: 123456</p>
-            </div>
           </motion.div>
         ) : (
           <motion.div
@@ -392,11 +423,14 @@ export function RegisterForm() {
               </form>
             </Form>
 
-            <div className="text-xs text-muted-foreground text-center pt-4 border-t">
-              <p>
-                Demo OTP: <strong>123456</strong>
-              </p>
-            </div>
+            {devOtp && (
+              <div className="text-xs text-muted-foreground text-center pt-4 border-t bg-yellow-50 p-2 rounded">
+                <p className="font-medium text-yellow-700">
+                  Development Mode - OTP: <strong>{devOtp}</strong>
+                </p>
+                <p className="text-yellow-600">Check console for OTP</p>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

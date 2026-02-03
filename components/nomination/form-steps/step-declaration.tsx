@@ -1,7 +1,7 @@
 // components/nomination/form-steps/step-declaration.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -15,7 +15,6 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -35,6 +34,7 @@ import {
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 import {
@@ -45,15 +45,25 @@ import {
   Shuffle,
   AlertCircle,
   CheckCircle2,
+  Loader2,
 } from "lucide-react";
 import { useNomination } from "@/app/context/nomination-context";
 import { useNominationSubmission } from "@/app/context/nomination-submission-context";
-import {
-  politicalParties,
-  independentSymbols,
-  getRandomSymbols,
-  IndependentSymbol,
-} from "@/lib/election-data";
+
+// Types for API responses
+interface PoliticalParty {
+  id: string;
+  name: string;
+  shortName: string;
+  symbol: string;
+  symbolImage: string | null;
+}
+
+interface IndependentSymbol {
+  id: string;
+  name: string;
+  image: string;
+}
 
 const schema = z.object({
   dateOfBirth: z
@@ -74,11 +84,22 @@ interface StepDeclarationProps {
 export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
   const { formData, updateFormData } = useNomination();
   const { submissionData } = useNominationSubmission();
+
+  // State for API data
+  const [politicalParties, setPoliticalParties] = useState<PoliticalParty[]>(
+    [],
+  );
+  const [independentSymbols, setIndependentSymbols] = useState<
+    IndependentSymbol[]
+  >([]);
+  const [isLoadingParties, setIsLoadingParties] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // State for form logic
   const [age, setAge] = useState<number | null>(null);
   const [shuffleCount, setShuffleCount] = useState(formData.shuffleCount || 0);
   const [selectedSymbol, setSelectedSymbol] =
     useState<IndependentSymbol | null>(null);
-  // Initialize shuffled symbols from saved formData if available
   const [shuffledSymbols, setShuffledSymbols] = useState<IndependentSymbol[]>(
     formData.shuffledSymbols || [],
   );
@@ -103,6 +124,40 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
   const selectedPartyId = form.watch("politicalPartyId");
   const watchDOB = form.watch("dateOfBirth");
 
+  // Fetch parties and symbols on mount
+  useEffect(() => {
+    const fetchPartiesAndSymbols = async () => {
+      try {
+        setIsLoadingParties(true);
+        const response = await fetch("/api/election/parties");
+        const data = await response.json();
+        if (data.success) {
+          // Add independent option to parties list
+          const partiesWithIndependent: PoliticalParty[] = [
+            ...data.data.parties,
+            {
+              id: "independent",
+              name: "Independent",
+              shortName: "IND",
+              symbol: "Independent",
+              symbolImage: null,
+            },
+          ];
+          setPoliticalParties(partiesWithIndependent);
+          setIndependentSymbols(data.data.independentSymbols || []);
+        } else {
+          setError("Failed to load parties. Please refresh the page.");
+        }
+      } catch (err) {
+        console.error("Failed to fetch parties:", err);
+        setError("Failed to load parties. Please refresh the page.");
+      } finally {
+        setIsLoadingParties(false);
+      }
+    };
+    fetchPartiesAndSymbols();
+  }, []);
+
   // Calculate age when DOB changes
   useEffect(() => {
     if (watchDOB) {
@@ -111,8 +166,22 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
     }
   }, [watchDOB]);
 
+  // Get random symbols from available pool
+  const getRandomSymbols = useCallback(
+    (count: number, exclude: string[] = []): IndependentSymbol[] => {
+      const available = independentSymbols.filter(
+        (s) => !exclude.includes(s.id),
+      );
+      const shuffled = [...available].sort(() => Math.random() - 0.5);
+      return shuffled.slice(0, count);
+    },
+    [independentSymbols],
+  );
+
   // Handle party change
   useEffect(() => {
+    if (isLoadingParties) return; // Wait for parties to load
+
     if (isPartyLocked) {
       // For subsequent submissions, use locked party data
       if (submissionData.lockedPoliticalPartyId === "independent") {
@@ -153,7 +222,7 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
           setSelectedSymbol({
             id: party.id,
             name: party.symbol,
-            image: party.symbolImage,
+            image: party.symbolImage || "",
           });
           form.setValue(
             "politicalPartyId",
@@ -183,14 +252,16 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
             setSelectedSymbol(savedSelected);
           }
         }
-      } else {
+      } else if (independentSymbols.length > 0) {
         // First time selecting independent - show first random symbol
         setSelectedSymbol(null);
         setShuffledSymbols([]);
         const randomSymbol = getRandomSymbols(1)[0];
-        setShuffledSymbols([randomSymbol]);
-        setSelectedSymbol(randomSymbol);
-        form.setValue("symbolPreference1", randomSymbol.name);
+        if (randomSymbol) {
+          setShuffledSymbols([randomSymbol]);
+          setSelectedSymbol(randomSymbol);
+          form.setValue("symbolPreference1", randomSymbol.name);
+        }
         setShuffleCount(1); // First symbol counts as first shuffle
       }
     } else if (selectedPartyId) {
@@ -216,6 +287,10 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
     formData.shuffledSymbols,
     formData.shuffleCount,
     formData.partySymbol,
+    politicalParties,
+    independentSymbols,
+    isLoadingParties,
+    getRandomSymbols,
   ]);
 
   // Handle shuffle for independent candidates - add new symbol to the list
@@ -276,6 +351,25 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
   };
 
   const isIndependent = selectedPartyId === "independent";
+
+  if (error) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -20 }}
+      >
+        <Card>
+          <CardContent className="pt-6">
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -370,28 +464,35 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Political Party *</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      disabled={isPartyLocked}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select political party" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {politicalParties.map((party) => (
-                          <SelectItem key={party.id} value={party.id}>
-                            <div className="flex items-center gap-2">
-                              <span>
-                                {party.name} ({party.shortName})
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {isLoadingParties ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Skeleton className="h-10 w-full" />
+                      </div>
+                    ) : (
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                        disabled={isPartyLocked}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select political party" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {politicalParties.map((party) => (
+                            <SelectItem key={party.id} value={party.id}>
+                              <div className="flex items-center gap-2">
+                                <span>
+                                  {party.name} ({party.shortName})
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     <FormMessage />
                     {isPartyLocked && (
                       <p className="text-xs text-amber-600 mt-1">
@@ -414,7 +515,7 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
                         <Input {...field} className="hidden" />
                       </FormControl>
 
-                      {/* Party Symbol Display (SKM/SDF) */}
+                      {/* Party Symbol Display */}
                       {selectedPartyId &&
                         !isIndependent &&
                         selectedSymbol?.image && (
@@ -469,7 +570,8 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
                               disabled={
                                 isShuffleDisabled ||
                                 shuffleCount >= 3 ||
-                                isPartyLocked
+                                isPartyLocked ||
+                                independentSymbols.length === 0
                               }
                             >
                               <Shuffle className="mr-2 h-4 w-4" />
@@ -569,7 +671,7 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
                 <Button
                   type="submit"
                   className="bg-primary hover:bg-primary-hover"
-                  disabled={age !== null && age < 21}
+                  disabled={(age !== null && age < 21) || isLoadingParties}
                 >
                   Preview Form
                   <ArrowRight className="ml-2 h-4 w-4" />

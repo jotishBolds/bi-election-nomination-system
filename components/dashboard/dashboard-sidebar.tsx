@@ -34,6 +34,16 @@ import {
   UserX,
   Trophy,
   FileBarChart,
+  Building2,
+  MapPin,
+  UserCog,
+  ScrollText,
+  Calendar,
+  Vote,
+  Landmark,
+  Eye,
+  History,
+  FileStack,
 } from "lucide-react";
 
 interface NavItem {
@@ -49,7 +59,7 @@ interface NavGroup {
   items: NavItem[];
 }
 
-// Navigation with colorful icons
+// Navigation with colorful icons - Dynamic config for all roles
 const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
   RO: [
     {
@@ -65,7 +75,7 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
       ],
     },
     {
-      label: "Management",
+      label: "Nomination Management",
       items: [
         {
           title: "Application List",
@@ -82,7 +92,7 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
           iconBgColor: "bg-amber-100",
         },
         {
-          title: "Withdraw",
+          title: "Withdrawals",
           icon: UserX,
           href: "/dashboard?tab=withdraw",
           iconColor: "text-rose-600",
@@ -98,7 +108,7 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
       ],
     },
     {
-      label: "Reports",
+      label: "Reports & Analytics",
       items: [
         {
           title: "Reports",
@@ -124,14 +134,33 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
       ],
     },
     {
-      label: "Actions",
+      label: "Nominations",
       items: [
         {
-          title: "Submit Nomination",
+          title: "My Nominations",
+          icon: FileStack,
+          href: "/dashboard?tab=nominations",
+          iconColor: "text-indigo-600",
+          iconBgColor: "bg-indigo-100",
+        },
+        {
+          title: "Submit New",
           icon: FileText,
           href: "/nomination",
           iconColor: "text-emerald-600",
           iconBgColor: "bg-emerald-100",
+        },
+      ],
+    },
+    {
+      label: "Track",
+      items: [
+        {
+          title: "Track Status",
+          icon: Eye,
+          href: "/dashboard?tab=track",
+          iconColor: "text-amber-600",
+          iconBgColor: "bg-amber-100",
         },
       ],
     },
@@ -149,6 +178,68 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
         },
       ],
     },
+    {
+      label: "Jurisdiction Management",
+      items: [
+        {
+          title: "Districts",
+          icon: MapPin,
+          href: "/dashboard?tab=districts",
+          iconColor: "text-blue-600",
+          iconBgColor: "bg-blue-100",
+        },
+        {
+          title: "ULBs",
+          icon: Building2,
+          href: "/dashboard?tab=ulbs",
+          iconColor: "text-emerald-600",
+          iconBgColor: "bg-emerald-100",
+        },
+        {
+          title: "Wards",
+          icon: Landmark,
+          href: "/dashboard?tab=wards",
+          iconColor: "text-cyan-600",
+          iconBgColor: "bg-cyan-100",
+        },
+      ],
+    },
+    {
+      label: "User Management",
+      items: [
+        {
+          title: "RO Management",
+          icon: UserCog,
+          href: "/dashboard?tab=ro-management",
+          iconColor: "text-amber-600",
+          iconBgColor: "bg-amber-100",
+        },
+      ],
+    },
+    {
+      label: "Nominations",
+      items: [
+        {
+          title: "All Nominations",
+          icon: ClipboardList,
+          href: "/dashboard?tab=nominations",
+          iconColor: "text-indigo-600",
+          iconBgColor: "bg-indigo-100",
+        },
+      ],
+    },
+    {
+      label: "Reports",
+      items: [
+        {
+          title: "Reports",
+          icon: FileBarChart,
+          href: "/dashboard?tab=reports",
+          iconColor: "text-rose-600",
+          iconBgColor: "bg-rose-100",
+        },
+      ],
+    },
   ],
   SUPER_ADMIN: [
     {
@@ -160,6 +251,82 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
           href: "/dashboard",
           iconColor: "text-orange-600",
           iconBgColor: "bg-orange-100",
+        },
+      ],
+    },
+    {
+      label: "User Management",
+      items: [
+        {
+          title: "Users",
+          icon: Users,
+          href: "/dashboard?tab=users",
+          iconColor: "text-blue-600",
+          iconBgColor: "bg-blue-100",
+        },
+        {
+          title: "Roles & Permissions",
+          icon: Shield,
+          href: "/dashboard?tab=roles",
+          iconColor: "text-purple-600",
+          iconBgColor: "bg-purple-100",
+        },
+      ],
+    },
+    {
+      label: "Election Management",
+      items: [
+        {
+          title: "Election Config",
+          icon: Settings,
+          href: "/dashboard?tab=election-config",
+          iconColor: "text-emerald-600",
+          iconBgColor: "bg-emerald-100",
+        },
+        {
+          title: "Schedule",
+          icon: Calendar,
+          href: "/dashboard?tab=schedule",
+          iconColor: "text-amber-600",
+          iconBgColor: "bg-amber-100",
+        },
+        {
+          title: "Parties & Symbols",
+          icon: Vote,
+          href: "/dashboard?tab=parties",
+          iconColor: "text-rose-600",
+          iconBgColor: "bg-rose-100",
+        },
+      ],
+    },
+    {
+      label: "Content Management",
+      items: [
+        {
+          title: "CMS",
+          icon: ScrollText,
+          href: "/dashboard?tab=cms",
+          iconColor: "text-cyan-600",
+          iconBgColor: "bg-cyan-100",
+        },
+      ],
+    },
+    {
+      label: "System",
+      items: [
+        {
+          title: "Audit Logs",
+          icon: History,
+          href: "/dashboard?tab=audit-logs",
+          iconColor: "text-slate-600",
+          iconBgColor: "bg-slate-100",
+        },
+        {
+          title: "Reports",
+          icon: FileBarChart,
+          href: "/dashboard?tab=reports",
+          iconColor: "text-indigo-600",
+          iconBgColor: "bg-indigo-100",
         },
       ],
     },

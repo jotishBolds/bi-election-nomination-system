@@ -44,21 +44,24 @@ function NominationFlowContent() {
 
   // Load previous form data when entering the form flow
   useEffect(() => {
-    if (flowStep === "consent" || flowStep === "form") {
-      const draftData = getDraftData();
-      if (draftData) {
-        // Populate form with previous data
-        updateFormData(draftData);
+    async function loadDraft() {
+      if (flowStep === "consent" || flowStep === "form") {
+        const draftData = await getDraftData();
+        if (draftData) {
+          // Populate form with previous data
+          updateFormData(draftData);
+        }
       }
     }
-  }, [flowStep]);
+    loadDraft();
+  }, [flowStep, getDraftData, updateFormData]);
 
   // Save form data as draft whenever it changes
   useEffect(() => {
     if (flowStep === "form" || flowStep === "preview") {
       saveDraft(formData);
     }
-  }, [formData, flowStep]);
+  }, [formData, flowStep, saveDraft]);
 
   const handleFormNext = () => {
     // Save current form data as draft
@@ -89,9 +92,9 @@ function NominationFlowContent() {
     }
   };
 
-  const handlePaymentSuccess = () => {
+  const handlePaymentSuccess = async () => {
     // Submit nomination data with full form data to the submission context
-    const result = submitNomination(
+    const result = await submitNomination(
       {
         district: formData.district || "GANGTOK",
         ulb: formData.ulb || "Gangtok MC",

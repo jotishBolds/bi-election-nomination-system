@@ -1,28 +1,37 @@
 // app/context/nomination-submission-context.tsx
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useState,
-  ReactNode,
-  useEffect,
-} from "react";
+import { createContext, useContext, useState, ReactNode } from "react";
 import { NominationFormData } from "@/types/nomination";
-import {
-  getNominationStorageData,
-  submitNomination as storeNomination,
-  saveDraftFormData,
-  getDraftFormData,
-  getSubmissionCount,
-  canSubmitMore,
-  getCandidateSubmissions,
-  getLatestSubmission,
-  resetNominationData,
-  StoredNomination,
-  clearRONominations,
-  NominationStatus,
-} from "@/lib/nomination-storage";
+import { useSession } from "next-auth/react";
+
+// Types for nomination
+export type NominationStatus =
+  | "draft"
+  | "submitted"
+  | "received"
+  | "under_review"
+  | "approved"
+  | "rejected"
+  | "withdrawn"
+  | "contesting";
+
+export interface StoredNomination {
+  id: string;
+  formData: NominationFormData;
+  submissionNumber: number;
+  submittedAt: string;
+  status: NominationStatus;
+  paymentStatus: "pending" | "paid" | "failed";
+  applicationId: string;
+  candidateId: string;
+  receivedAt?: string;
+  scrutinyDate?: string;
+  scrutinyResult?: "accepted" | "rejected";
+  scrutinyRemarks?: string;
+  withdrawnAt?: string;
+  withdrawnReason?: string;
+}
 
 interface NominationSubmissionData {
   isSubmitted: boolean;
@@ -36,12 +45,10 @@ interface NominationSubmissionData {
   wardName: string;
   reservation: string;
   constituency: string;
-  // New fields for multiple submissions
   submissionCount: number;
   maxSubmissions: number;
   applicationId: string | null;
   submissions: StoredNomination[];
-  // Locked party data from first submission
   lockedPoliticalPartyId: string;
   lockedPartySymbol: string;
   lockedPartySymbolImage: string;
@@ -52,15 +59,14 @@ interface NominationSubmissionContextType {
   submitNomination: (
     data: Partial<NominationSubmissionData>,
     formData: NominationFormData,
-  ) => StoredNomination | null;
+  ) => Promise<StoredNomination | null>;
   resetNomination: () => void;
   canSubmitMore: () => boolean;
-  getDraftData: () => NominationFormData | null;
-  saveDraft: (formData: NominationFormData) => void;
-  candidateId: string;
+  getDraftData: () => Promise<NominationFormData | null>;
+  saveDraft: (formData: NominationFormData) => Promise<void>;
+  candidateId: string | null;
+  loadNominationData: () => Promise<void>;
 }
-
-const CANDIDATE_ID = "MC2026-0142"; // This would come from auth in real app
 
 const defaultSubmissionData: NominationSubmissionData = {
   isSubmitted: false,
@@ -92,75 +98,120 @@ export function NominationSubmissionProvider({
 }: {
   children: ReactNode;
 }) {
+  const { data: session } = useSession();
   const [submissionData, setSubmissionData] =
     useState<NominationSubmissionData>(defaultSubmissionData);
 
-  // Load data from localStorage on mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      loadStorageData();
+  const candidateId = session?.user?.id || null;
+
+  // Load nomination data from API
+  const loadNominationData = async () => {
+    if (!candidateId) return;
+
+    try {
+      const response = await fetch(
+        `/api/nominations?candidateId=${candidateId}`,
+      );
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.nominations) {
+          const submissions = data.nominations;
+          const latestSubmission = submissions[submissions.length - 1];
+          const firstSubmission = submissions[0];
+
+          setSubmissionData({
+            isSubmitted: submissions.length > 0,
+            submissionDate: latestSubmission?.submittedAt || null,
+            status: latestSubmission?.status || "draft",
+            paymentStatus: submissions.length > 0 ? "paid" : "pending",
+            applicationFee: 500,
+            district: latestSubmission?.formData?.district || "",
+            ulb: latestSubmission?.formData?.ulb || "",
+            wardNumber: latestSubmission?.formData?.municipalWard || "",
+            wardName: latestSubmission?.formData?.wardName || "",
+            reservation: latestSubmission?.formData?.reservation || "",
+            constituency: latestSubmission?.formData?.constituency || "",
+            submissionCount: submissions.length,
+            maxSubmissions: 3,
+            applicationId: latestSubmission?.applicationId || null,
+            submissions,
+            lockedPoliticalPartyId:
+              firstSubmission?.formData?.politicalPartyId || "",
+            lockedPartySymbol: firstSubmission?.formData?.partySymbol || "",
+            lockedPartySymbolImage:
+              firstSubmission?.formData?.partySymbolImage || "",
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load nomination data:", error);
     }
-  }, []);
-
-  const loadStorageData = () => {
-    const storageData = getNominationStorageData(CANDIDATE_ID);
-    const submissions = getCandidateSubmissions(CANDIDATE_ID);
-    const latestSubmission = getLatestSubmission(CANDIDATE_ID);
-    const firstSubmission = submissions.length > 0 ? submissions[0] : null;
-
-    setSubmissionData({
-      isSubmitted: submissions.length > 0,
-      submissionDate: latestSubmission?.submittedAt || null,
-      status: latestSubmission?.status || "draft",
-      // Payment is considered "paid" after first submission
-      paymentStatus: submissions.length > 0 ? "paid" : "pending",
-      applicationFee: 500,
-      district: latestSubmission?.formData.district || "",
-      ulb: latestSubmission?.formData.ulb || "",
-      wardNumber: latestSubmission?.formData.municipalWard || "",
-      wardName: latestSubmission?.formData.wardName || "",
-      reservation: latestSubmission?.formData.reservation || "",
-      constituency: latestSubmission?.formData.constituency || "",
-      submissionCount: submissions.length,
-      maxSubmissions: 3,
-      applicationId: latestSubmission?.applicationId || null,
-      submissions,
-      // Locked party data from first submission
-      lockedPoliticalPartyId: firstSubmission?.formData.politicalPartyId || "",
-      lockedPartySymbol: firstSubmission?.formData.partySymbol || "",
-      lockedPartySymbolImage: firstSubmission?.formData.partySymbolImage || "",
-    });
   };
 
-  const submitNomination = (
-    data: Partial<NominationSubmissionData>,
+  const submitNomination = async (
+    _data: Partial<NominationSubmissionData>,
     formData: NominationFormData,
-  ): StoredNomination | null => {
-    const result = storeNomination(CANDIDATE_ID, formData);
+  ): Promise<StoredNomination | null> => {
+    if (!candidateId) return null;
 
-    if (result) {
-      loadStorageData(); // Reload all data after submission
+    try {
+      const response = await fetch("/api/nominations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidateId, formData }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          await loadNominationData();
+          return result.nomination;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error("Failed to submit nomination:", error);
+      return null;
     }
-
-    return result;
   };
 
   const resetNomination = () => {
-    resetNominationData(CANDIDATE_ID);
-    clearRONominations(); // Clear RO data too for testing
     setSubmissionData(defaultSubmissionData);
   };
 
   const checkCanSubmitMore = (): boolean => {
-    return canSubmitMore(CANDIDATE_ID);
+    return submissionData.submissionCount < submissionData.maxSubmissions;
   };
 
-  const getDraftData = (): NominationFormData | null => {
-    return getDraftFormData(CANDIDATE_ID);
+  const getDraftData = async (): Promise<NominationFormData | null> => {
+    if (!candidateId) return null;
+
+    try {
+      const response = await fetch(
+        `/api/nominations/draft?candidateId=${candidateId}`,
+      );
+      if (response.ok) {
+        const data = await response.json();
+        return data.draft || null;
+      }
+      return null;
+    } catch {
+      return null;
+    }
   };
 
-  const saveDraft = (formData: NominationFormData): void => {
-    saveDraftFormData(CANDIDATE_ID, formData);
+  const saveDraft = async (formData: NominationFormData): Promise<void> => {
+    if (!candidateId) return;
+
+    try {
+      await fetch("/api/nominations/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidateId, formData }),
+      });
+    } catch (error) {
+      console.error("Failed to save draft:", error);
+    }
   };
 
   return (
@@ -172,7 +223,8 @@ export function NominationSubmissionProvider({
         canSubmitMore: checkCanSubmitMore,
         getDraftData,
         saveDraft,
-        candidateId: CANDIDATE_ID,
+        candidateId,
+        loadNominationData,
       }}
     >
       {children}

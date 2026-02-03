@@ -1,7 +1,7 @@
 // components/nomination/form-steps/step-basic-info.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -25,21 +25,45 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-import { ArrowRight, User, MapPin } from "lucide-react";
+import { ArrowRight, User, MapPin, AlertCircle, Loader2 } from "lucide-react";
 import { useNomination } from "@/app/context/nomination-context";
-import {
-  electionData,
-  getDistricts,
-  getULBsForDistrict,
-  getWardsForULB,
-  Ward,
-} from "@/lib/election-data";
+
+// Types for API responses
+interface District {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface ULB {
+  id: string;
+  name: string;
+  code: string;
+  type: string;
+  districtId: string;
+}
+
+interface Ward {
+  id: string;
+  wardNumber: number;
+  wardName: string;
+  reservationStatus: string | null;
+  constituencyType: string | null;
+  ulbId: string;
+}
+
+interface ElectionConfig {
+  name: string;
+  year: number;
+}
 
 const schema = z.object({
-  district: z.string().min(1, "Please select a district"),
-  ulb: z.string().min(1, "Please select a ULB"),
-  municipalWard: z.string().min(1, "Please select a ward"),
+  districtId: z.string().min(1, "Please select a district"),
+  ulbId: z.string().min(1, "Please select a ULB"),
+  wardId: z.string().min(1, "Please select a ward"),
   candidateName: z.string().min(2, "Applicant name is required"),
   fatherOrHusbandName: z.string().min(2, "Father's/Husband's name is required"),
   fullPostalAddress: z.string().min(10, "Complete address is required"),
@@ -59,17 +83,31 @@ interface StepBasicInfoProps {
 
 export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
   const { formData, updateFormData } = useNomination();
-  const [districts] = useState<string[]>(getDistricts());
-  const [ulbs, setUlbs] = useState<string[]>([]);
+
+  // State for API data
+  const [districts, setDistricts] = useState<District[]>([]);
+  const [ulbs, setUlbs] = useState<ULB[]>([]);
   const [wards, setWards] = useState<Ward[]>([]);
+  const [electionConfig, setElectionConfig] = useState<ElectionConfig | null>(
+    null,
+  );
   const [selectedWard, setSelectedWard] = useState<Ward | null>(null);
+
+  // Loading states
+  const [isLoadingDistricts, setIsLoadingDistricts] = useState(true);
+  const [isLoadingUlbs, setIsLoadingUlbs] = useState(false);
+  const [isLoadingWards, setIsLoadingWards] = useState(false);
+  const [isLoadingConfig, setIsLoadingConfig] = useState(true);
+
+  // Error state
+  const [error, setError] = useState<string | null>(null);
 
   const form = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
-      district: formData.district,
-      ulb: formData.ulb,
-      municipalWard: formData.municipalWard,
+      districtId: formData.districtId || "",
+      ulbId: formData.ulbId || "",
+      wardId: formData.wardId || "",
       candidateName: formData.candidateName,
       fatherOrHusbandName: formData.fatherOrHusbandName,
       fullPostalAddress: formData.fullPostalAddress,
@@ -77,66 +115,183 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
     },
   });
 
-  const watchDistrict = form.watch("district");
-  const watchUlb = form.watch("ulb");
-  const watchWard = form.watch("municipalWard");
+  const watchDistrictId = form.watch("districtId");
+  const watchUlbId = form.watch("ulbId");
+  const watchWardId = form.watch("wardId");
+
+  // Fetch election config
+  useEffect(() => {
+    const fetchElectionConfig = async () => {
+      try {
+        const response = await fetch("/api/election/config");
+        const data = await response.json();
+        if (data.success) {
+          setElectionConfig(data.data);
+        } else if (data.configRequired) {
+          setError(
+            "Election configuration is not set. Please contact administrator.",
+          );
+        }
+      } catch (err) {
+        console.error("Failed to fetch election config:", err);
+      } finally {
+        setIsLoadingConfig(false);
+      }
+    };
+    fetchElectionConfig();
+  }, []);
+
+  // Fetch districts on mount
+  useEffect(() => {
+    const fetchDistricts = async () => {
+      try {
+        setIsLoadingDistricts(true);
+        const response = await fetch("/api/election/districts");
+        const data = await response.json();
+        if (data.success) {
+          setDistricts(data.data);
+        } else if (data.configRequired) {
+          setError("No districts configured. Please contact administrator.");
+        }
+      } catch (err) {
+        console.error("Failed to fetch districts:", err);
+        setError("Failed to load districts. Please refresh the page.");
+      } finally {
+        setIsLoadingDistricts(false);
+      }
+    };
+    fetchDistricts();
+  }, []);
+
+  // Fetch ULBs when district changes
+  const fetchUlbs = useCallback(async (districtId: string) => {
+    if (!districtId) {
+      setUlbs([]);
+      return;
+    }
+    try {
+      setIsLoadingUlbs(true);
+      const response = await fetch(
+        `/api/election/ulbs?districtId=${districtId}`,
+      );
+      const data = await response.json();
+      if (data.success) {
+        setUlbs(data.data);
+      } else {
+        setUlbs([]);
+      }
+    } catch (err) {
+      console.error("Failed to fetch ULBs:", err);
+      setUlbs([]);
+    } finally {
+      setIsLoadingUlbs(false);
+    }
+  }, []);
+
+  // Fetch wards when ULB changes
+  const fetchWards = useCallback(async (ulbId: string) => {
+    if (!ulbId) {
+      setWards([]);
+      return;
+    }
+    try {
+      setIsLoadingWards(true);
+      const response = await fetch(`/api/election/wards?ulbId=${ulbId}`);
+      const data = await response.json();
+      if (data.success) {
+        setWards(data.data);
+      } else {
+        setWards([]);
+      }
+    } catch (err) {
+      console.error("Failed to fetch wards:", err);
+      setWards([]);
+    } finally {
+      setIsLoadingWards(false);
+    }
+  }, []);
 
   // Update ULBs when district changes
   useEffect(() => {
-    if (watchDistrict) {
-      const ulbList = getULBsForDistrict(watchDistrict);
-      setUlbs(ulbList);
+    if (watchDistrictId) {
+      fetchUlbs(watchDistrictId);
       // Reset ULB and ward if district changes
-      if (formData.district !== watchDistrict) {
-        form.setValue("ulb", "");
-        form.setValue("municipalWard", "");
+      if (formData.districtId !== watchDistrictId) {
+        form.setValue("ulbId", "");
+        form.setValue("wardId", "");
         setWards([]);
         setSelectedWard(null);
       }
     }
-  }, [watchDistrict, form, formData.district]);
+  }, [watchDistrictId, fetchUlbs, form, formData.districtId]);
 
   // Update wards when ULB changes
   useEffect(() => {
-    if (watchDistrict && watchUlb) {
-      const wardList = getWardsForULB(watchDistrict, watchUlb);
-      setWards(wardList);
+    if (watchUlbId) {
+      fetchWards(watchUlbId);
       // Reset ward if ULB changes
-      if (formData.ulb !== watchUlb) {
-        form.setValue("municipalWard", "");
+      if (formData.ulbId !== watchUlbId) {
+        form.setValue("wardId", "");
         setSelectedWard(null);
       }
     }
-  }, [watchDistrict, watchUlb, form, formData.ulb]);
+  }, [watchUlbId, fetchWards, form, formData.ulbId]);
 
   // Update selected ward details
   useEffect(() => {
-    if (watchWard && wards.length > 0) {
-      const ward = wards.find((w) => `${w.wardNo}-${w.wardName}` === watchWard);
+    if (watchWardId && wards.length > 0) {
+      const ward = wards.find((w) => w.id === watchWardId);
       setSelectedWard(ward || null);
     }
-  }, [watchWard, wards]);
+  }, [watchWardId, wards]);
 
   const onSubmit = (data: z.infer<typeof schema>) => {
+    const selectedDistrict = districts.find((d) => d.id === data.districtId);
+    const selectedUlb = ulbs.find((u) => u.id === data.ulbId);
     const wardInfo = selectedWard;
+
     updateFormData({
-      district: data.district,
-      ulb: data.ulb,
-      municipality: data.ulb, // ULB is the municipality
-      municipalWard: data.municipalWard,
+      districtId: data.districtId,
+      district: selectedDistrict?.name || "",
+      ulbId: data.ulbId,
+      ulb: selectedUlb?.name || "",
+      municipality: selectedUlb?.name || "",
+      wardId: data.wardId,
+      municipalWard: wardInfo
+        ? `${wardInfo.wardNumber}-${wardInfo.wardName}`
+        : "",
       wardName: wardInfo?.wardName || "",
-      constituency: wardInfo?.constituency || "",
-      reservation: wardInfo?.reservation || "",
+      constituency: wardInfo?.constituencyType || "",
+      reservation: wardInfo?.reservationStatus || "",
       candidateName: data.candidateName,
       fatherOrHusbandName: data.fatherOrHusbandName,
       fullPostalAddress: data.fullPostalAddress,
-      serialNoCandidate: "", // Remove from basic info
-      partNoCandidate: "", // Remove part number
+      serialNoCandidate: "",
+      partNoCandidate: "",
       category: data.category,
-      casteTribeName: "", // Reset caste/tribe name when category changes
+      casteTribeName: "",
     });
     onNext();
   };
+
+  if (error) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -20 }}
+      >
+        <Card>
+          <CardContent className="pt-6">
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -150,9 +305,13 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
             <User className="h-5 w-5 text-primary" />
             Applicant Information
           </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            {electionData.election}
-          </p>
+          {isLoadingConfig ? (
+            <Skeleton className="h-4 w-48" />
+          ) : electionConfig ? (
+            <p className="text-sm text-muted-foreground">
+              {electionConfig.name} {electionConfig.year}
+            </p>
+          ) : null}
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -166,27 +325,34 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
-                    name="district"
+                    name="districtId"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>District *</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select district" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {districts.map((district) => (
-                              <SelectItem key={district} value={district}>
-                                {district}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {isLoadingDistricts ? (
+                          <Skeleton className="h-10 w-full" />
+                        ) : (
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select district" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {districts.map((district) => (
+                                <SelectItem
+                                  key={district.id}
+                                  value={district.id}
+                                >
+                                  {district.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -194,28 +360,35 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
 
                   <FormField
                     control={form.control}
-                    name="ulb"
+                    name="ulbId"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>ULB / Municipality *</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          disabled={!watchDistrict}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select ULB" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {ulbs.map((ulb) => (
-                              <SelectItem key={ulb} value={ulb}>
-                                {ulb}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {isLoadingUlbs ? (
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <Skeleton className="h-10 w-full" />
+                          </div>
+                        ) : (
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                            disabled={!watchDistrictId || ulbs.length === 0}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select ULB" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {ulbs.map((ulb) => (
+                                <SelectItem key={ulb.id} value={ulb.id}>
+                                  {ulb.name} ({ulb.type})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -223,31 +396,35 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
 
                   <FormField
                     control={form.control}
-                    name="municipalWard"
+                    name="wardId"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Ward *</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          disabled={!watchUlb}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select ward" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {wards.map((ward) => (
-                              <SelectItem
-                                key={`${ward.wardNo}-${ward.wardName}`}
-                                value={`${ward.wardNo}-${ward.wardName}`}
-                              >
-                                Ward {ward.wardNo} - {ward.wardName}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {isLoadingWards ? (
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <Skeleton className="h-10 w-full" />
+                          </div>
+                        ) : (
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                            disabled={!watchUlbId || wards.length === 0}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select ward" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {wards.map((ward) => (
+                                <SelectItem key={ward.id} value={ward.id}>
+                                  Ward {ward.wardNumber} - {ward.wardName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -266,7 +443,7 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                         Constituency
                       </p>
                       <p className="font-medium text-sm">
-                        {selectedWard.constituency || "N/A"}
+                        {selectedWard.constituencyType || "N/A"}
                       </p>
                     </div>
                     <div>
@@ -274,7 +451,7 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                         Reservation
                       </p>
                       <p className="font-medium text-sm">
-                        {selectedWard.reservation || "Unreserved"}
+                        {selectedWard.reservationStatus || "Unreserved"}
                       </p>
                     </div>
                   </motion.div>
@@ -376,6 +553,7 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                 <Button
                   type="submit"
                   className="bg-primary hover:bg-primary-hover"
+                  disabled={isLoadingDistricts || districts.length === 0}
                 >
                   Next Step
                   <ArrowRight className="ml-2 h-4 w-4" />

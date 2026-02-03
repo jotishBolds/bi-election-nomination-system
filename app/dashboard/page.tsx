@@ -1,18 +1,53 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth/auth-context";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
-import { ROPanel } from "@/components/dashboard/panels/ro-panel";
-import { CandidatePanel } from "@/components/dashboard/panels/candidate-panel";
-import { SESPanel } from "@/components/dashboard/panels/ses-panel";
-import { SuperAdminPanel } from "@/components/dashboard/panels/super-admin-panel";
 import { Loader2 } from "lucide-react";
 
-export default function DashboardPage() {
+// Admin Panels
+import { SuperAdminPanel } from "@/components/dashboard/panels/super-admin-panel";
+import {
+  UserManagementPanel,
+  ElectionConfigPanel,
+  AuditLogsPanel,
+  CMSPanel,
+} from "@/components/dashboard/panels/admin";
+
+// SEC Panels
+import { SESPanel } from "@/components/dashboard/panels/ses-panel";
+import {
+  DistrictsPanel,
+  ULBsPanel,
+  WardsPanel,
+  ROManagementPanel,
+  NominationsPanel as SECNominationsPanel,
+  ReportsPanel as SECReportsPanel,
+} from "@/components/dashboard/panels/sec";
+
+// RO Panels
+import { ROPanel } from "@/components/dashboard/panels/ro-panel";
+import {
+  ApplicationsListPanel,
+  ScrutinyPanel,
+  WithdrawPanel,
+  ContestPanel,
+  ROReportsPanel,
+} from "@/components/dashboard/panels/ro";
+
+// Candidate Panels
+import { CandidatePanel } from "@/components/dashboard/panels/candidate-panel";
+import {
+  CandidateNominationsPanel,
+  TrackStatusPanel,
+} from "@/components/dashboard/panels/candidate";
+
+function DashboardContent() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get("tab");
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -36,19 +71,114 @@ export default function DashboardPage() {
   }
 
   const renderPanel = () => {
-    switch (user.role) {
-      case "RO":
-        return <ROPanel />;
-      case "CANDIDATE":
-        return <CandidatePanel />;
-      case "SES":
-        return <SESPanel />;
-      case "SUPER_ADMIN":
-        return <SuperAdminPanel />;
-      default:
-        return <div>Unknown role</div>;
+    // If no tab is selected, show the default dashboard panel for each role
+    if (!activeTab) {
+      switch (user.role) {
+        case "RO":
+          return <ROPanel />;
+        case "CANDIDATE":
+          return <CandidatePanel />;
+        case "SES":
+          return <SESPanel />;
+        case "SUPER_ADMIN":
+          return <SuperAdminPanel />;
+        default:
+          return <div>Unknown role</div>;
+      }
     }
+
+    // Handle tab-specific panels for SUPER_ADMIN
+    if (user.role === "SUPER_ADMIN") {
+      switch (activeTab) {
+        case "users":
+          return <UserManagementPanel />;
+        case "roles":
+          return <UserManagementPanel />; // Can reuse with roles filter
+        case "election-config":
+        case "schedule":
+          return <ElectionConfigPanel />;
+        case "parties":
+          return <CMSPanel />;
+        case "cms":
+          return <CMSPanel />;
+        case "audit-logs":
+          return <AuditLogsPanel />;
+        case "reports":
+          return <SECReportsPanel />; // Admin can see SEC reports
+        default:
+          return <SuperAdminPanel />;
+      }
+    }
+
+    // Handle tab-specific panels for SES
+    if (user.role === "SES") {
+      switch (activeTab) {
+        case "districts":
+          return <DistrictsPanel />;
+        case "ulbs":
+          return <ULBsPanel />;
+        case "wards":
+          return <WardsPanel />;
+        case "ro-management":
+          return <ROManagementPanel />;
+        case "nominations":
+          return <SECNominationsPanel />;
+        case "reports":
+          return <SECReportsPanel />;
+        default:
+          return <SESPanel />;
+      }
+    }
+
+    // Handle tab-specific panels for RO
+    if (user.role === "RO") {
+      switch (activeTab) {
+        case "applications":
+          return <ApplicationsListPanel />;
+        case "scrutiny":
+          return <ScrutinyPanel />;
+        case "withdraw":
+          return <WithdrawPanel />;
+        case "contest":
+          return <ContestPanel />;
+        case "reports":
+          return <ROReportsPanel />;
+        default:
+          return <ROPanel />;
+      }
+    }
+
+    // Handle tab-specific panels for CANDIDATE
+    if (user.role === "CANDIDATE") {
+      switch (activeTab) {
+        case "nominations":
+          return <CandidateNominationsPanel />;
+        case "track":
+          return <TrackStatusPanel />;
+        default:
+          return <CandidatePanel />;
+      }
+    }
+
+    return <div>Unknown tab</div>;
   };
 
   return <DashboardLayout>{renderPanel()}</DashboardLayout>;
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-dashboard-bg">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Loading dashboard...</p>
+          </div>
+        </div>
+      }
+    >
+      <DashboardContent />
+    </Suspense>
+  );
 }

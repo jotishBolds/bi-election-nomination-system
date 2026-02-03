@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useAuth } from "@/lib/auth/auth-context";
+import { signIn } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
@@ -42,22 +42,20 @@ import {
   otpSchema,
 } from "@/lib/auth/validations/auth";
 
-// Hardcoded OTP for demo
-const DEMO_OTP = "123456";
-
 type LoginMethod = "email" | "phone";
 type LoginStep = "credentials" | "otp";
 
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, verifyOtp } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginMethod, setLoginMethod] = useState<LoginMethod>("email");
   const [loginStep, setLoginStep] = useState<LoginStep>("credentials");
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [devOtp, setDevOtp] = useState<string | null>(null);
 
   // Check if user just registered
   const showRegistrationSuccess = searchParams.get("registered") === "true";
@@ -89,13 +87,31 @@ export function LoginForm() {
     setIsSubmitting(true);
 
     try {
-      const result = await login(data);
+      // Store credentials for OTP verification
+      setIdentifier(data.email);
+      setPassword(data.password);
+
+      // Send OTP for login - this will check if user exists
+      const response = await fetch("/api/otp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identifier: data.email,
+          type: "LOGIN",
+          channel: "email",
+        }),
+      });
+
+      const result = await response.json();
 
       if (result.success) {
         setLoginStep("otp");
-        setOtpSent(true);
+        if (result.devOtp) {
+          setDevOtp(result.devOtp);
+        }
       } else {
-        setError(result.error || "Login failed");
+        // Show the error from OTP API (user not found, etc.)
+        setError(result.error || "Failed to send OTP. Please try again.");
       }
     } catch {
       setError("An unexpected error occurred");
@@ -109,18 +125,29 @@ export function LoginForm() {
     setIsSubmitting(true);
 
     try {
-      // For phone login, use a default user account but require OTP
-      const result = await login({
-        email: "tenzin.bhutia@sikkim.gov",
-        password: "applicant123",
+      setPhoneNumber(data.phone);
+      setIdentifier(data.phone);
+
+      // Send OTP to phone
+      const response = await fetch("/api/otp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identifier: data.phone,
+          type: "LOGIN",
+          channel: "sms",
+        }),
       });
 
-      if (result.success && result.requiresOtp) {
-        setPhoneNumber(data.phone);
+      const result = await response.json();
+
+      if (result.success) {
         setLoginStep("otp");
-        setOtpSent(true);
+        if (result.devOtp) {
+          setDevOtp(result.devOtp);
+        }
       } else {
-        setError(result.error || "Login failed");
+        setError(result.error || "Failed to send OTP");
       }
     } catch {
       setError("Failed to send OTP");
@@ -134,13 +161,50 @@ export function LoginForm() {
     setIsSubmitting(true);
 
     try {
-      const result = await verifyOtp(data.otp);
-      if (result.success) {
-        router.push("/dashboard");
+      // Verify OTP first
+      const otpResponse = await fetch("/api/otp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identifier,
+          otp: data.otp,
+          type: "LOGIN",
+        }),
+      });
+
+      const otpResult = await otpResponse.json();
+
+      if (!otpResult.success) {
+        setError(otpResult.error || "Invalid OTP");
+        return;
+      }
+
+      // OTP verified, now sign in with NextAuth
+      if (loginMethod === "email" && password) {
+        const result = await signIn("credentials", {
+          email: identifier,
+          password: password,
+          redirect: false,
+        });
+
+        if (result?.error) {
+          setError(result.error);
+        } else {
+          router.push("/dashboard");
+        }
       } else {
-        setError(
-          result.error || "Invalid OTP. Please try again. (Hint: Use 123456)",
-        );
+        // Phone login - use phone-otp provider
+        const result = await signIn("phone-otp", {
+          phone: identifier,
+          otpVerified: "true",
+          redirect: false,
+        });
+
+        if (result?.error) {
+          setError(result.error);
+        } else {
+          router.push("/dashboard");
+        }
       }
     } catch {
       setError("OTP verification failed");
@@ -151,15 +215,35 @@ export function LoginForm() {
 
   const handleBack = () => {
     setLoginStep("credentials");
-    setOtpSent(false);
     setError(null);
+    setDevOtp(null);
     otpForm.reset();
   };
 
   const handleResendOtp = async () => {
     setError(null);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setOtpSent(true);
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/otp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identifier,
+          type: "LOGIN",
+          channel: loginMethod === "phone" ? "sms" : "email",
+        }),
+      });
+
+      const result = await response.json();
+      if (result.devOtp) {
+        setDevOtp(result.devOtp);
+      }
+    } catch {
+      setError("Failed to resend OTP");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -345,12 +429,6 @@ export function LoginForm() {
                 </Button>
               </p>
             </div>
-
-            <div className="text-xs text-muted-foreground text-center space-y-1 pt-4 border-t mt-6">
-              <p className="font-medium">Applicant Credentials:</p>
-              <p>Email: tenzin.bhutia@sikkim.gov / applicant123</p>
-              <p>OTP: 123456</p>
-            </div>
           </motion.div>
         ) : (
           <motion.div
@@ -444,17 +522,21 @@ export function LoginForm() {
                   type="button"
                   className="text-primary hover:underline font-medium"
                   onClick={handleResendOtp}
+                  disabled={isSubmitting}
                 >
                   Resend OTP
                 </button>
               </p>
             </div>
 
-            <div className="text-xs text-muted-foreground text-center pt-4 border-t">
-              <p>
-                Demo OTP: <strong>123456</strong>
-              </p>
-            </div>
+            {devOtp && (
+              <div className="text-xs text-muted-foreground text-center pt-4 border-t bg-yellow-50 p-2 rounded">
+                <p className="font-medium text-yellow-700">
+                  Development Mode - OTP: <strong>{devOtp}</strong>
+                </p>
+                <p className="text-yellow-600">Check server console for OTP</p>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

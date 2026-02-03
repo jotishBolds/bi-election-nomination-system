@@ -8,13 +8,8 @@ import React, {
   useCallback,
 } from "react";
 import { useRouter } from "next/navigation";
+import { signIn, signOut, useSession } from "next-auth/react";
 import { AuthState, AuthUser, LoginCredentials } from "./types";
-import { validateCredentials } from "./users";
-import {
-  storeAuthUser,
-  getStoredAuthUser,
-  clearStoredAuthUser,
-} from "./auth-utils";
 
 interface AuthContextType extends AuthState {
   login: (
@@ -26,61 +21,128 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Temporary storage for pending login
-let pendingLogin: { user: any; credentials: LoginCredentials } | null = null;
+// Temporary storage for pending login credentials
+let pendingCredentials: LoginCredentials | null = null;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [state, setState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
     isLoading: true,
   });
 
+  // Sync state with NextAuth session
   useEffect(() => {
-    const user = getStoredAuthUser();
-    setState({
-      user,
-      isAuthenticated: !!user,
-      isLoading: false,
-    });
-  }, []);
+    if (status === "loading") {
+      setState((prev) => ({ ...prev, isLoading: true }));
+    } else if (status === "authenticated" && session?.user) {
+      setState({
+        user: {
+          id: session.user.id,
+          email: session.user.email || "",
+          name: session.user.name || "",
+          role: session.user.role as AuthUser["role"],
+        },
+        isAuthenticated: true,
+        isLoading: false,
+      });
+    } else {
+      setState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+      });
+    }
+  }, [session, status]);
 
   const login = useCallback(async (credentials: LoginCredentials) => {
-    const user = validateCredentials(credentials.email, credentials.password);
+    try {
+      // Store credentials for OTP verification step
+      pendingCredentials = credentials;
 
-    if (!user) {
-      return { success: false, error: "Invalid email or password" };
+      // For now, we'll send OTP via API then verify
+      // In a real flow, you'd call an API to send OTP first
+      const response = await fetch("/api/otp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identifier: credentials.email,
+          type: "LOGIN",
+          channel: "email",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        return { success: true, requiresOtp: true };
+      } else {
+        // If OTP sending fails, try direct login (for users without OTP requirement)
+        const result = await signIn("credentials", {
+          email: credentials.email,
+          password: credentials.password,
+          redirect: false,
+        });
+
+        if (result?.error) {
+          return { success: false, error: result.error };
+        }
+
+        return { success: true, requiresOtp: false };
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      return { success: false, error: "An unexpected error occurred" };
     }
-
-    // Store pending login for OTP verification
-    pendingLogin = { user, credentials };
-    return { success: true, requiresOtp: true };
   }, []);
 
   const verifyOtp = useCallback(async (otp: string) => {
-    // Demo OTP check
-    if (otp !== "123456") {
-      return { success: false, error: "Invalid OTP" };
-    }
-
-    if (!pendingLogin) {
+    if (!pendingCredentials) {
       return { success: false, error: "No pending login found" };
     }
 
-    const authUser = storeAuthUser(pendingLogin.user);
-    setState({
-      user: authUser,
-      isAuthenticated: true,
-      isLoading: false,
-    });
+    try {
+      // Verify OTP first
+      const otpResponse = await fetch("/api/otp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identifier: pendingCredentials.email,
+          otp,
+          type: "LOGIN",
+        }),
+      });
 
-    pendingLogin = null; // Clear pending login
-    return { success: true };
+      const otpData = await otpResponse.json();
+
+      if (!otpData.success) {
+        return { success: false, error: otpData.error || "Invalid OTP" };
+      }
+
+      // OTP verified, now sign in with NextAuth
+      const result = await signIn("credentials", {
+        email: pendingCredentials.email,
+        password: pendingCredentials.password,
+        redirect: false,
+      });
+
+      pendingCredentials = null;
+
+      if (result?.error) {
+        return { success: false, error: result.error };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error("OTP verification error:", error);
+      return { success: false, error: "OTP verification failed" };
+    }
   }, []);
 
-  const logout = useCallback(() => {
-    clearStoredAuthUser();
+  const logout = useCallback(async () => {
+    await signOut({ redirect: false });
     setState({
       user: null,
       isAuthenticated: false,

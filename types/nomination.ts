@@ -9,9 +9,12 @@ export interface ShuffledSymbol {
 
 export interface NominationFormData {
   // Step 1: Basic Info
-  district: string;
-  ulb: string;
+  districtId: string; // Database ID
+  district: string; // Display name
+  ulbId: string; // Database ID
+  ulb: string; // Display name
   municipality: string;
+  wardId: string; // Database ID
   municipalWard: string;
   wardName: string;
   constituency: string;
