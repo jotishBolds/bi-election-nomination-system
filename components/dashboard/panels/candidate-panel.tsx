@@ -747,7 +747,7 @@ export function CandidatePanel() {
             <div className="mt-3 p-4 rounded-xl bg-primary">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-400">Nomination Deadline</p>
+                  <p className="text-xs text-white">Nomination Deadline</p>
                   <p className="text-sm font-medium text-white mt-0.5">
                     March 8, 2026
                   </p>

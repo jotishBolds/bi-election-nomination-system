@@ -15,8 +15,15 @@ const initialFormData: NominationFormData = {
   candidateName: "",
   fatherOrHusbandName: "",
   fullPostalAddress: "",
+  sameAsPostalAddress: false,
+  correspondingAddress: "",
   serialNoCandidate: "",
   partNoCandidate: "",
+  category: "general",
+  casteTribeName: "",
+  casteCertificateFile: "",
+  affidavitFile: "",
+  addressProofFile: "",
   proposerName: "",
   proposerSerialNo: "",
   proposerPartNo: "",
@@ -30,8 +37,6 @@ const initialFormData: NominationFormData = {
   symbolPreference2: "",
   symbolPreference3: "",
   shuffleCount: 0,
-  category: "general",
-  casteTribeName: "",
 };
 
 const NominationContext = createContext<NominationContextType | undefined>(

@@ -19,10 +19,15 @@ export interface NominationFormData {
   candidateName: string;
   fatherOrHusbandName: string;
   fullPostalAddress: string;
+  sameAsPostalAddress: boolean;
+  correspondingAddress: string;
   serialNoCandidate: string;
   partNoCandidate: string;
   category: "general" | "sc" | "st_bl" | "st_lt" | "obc_central" | "obc_state";
   casteTribeName: string;
+  casteCertificateFile: string;
+  affidavitFile: string;
+  addressProofFile: string;
 
   // Step 2: Proposer Details
   proposerName: string;
@@ -40,7 +45,7 @@ export interface NominationFormData {
   symbolPreference2: string;
   symbolPreference3: string;
   shuffleCount: number;
-  shuffledSymbols?: ShuffledSymbol[]; // Store all shuffled symbols for persistence
+  shuffledSymbols?: ShuffledSymbol[];
 }
 
 export interface NominationContextType {

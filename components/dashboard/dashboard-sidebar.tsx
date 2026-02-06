@@ -177,10 +177,14 @@ function DashboardSidebarContent() {
   const navGroups = ROLE_NAV_CONFIG[user.role];
 
   return (
-    <Sidebar className="border-r border-blue-100 bg-gradient-to-b from-blue-50 to-slate-50">
-      <SidebarHeader className="border-b border-blue-100 px-4 py-4">
+    <Sidebar className="border-r border-green-100 bg-gradient-to-b from-green-50 to-slate-50">
+      <SidebarHeader className="border-b border-green-100 px-4 py-4">
         <div className="flex items-center gap-3">
-          <img src="/main-logo.png" alt="ENS Portal" className="h-10 w-auto" />
+          <img
+            src="/main-logo-new.png"
+            alt="ENS Portal"
+            className="h-10 w-auto"
+          />
           <div>
             <h2 className="font-semibold text-primary">ENS Portal</h2>
             <p className="text-xs text-muted-foreground">Nomination System</p>

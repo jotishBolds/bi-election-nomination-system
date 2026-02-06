@@ -186,7 +186,7 @@ export function FormPreview({ onProceedToPayment, onBack }: FormPreviewProps) {
           {/* Proposer Section */}
           <div style={{ marginBottom: "24px" }}>
             <p style={{ margin: "12px 0" }}>
-              * I nominate as an applicant for election to the{" "}
+              * I nominate as a candidate for election to the{" "}
               <span
                 style={{
                   borderBottom: "1px solid #000",
@@ -214,7 +214,7 @@ export function FormPreview({ onProceedToPayment, onBack }: FormPreviewProps) {
             </p>
 
             <p style={{ margin: "12px 0" }}>
-              Applicant's name:{" "}
+              Candidate's name:{" "}
               <span
                 style={{
                   borderBottom: "1px solid #000",
@@ -258,7 +258,6 @@ export function FormPreview({ onProceedToPayment, onBack }: FormPreviewProps) {
               </span>
             </p>
 
-            {/*
             <p style={{ margin: "16px 0" }}>
               His name is entered at Serial No.{" "}
               <span
@@ -286,7 +285,6 @@ export function FormPreview({ onProceedToPayment, onBack }: FormPreviewProps) {
               </span>{" "}
               of electoral roll of the Municipality.
             </p>
-            */}
 
             <p style={{ margin: "16px 0" }}>
               My name is{" "}
@@ -385,10 +383,10 @@ export function FormPreview({ onProceedToPayment, onBack }: FormPreviewProps) {
             }}
           />
 
-          {/* Applicant Declaration Section */}
+          {/* Candidate Declaration Section */}
           <div style={{ marginBottom: "24px" }}>
             <p style={{ fontWeight: "500", marginBottom: "16px" }}>
-              I, the above mentioned applicant, assent to this nomination and
+              I, the above-mentioned candidate, assent to this nomination and
               hereby declare:-
             </p>
 
@@ -404,62 +402,13 @@ export function FormPreview({ onProceedToPayment, onBack }: FormPreviewProps) {
                     minWidth: "40px",
                   }}
                 >
-                  {formData.age}
+                  18
                 </span>{" "}
                 years of age.
               </p>
 
               <p style={{ margin: "10px 0" }}>
-                (b) that the symbol I have chosen is:
-              </p>
-
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "16px",
-                  margin: "12px 0 12px 30px",
-                  padding: "12px",
-                  backgroundColor: "#f5f5f5",
-                  borderRadius: "6px",
-                }}
-              >
-                {formData.partySymbolImage && (
-                  <img
-                    src={formData.partySymbolImage}
-                    alt={formData.partySymbol}
-                    style={{
-                      width: "60px",
-                      height: "60px",
-                      objectFit: "contain",
-                      border: "1px solid #ddd",
-                      backgroundColor: "white",
-                      padding: "4px",
-                      borderRadius: "4px",
-                    }}
-                  />
-                )}
-                <div>
-                  <p style={{ fontWeight: "600", margin: "0 0 4px 0" }}>
-                    {formData.partySymbol}
-                  </p>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      padding: "2px 10px",
-                      border: "1px solid #ccc",
-                      borderRadius: "4px",
-                      fontSize: "10pt",
-                      backgroundColor: "#fff",
-                    }}
-                  >
-                    {formData.politicalParty}
-                  </span>
-                </div>
-              </div>
-
-              <p style={{ margin: "10px 0" }}>
-                (c) that I am set up at this election by{" "}
+                (b) that I am set up at this election by{" "}
                 <span
                   style={{
                     borderBottom: "1px solid #000",
@@ -473,6 +422,60 @@ export function FormPreview({ onProceedToPayment, onBack }: FormPreviewProps) {
                 </span>{" "}
                 Political Party.
               </p>
+
+              <p style={{ margin: "10px 0" }}>
+                (c) that the symbols I have chosen are, in order of preference:
+              </p>
+
+              <div style={{ marginLeft: "30px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "16px",
+                    margin: "12px 0",
+                    padding: "12px",
+                    backgroundColor: "#f5f5f5",
+                    borderRadius: "6px",
+                  }}
+                >
+                  {formData.partySymbolImage && (
+                    <img
+                      src={formData.partySymbolImage}
+                      alt={formData.symbolPreference1}
+                      style={{
+                        width: "50px",
+                        height: "50px",
+                        objectFit: "contain",
+                        border: "1px solid #ddd",
+                        backgroundColor: "white",
+                        padding: "4px",
+                        borderRadius: "4px",
+                      }}
+                    />
+                  )}
+                  <div>
+                    <p style={{ margin: "2px 0" }}>
+                      (i){" "}
+                      <span style={{ fontWeight: "600" }}>
+                        {formData.symbolPreference1}
+                      </span>
+                    </p>
+                    <p style={{ margin: "2px 0" }}>
+                      (ii){" "}
+                      <span style={{ fontWeight: "600" }}>
+                        {formData.symbolPreference2}
+                      </span>
+                    </p>
+                    <p style={{ margin: "2px 0" }}>
+                      (iii){" "}
+                      <span style={{ fontWeight: "600" }}>
+                        {formData.symbolPreference3}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              </div>
 
               <p style={{ margin: "10px 0" }}>
                 (d) that my name and my *father's / husband's name have been
@@ -497,7 +500,7 @@ export function FormPreview({ onProceedToPayment, onBack }: FormPreviewProps) {
                 Municipality.
               </p>
 
-              {formData.category !== "general" && (
+              {formData.category !== "general" && formData.casteTribeName && (
                 <p style={{ margin: "10px 0" }}>
                   * I further declare that I am a member of the{" "}
                   <span
@@ -550,7 +553,7 @@ export function FormPreview({ onProceedToPayment, onBack }: FormPreviewProps) {
                   }}
                 >
                   <span style={{ fontSize: "10pt" }}>
-                    (Signature of applicant)
+                    (Signature of candidate)
                   </span>
                 </div>
               </div>
@@ -635,6 +638,274 @@ export function FormPreview({ onProceedToPayment, onBack }: FormPreviewProps) {
               </p>
             </div>
           </div>
+
+          {/* Page Break for Second Page */}
+          {/* <div style={{ pageBreakAfter: "always", marginTop: "40px" }}></div> */}
+
+          {/* Decision Section (Page 2) */}
+          {/* <div
+            style={{
+              padding: "16px",
+              border: "1px solid #ddd",
+              borderRadius: "6px",
+              backgroundColor: "#fafafa",
+              marginBottom: "30px",
+            }}
+          >
+            <p
+              style={{
+                fontWeight: "600",
+                textAlign: "center",
+                marginBottom: "16px",
+                textDecoration: "underline",
+              }}
+            >
+              Decision of the Municipality Returning Officer
+            </p>
+            <p
+              style={{
+                fontWeight: "500",
+                textAlign: "center",
+                marginBottom: "20px",
+              }}
+            >
+              Accepting or Rejecting the Nomination Paper
+            </p>
+
+            <p style={{ margin: "12px 0" }}>
+              I have examined this nomination paper in accordance with Rule 28
+              and decide as follows:
+            </p>
+
+            <div style={{ margin: "30px 0" }}>
+              <span
+                style={{
+                  borderBottom: "1px solid #000",
+                  display: "inline-block",
+                  minWidth: "100%",
+                  minHeight: "60px",
+                }}
+              >
+                &nbsp;
+              </span>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-end",
+                marginTop: "20px",
+              }}
+            >
+              <p style={{ margin: "0" }}>
+                Date:{" "}
+                <span
+                  style={{
+                    borderBottom: "1px solid #000",
+                    display: "inline-block",
+                    minWidth: "120px",
+                  }}
+                >
+                  &nbsp;
+                </span>
+              </p>
+              <p style={{ fontWeight: "500", margin: "0" }}>
+                Municipal Returning Officer
+              </p>
+            </div>
+
+            <p
+              style={{
+                fontStyle: "italic",
+                fontSize: "10pt",
+                marginTop: "16px",
+              }}
+            >
+              *Strike out the word not applicable.
+            </p>
+          </div> */}
+
+          {/* <hr
+            style={{
+              border: "none",
+              borderTop: "2px dashed #999",
+              margin: "30px 0",
+            }}
+          /> */}
+
+          {/* Receipt Section */}
+          {/* <div
+            style={{
+              padding: "16px",
+              border: "1px solid #ddd",
+              borderRadius: "6px",
+              backgroundColor: "#fffef0",
+            }}
+          >
+            <p
+              style={{
+                fontWeight: "600",
+                textAlign: "center",
+                marginBottom: "12px",
+                textDecoration: "underline",
+              }}
+            >
+              Receipt for nomination paper and notice of scrutiny
+            </p>
+            <p
+              style={{
+                fontSize: "10pt",
+                textAlign: "center",
+                marginBottom: "16px",
+                fontStyle: "italic",
+              }}
+            >
+              (to be handed over to the person presenting the nomination paper)
+            </p>
+
+            <p style={{ margin: "12px 0" }}>
+              Serial No. of nomination paper:{" "}
+              <span
+                style={{
+                  borderBottom: "1px solid #000",
+                  display: "inline-block",
+                  minWidth: "150px",
+                }}
+              >
+                &nbsp;
+              </span>
+            </p>
+
+            <p style={{ margin: "12px 0", lineHeight: "1.8" }}>
+              The nomination paper of{" "}
+              <span
+                style={{
+                  borderBottom: "1px solid #000",
+                  padding: "0 8px",
+                  fontWeight: "500",
+                  display: "inline-block",
+                  minWidth: "250px",
+                }}
+              >
+                {formData.candidateName}
+              </span>{" "}
+              a candidate for election from Ward No.{" "}
+              <span
+                style={{
+                  borderBottom: "1px solid #000",
+                  padding: "0 8px",
+                  fontWeight: "500",
+                  display: "inline-block",
+                  minWidth: "50px",
+                }}
+              >
+                {formData.municipalWard.split("-")[0]}
+              </span>{" "}
+              of the{" "}
+              <span
+                style={{
+                  borderBottom: "1px solid #000",
+                  padding: "0 8px",
+                  fontWeight: "500",
+                  display: "inline-block",
+                  minWidth: "150px",
+                }}
+              >
+                {formData.municipality}
+              </span>{" "}
+              Municipality was delivered to me at my office at{" "}
+              <span
+                style={{
+                  borderBottom: "1px solid #000",
+                  display: "inline-block",
+                  minWidth: "80px",
+                }}
+              >
+                &nbsp;
+              </span>{" "}
+              (hour) on{" "}
+              <span
+                style={{
+                  borderBottom: "1px solid #000",
+                  display: "inline-block",
+                  minWidth: "120px",
+                }}
+              >
+                &nbsp;
+              </span>{" "}
+              (date) by the * candidate / proposer.
+            </p>
+
+            <p style={{ margin: "16px 0", lineHeight: "1.8" }}>
+              All nomination papers will be taken up for scrutiny at{" "}
+              <span
+                style={{
+                  borderBottom: "1px solid #000",
+                  display: "inline-block",
+                  minWidth: "80px",
+                }}
+              >
+                &nbsp;
+              </span>{" "}
+              (hour) on{" "}
+              <span
+                style={{
+                  borderBottom: "1px solid #000",
+                  display: "inline-block",
+                  minWidth: "120px",
+                }}
+              >
+                &nbsp;
+              </span>{" "}
+              (date) at{" "}
+              <span
+                style={{
+                  borderBottom: "1px solid #000",
+                  display: "inline-block",
+                  minWidth: "200px",
+                }}
+              >
+                &nbsp;
+              </span>{" "}
+              (place)
+            </p>
+
+            <p
+              style={{
+                fontStyle: "italic",
+                fontSize: "10pt",
+                margin: "16px 0 12px 0",
+              }}
+            >
+              *Strike out the word not applicable.
+            </p>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-end",
+                marginTop: "24px",
+              }}
+            >
+              <p style={{ margin: "0" }}>
+                Date:{" "}
+                <span
+                  style={{
+                    borderBottom: "1px solid #000",
+                    display: "inline-block",
+                    minWidth: "120px",
+                  }}
+                >
+                  &nbsp;
+                </span>
+              </p>
+              <p style={{ fontWeight: "500", margin: "0" }}>
+                Municipal Returning Officer
+              </p>
+            </div>
+          </div> */}
         </div>
       </Card>
 

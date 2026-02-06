@@ -52,7 +52,7 @@ const guidelines = [
     icon: IndianRupee,
     title: "Application Fee",
     description:
-      "₹500 for General category, ₹250 for SC/ST applicants (non-refundable)",
+      "₹XXXXX for General category, ₹XXXXX for SC/ST applicants (non-refundable)",
     iconColor: "text-emerald-600",
     iconBg: "bg-emerald-100",
     cardBg: "bg-emerald-50",
@@ -61,7 +61,7 @@ const guidelines = [
     icon: Calendar,
     title: "Important Dates",
     description:
-      "Last date for submission: February 15, 2026. Scrutiny: February 18, 2026",
+      "Last date for submission: XXXXX XX, XXXX. Scrutiny: XXXXX XX, XXXX",
     iconColor: "text-rose-600",
     iconBg: "bg-rose-100",
     cardBg: "bg-rose-50",
@@ -99,7 +99,7 @@ export function StartPage({ onApplyClick }: StartPageProps) {
         >
           <div className="mx-auto">
             <img
-              src="/main-logo.png"
+              src="/main-logo-new.png"
               alt="Election Nomination Portal"
               className="h-20 w-auto mx-auto"
             />
@@ -108,7 +108,7 @@ export function StartPage({ onApplyClick }: StartPageProps) {
             Election Nomination Portal
           </h1>
           <p className="text-muted-foreground text-lg">
-            Municipal Corporation Elections 2026
+            Municipal Corporation Elections XXXX
           </p>
         </motion.div>
 
@@ -117,9 +117,8 @@ export function StartPage({ onApplyClick }: StartPageProps) {
           <AlertCircle className="h-4 w-4 text-amber-600" />
           <AlertTitle className="text-amber-800">Important Notice</AlertTitle>
           <AlertDescription className="text-amber-700">
-            Nomination filing is open from January 20, 2026 to February 15,
-            2026. Ensure all documents are ready before starting the
-            application.
+            Nomination filing is open from XXXXX XX, XXXX to XXXXX XX, XXXX.
+            Ensure all documents are ready before starting the application.
           </AlertDescription>
         </Alert>
 
@@ -191,7 +190,7 @@ export function StartPage({ onApplyClick }: StartPageProps) {
         </Card>
 
         {/* SLA Information */}
-        <Card className="border-0 bg-teal-50 shadow-sm">
+        {/* <Card className="border-0 bg-teal-50 shadow-sm">
           <CardContent className="pt-6">
             <div className="flex items-start gap-4">
               <div className="p-2 bg-teal-100 rounded-lg">
@@ -208,7 +207,7 @@ export function StartPage({ onApplyClick }: StartPageProps) {
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
-                    Document verification: Within 48 hours
+                    Document verification: Within XX hours
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
@@ -218,7 +217,7 @@ export function StartPage({ onApplyClick }: StartPageProps) {
               </div>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* Submission Status Card */}
         {submissionCount > 0 && (
@@ -277,7 +276,7 @@ export function StartPage({ onApplyClick }: StartPageProps) {
           </Alert>
         )}
 
-        {/* Apply Button */}
+        {/* Apply Button - KEPT INTACT */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

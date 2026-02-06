@@ -22,6 +22,7 @@ import {
   FileText,
   Printer,
   Mail,
+  AlertCircle,
 } from "lucide-react";
 import { useNomination } from "@/app/context/nomination-context";
 
@@ -74,7 +75,7 @@ export function SuccessPage({ onGoHome }: SuccessPageProps) {
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="min-h-screen bg-gradient-to-br from-green-50 to-white p-4 md:p-8"
+      className="min-h-screen bg-gradient-to-br  p-4 md:p-8"
     >
       <div className="max-w-3xl mx-auto space-y-6">
         {/* Success Header */}
@@ -93,11 +94,35 @@ export function SuccessPage({ onGoHome }: SuccessPageProps) {
             <CheckCircle className="w-14 h-14 text-green-600" />
           </motion.div>
           <h1 className="text-3xl font-bold text-green-700">
-            Nomination Submitted Successfully!
+            Online Application Submitted Successfully!
           </h1>
           <p className="text-muted-foreground">
             Your nomination has been received and is being processed
           </p>
+        </motion.div>
+
+        {/* Important Alert Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <Card className="border-amber-200 bg-amber-50 shadow-sm">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h4 className="font-semibold text-amber-800 mb-1">
+                    Important: In-Person Verification Required
+                  </h4>
+                  <p className="text-sm text-amber-700">
+                    After submitting online, you must visit the Returning
+                    Officer (RO) in person to complete your nomination.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </motion.div>
 
         {/* Application Details Card */}
@@ -207,16 +232,10 @@ export function SuccessPage({ onGoHome }: SuccessPageProps) {
               Important Notes:
             </h4>
             <ul className="text-sm text-yellow-700 space-y-2">
+              <li>• Please bring a printed copy of this form to the RO</li>
               <li>
-                • Please bring a printed copy of this acknowledgment for
-                scrutiny
-              </li>
-              <li>
-                • Original documents must be presented during verification
-              </li>
-              <li>
-                • Track your application status on the portal using the
-                reference ID
+                • Original documents must be presented to the RO during
+                verification
               </li>
               <li>• Contact helpdesk at 1800-XXX-XXXX for any queries</li>
             </ul>
@@ -225,14 +244,6 @@ export function SuccessPage({ onGoHome }: SuccessPageProps) {
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-          {/* <Button variant="outline" className="gap-2">
-            <Printer className="h-4 w-4" />
-            Print Acknowledgment
-          </Button>
-          <Button variant="outline" className="gap-2">
-            <Download className="h-4 w-4" />
-            Download PDF
-          </Button> */}
           <Button
             className="bg-primary hover:bg-primary-hover gap-2"
             onClick={onGoHome}

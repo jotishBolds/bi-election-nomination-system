@@ -28,7 +28,7 @@ export function DashboardHeader() {
         <Separator orientation="vertical" className="h-6" />
         <div className="flex items-center gap-2">
           <img
-            src="/main-logo.png"
+            src="/main-logo-new.png"
             alt="Election Nomination System"
             className="h-8 w-auto"
           />

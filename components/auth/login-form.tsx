@@ -18,7 +18,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   InputOTP,
   InputOTPGroup,
@@ -27,26 +26,19 @@ import {
 import {
   Loader2,
   AlertCircle,
-  Mail,
-  Lock,
   Phone,
   ArrowLeft,
   CheckCircle2,
+  ShieldCheck,
 } from "lucide-react";
 import {
-  LoginFormData,
-  loginSchema,
   PhoneLoginFormData,
   phoneLoginSchema,
   OtpFormData,
   otpSchema,
 } from "@/lib/auth/validations/auth";
 
-// Hardcoded OTP for demo
-const DEMO_OTP = "123456";
-
-type LoginMethod = "email" | "phone";
-type LoginStep = "credentials" | "otp";
+type LoginStep = "phone" | "otp";
 
 export function LoginForm() {
   const router = useRouter();
@@ -54,76 +46,37 @@ export function LoginForm() {
   const { login, verifyOtp } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loginMethod, setLoginMethod] = useState<LoginMethod>("email");
-  const [loginStep, setLoginStep] = useState<LoginStep>("credentials");
+  const [loginStep, setLoginStep] = useState<LoginStep>("phone");
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
 
-  // Check if user just registered
   const showRegistrationSuccess = searchParams.get("registered") === "true";
-
-  const emailForm = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
-  });
 
   const phoneForm = useForm<PhoneLoginFormData>({
     resolver: zodResolver(phoneLoginSchema),
-    defaultValues: {
-      phone: "",
-    },
+    defaultValues: { phone: "" },
   });
 
   const otpForm = useForm<OtpFormData>({
     resolver: zodResolver(otpSchema),
-    defaultValues: {
-      otp: "",
-    },
+    defaultValues: { otp: "" },
   });
-
-  async function onEmailSubmit(data: LoginFormData) {
-    setError(null);
-    setIsSubmitting(true);
-
-    try {
-      const result = await login(data);
-
-      if (result.success) {
-        setLoginStep("otp");
-        setOtpSent(true);
-      } else {
-        setError(result.error || "Login failed");
-      }
-    } catch {
-      setError("An unexpected error occurred");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
 
   async function onPhoneSubmit(data: PhoneLoginFormData) {
     setError(null);
     setIsSubmitting(true);
-
     try {
-      // For phone login, use a default user account but require OTP
       const result = await login({
         email: "tenzin.bhutia@sikkim.gov",
         password: "applicant123",
       });
-
-      if (result.success && result.requiresOtp) {
+      if (result.success) {
         setPhoneNumber(data.phone);
         setLoginStep("otp");
-        setOtpSent(true);
       } else {
-        setError(result.error || "Login failed");
+        setError(result.error || "Failed to send OTP");
       }
     } catch {
-      setError("Failed to send OTP");
+      setError("Failed to send OTP. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -132,7 +85,6 @@ export function LoginForm() {
   async function onOtpSubmit(data: OtpFormData) {
     setError(null);
     setIsSubmitting(true);
-
     try {
       const result = await verifyOtp(data.otp);
       if (result.success) {
@@ -150,8 +102,7 @@ export function LoginForm() {
   }
 
   const handleBack = () => {
-    setLoginStep("credentials");
-    setOtpSent(false);
+    setLoginStep("phone");
     setError(null);
     otpForm.reset();
   };
@@ -159,226 +110,145 @@ export function LoginForm() {
   const handleResendOtp = async () => {
     setError(null);
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    setOtpSent(true);
   };
 
   return (
     <div className="w-full">
       <AnimatePresence mode="wait">
-        {loginStep === "credentials" ? (
+        {loginStep === "phone" ? (
           <motion.div
-            key="credentials"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
+            key="phone-step"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.25 }}
           >
             {showRegistrationSuccess && (
-              <Alert className="mb-6 border-green-200 bg-green-50">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <AlertDescription className="text-green-800">
-                  Registration completed successfully! Please login with your
-                  credentials.
+              <Alert className="mb-6 border-primary/30 bg-secondary">
+                <CheckCircle2 className="h-4 w-4 text-primary" />
+                <AlertDescription className="text-secondary-foreground">
+                  Registration completed! Sign in with your phone number.
                 </AlertDescription>
               </Alert>
             )}
 
-            <Tabs
-              value={loginMethod}
-              onValueChange={(v) => setLoginMethod(v as LoginMethod)}
-            >
-              <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="email" className="gap-2">
-                  <Mail className="h-4 w-4 text-blue-500" />
-                  Email
-                </TabsTrigger>
-                <TabsTrigger value="phone" className="gap-2">
-                  <Phone className="h-4 w-4 text-emerald-500" />
-                  Phone
-                </TabsTrigger>
-              </TabsList>
+            <div className="space-y-6">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
 
-              <TabsContent value="email">
-                <Form {...emailForm}>
-                  <form
-                    onSubmit={emailForm.handleSubmit(onEmailSubmit)}
-                    className="space-y-6"
-                  >
-                    {error && (
-                      <Alert variant="destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>{error}</AlertDescription>
-                      </Alert>
-                    )}
-
-                    <FormField
-                      control={emailForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email Address</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-blue-500" />
-                              <Input
-                                {...field}
-                                type="email"
-                                placeholder="Enter your email"
-                                className="pl-10"
-                                disabled={isSubmitting}
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={emailForm.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Password</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-amber-500" />
-                              <Input
-                                {...field}
-                                type="password"
-                                placeholder="Enter your password"
-                                className="pl-10"
-                                disabled={isSubmitting}
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <Button
-                      type="submit"
-                      className="w-full bg-primary hover:bg-primary-hover"
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Verifying...
-                        </>
-                      ) : (
-                        "Continue"
-                      )}
-                    </Button>
-                  </form>
-                </Form>
-              </TabsContent>
-
-              <TabsContent value="phone">
-                <Form {...phoneForm}>
-                  <form
-                    onSubmit={phoneForm.handleSubmit(onPhoneSubmit)}
-                    className="space-y-6"
-                  >
-                    {error && (
-                      <Alert variant="destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>{error}</AlertDescription>
-                      </Alert>
-                    )}
-
-                    <FormField
-                      control={phoneForm.control}
-                      name="phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Phone Number</FormLabel>
-                          <FormControl>
-                            <div className="flex">
-                              <div className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-muted-foreground">
-                                <Phone className="h-4 w-4 mr-1 text-emerald-500" />
-                                <span className="text-sm">+91</span>
-                              </div>
-                              <Input
-                                {...field}
-                                type="tel"
-                                placeholder="Enter 10 digit number"
-                                className="rounded-l-none"
-                                maxLength={10}
-                                disabled={isSubmitting}
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <Button
-                      type="submit"
-                      className="w-full bg-primary hover:bg-primary-hover"
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Sending OTP...
-                        </>
-                      ) : (
-                        "Send OTP"
-                      )}
-                    </Button>
-                  </form>
-                </Form>
-              </TabsContent>
-            </Tabs>
-
-            <div className="text-center mt-6">
-              <p className="text-sm text-muted-foreground">
-                Don't have an account?{" "}
-                <Button
-                  variant="link"
-                  className="p-0 h-auto font-medium text-primary hover:underline"
-                  onClick={() => router.push("/register")}
+              <Form {...phoneForm}>
+                <form
+                  onSubmit={phoneForm.handleSubmit(onPhoneSubmit)}
+                  className="space-y-6"
                 >
-                  Register here
-                </Button>
-              </p>
-            </div>
+                  <FormField
+                    control={phoneForm.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-foreground font-medium">
+                          Phone Number
+                        </FormLabel>
+                        <FormControl>
+                          <div className="flex">
+                            <div className="inline-flex items-center px-4 rounded-l-xl border-2 border-r-0 border-input bg-muted text-secondary-foreground">
+                              <Phone className="h-4 w-4 mr-2 text-primary/70" />
+                              <span className="text-sm font-medium">+91</span>
+                            </div>
+                            <Input
+                              {...field}
+                              type="tel"
+                              placeholder="Enter 10-digit number"
+                              className="rounded-l-none rounded-r-xl border-2 border-input focus-visible:ring-ring focus-visible:border-primary h-12 text-base"
+                              maxLength={10}
+                              disabled={isSubmitting}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-            <div className="text-xs text-muted-foreground text-center space-y-1 pt-4 border-t mt-6">
-              <p className="font-medium">Applicant Credentials:</p>
-              <p>Email: tenzin.bhutia@sikkim.gov / applicant123</p>
-              <p>OTP: 123456</p>
+                  <Button
+                    type="submit"
+                    className="w-full h-12 rounded-xl font-semibold text-base shadow-lg shadow-primary/20 transition-all duration-200 hover:shadow-xl hover:shadow-primary/30"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Sending OTP...
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="mr-2 h-5 w-5" />
+                        Send OTP
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </Form>
+
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">
+                  Don&apos;t have an account?{" "}
+                  <Button
+                    variant="link"
+                    className="p-0 h-auto font-semibold text-primary hover:underline"
+                    onClick={() => router.push("/register")}
+                  >
+                    Register here
+                  </Button>
+                </p>
+              </div>
+
+              <div className="text-xs text-muted-foreground/60 text-center space-y-1 pt-4 border-t border-border">
+                <p className="font-medium text-muted-foreground/80">
+                  Demo Credentials
+                </p>
+                <p>Phone: Any 10-digit number</p>
+                <p>
+                  OTP: <span className="font-mono font-bold">123456</span>
+                </p>
+              </div>
             </div>
           </motion.div>
         ) : (
           <motion.div
-            key="otp"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
+            key="otp-step"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.25 }}
             className="space-y-6"
           >
             <Button
               variant="ghost"
               size="sm"
-              className="mb-4"
+              className="mb-2 text-secondary-foreground hover:bg-accent"
               onClick={handleBack}
             >
-              <ArrowLeft className="mr-2 h-4 w-4 text-slate-500" />
+              <ArrowLeft className="mr-2 h-4 w-4" />
               Back
             </Button>
 
-            <div className="text-center space-y-2">
-              <div className="mx-auto w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
-                <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+            <div className="text-center space-y-3">
+              <div className="mx-auto w-16 h-16 bg-accent rounded-2xl flex items-center justify-center">
+                <ShieldCheck className="h-8 w-8 text-primary" />
               </div>
-              <h3 className="text-lg font-semibold">Verify OTP</h3>
+              <h3 className="text-xl font-bold text-foreground">
+                Verify Your Number
+              </h3>
               <p className="text-sm text-muted-foreground">
-                {loginMethod === "phone"
-                  ? `Enter the 6-digit code sent to +91 ${phoneNumber}`
-                  : "Enter the 6-digit code sent to your email"}
+                Enter the 6-digit code sent to{" "}
+                <span className="font-semibold text-secondary-foreground">
+                  +91 {phoneNumber}
+                </span>
               </p>
             </div>
 
@@ -405,13 +275,14 @@ export function LoginForm() {
                           value={field.value}
                           onChange={field.onChange}
                         >
-                          <InputOTPGroup>
-                            <InputOTPSlot index={0} />
-                            <InputOTPSlot index={1} />
-                            <InputOTPSlot index={2} />
-                            <InputOTPSlot index={3} />
-                            <InputOTPSlot index={4} />
-                            <InputOTPSlot index={5} />
+                          <InputOTPGroup className="gap-2">
+                            {[0, 1, 2, 3, 4, 5].map((index) => (
+                              <InputOTPSlot
+                                key={index}
+                                index={index}
+                                className="rounded-xl border-2 border-input focus:border-primary h-14 w-12 text-lg font-bold text-foreground"
+                              />
+                            ))}
                           </InputOTPGroup>
                         </InputOTP>
                       </FormControl>
@@ -422,16 +293,19 @@ export function LoginForm() {
 
                 <Button
                   type="submit"
-                  className="w-full bg-primary hover:bg-primary-hover"
+                  className="w-full h-12 rounded-xl font-semibold text-base shadow-lg shadow-primary/20 transition-all duration-200 hover:shadow-xl hover:shadow-primary/30"
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                       Verifying...
                     </>
                   ) : (
-                    "Verify & Login"
+                    <>
+                      <CheckCircle2 className="mr-2 h-5 w-5" />
+                      Verify & Login
+                    </>
                   )}
                 </Button>
               </form>
@@ -439,10 +313,10 @@ export function LoginForm() {
 
             <div className="text-center">
               <p className="text-sm text-muted-foreground">
-                Didn't receive the code?{" "}
+                Didn&apos;t receive the code?{" "}
                 <button
                   type="button"
-                  className="text-primary hover:underline font-medium"
+                  className="text-primary hover:underline font-semibold"
                   onClick={handleResendOtp}
                 >
                   Resend OTP
@@ -450,9 +324,12 @@ export function LoginForm() {
               </p>
             </div>
 
-            <div className="text-xs text-muted-foreground text-center pt-4 border-t">
+            <div className="text-xs text-muted-foreground/60 text-center pt-4 border-t border-border">
               <p>
-                Demo OTP: <strong>123456</strong>
+                Demo OTP:{" "}
+                <span className="font-mono font-bold text-secondary-foreground">
+                  123456
+                </span>
               </p>
             </div>
           </motion.div>
