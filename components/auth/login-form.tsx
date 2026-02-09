@@ -66,8 +66,7 @@ export function LoginForm() {
     setIsSubmitting(true);
     try {
       const result = await login({
-        email: "tenzin.bhutia@sikkim.gov",
-        password: "applicant123",
+        phone: data.phone,
       });
       if (result.success) {
         setPhoneNumber(data.phone);
@@ -207,15 +206,27 @@ export function LoginForm() {
                 </p>
               </div>
 
-              <div className="text-xs text-muted-foreground/60 text-center space-y-1 pt-4 border-t border-border">
+              {/* <div className="text-xs text-muted-foreground/60 text-center space-y-1 pt-4 border-t border-border">
                 <p className="font-medium text-muted-foreground/80">
                   Demo Credentials
                 </p>
-                <p>Phone: Any 10-digit number</p>
+                <p>
+                  RO: <span className="font-mono font-bold">9876543210</span>
+                </p>
+                <p>
+                  Candidate:{" "}
+                  <span className="font-mono font-bold">9876543211</span>
+                </p>
+                <p>
+                  SES: <span className="font-mono font-bold">9876543212</span>
+                </p>
+                <p>
+                  Admin: <span className="font-mono font-bold">9876543213</span>
+                </p>
                 <p>
                   OTP: <span className="font-mono font-bold">123456</span>
                 </p>
-              </div>
+              </div> */}
             </div>
           </motion.div>
         ) : (
@@ -324,14 +335,14 @@ export function LoginForm() {
               </p>
             </div>
 
-            <div className="text-xs text-muted-foreground/60 text-center pt-4 border-t border-border">
+            {/* <div className="text-xs text-muted-foreground/60 text-center pt-4 border-t border-border">
               <p>
                 Demo OTP:{" "}
                 <span className="font-mono font-bold text-secondary-foreground">
                   123456
                 </span>
               </p>
-            </div>
+            </div> */}
           </motion.div>
         )}
       </AnimatePresence>

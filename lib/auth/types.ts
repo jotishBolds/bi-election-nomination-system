@@ -3,8 +3,8 @@ export type UserRole = "RO" | "CANDIDATE" | "SES" | "SUPER_ADMIN";
 export interface User {
   id: string;
   email: string;
-  name: string;
   phone: string;
+  name: string;
   role: UserRole;
   password: string;
 }
@@ -12,13 +12,13 @@ export interface User {
 export interface AuthUser {
   id: string;
   email: string;
+  phone: string;
   name: string;
   role: UserRole;
 }
 
 export interface LoginCredentials {
-  email: string;
-  password: string;
+  phone: string;
 }
 
 export interface AuthState {

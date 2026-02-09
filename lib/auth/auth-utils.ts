@@ -6,6 +6,7 @@ export function storeAuthUser(user: User): AuthUser {
   const authUser: AuthUser = {
     id: user.id,
     email: user.email,
+    phone: user.phone,
     name: user.name,
     role: user.role,
   };

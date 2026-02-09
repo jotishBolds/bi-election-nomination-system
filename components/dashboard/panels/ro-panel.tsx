@@ -93,6 +93,7 @@ import {
   NominationStatus,
   updateNominationStatus,
   getAllWardsFromNominations,
+  getUncontestingCandidates,
 } from "@/lib/nomination-storage";
 
 // Mock OTP for demo
@@ -415,6 +416,11 @@ export function ROPanel() {
       value: nominations.filter((n) => n.status === "contesting").length,
       color: "#8b5cf6",
     },
+    {
+      name: "Uncontesting",
+      value: nominations.filter((n) => n.status === "uncontesting").length,
+      color: "#f97316",
+    },
   ];
 
   const getCategoryLabel = (category: string) => {
@@ -467,6 +473,12 @@ export function ROPanel() {
             Contesting
           </Badge>
         );
+      case "uncontesting":
+        return (
+          <Badge className="bg-orange-100 text-orange-700 text-xs">
+            Uncontesting
+          </Badge>
+        );
       default:
         return (
           <Badge className="bg-slate-100 text-slate-700 text-xs">Draft</Badge>
@@ -494,15 +506,40 @@ export function ROPanel() {
       </div>
       <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;" />
       <div style="margin-bottom: 24px;">
-        <p style="margin: 12px 0;">* I nominate as an applicant for election to the <strong>${formData.municipality || ""}</strong> Municipality from the <strong>${formData.municipalWard || ""}</strong> Municipal ward.</p>
-        <p style="margin: 12px 0;">Applicant's name: <strong>${formData.candidateName || ""}</strong></p>
+        <p style="margin: 12px 0;">* I nominate as a candidate for election to the <strong>${formData.municipality || ""}</strong> Municipality from the <strong>${formData.municipalWard || ""}</strong> Municipal ward.</p>
+        <p style="margin: 12px 0;">Candidate's name: <strong>${formData.candidateName || ""}</strong></p>
         <p style="margin: 12px 0;">Father's / Husband's name: <strong>${formData.fatherOrHusbandName || ""}</strong></p>
         <p style="margin: 12px 0;">Full postal address: <strong>${formData.fullPostalAddress || ""}</strong></p>
+        <p style="margin: 12px 0;">His name is entered at Serial No. <strong>${formData.serialNoCandidate || "___"}</strong> in Part No. <strong>${formData.partNoCandidate || "___"}</strong> of electoral roll of the Municipality.</p>
         <p style="margin: 16px 0;">Proposer name: <strong>${formData.proposerName || ""}</strong> at Serial No. <strong>${formData.proposerSerialNo || ""}</strong> in Part No. <strong>${formData.proposerPartNo || ""}</strong></p>
-        <p style="margin: 12px 0;">Date of Birth: <strong>${formData.dateOfBirth || ""}</strong> | Age: <strong>${formData.age || ""}</strong> years</p>
-        <p style="margin: 12px 0;">Political Party: <strong>${formData.politicalParty || ""}</strong></p>
-        <p style="margin: 12px 0;">Symbol: <strong>${formData.partySymbol || ""}</strong></p>
-        ${formData.category && formData.category !== "general" ? `<p style="margin: 12px 0;">Category: <strong>${getCategoryLabel(formData.category)}</strong></p>` : ""}
+      </div>
+      <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;" />
+      <div style="margin-bottom: 24px;">
+        <p style="font-weight: 500; margin-bottom: 16px;">I, the above-mentioned candidate, assent to this nomination and hereby declare:-</p>
+        <div style="margin-left: 20px;">
+          <p style="margin: 10px 0;">(a) that I have completed <strong>${formData.age || ""}</strong> years of age.</p>
+          <p style="margin: 10px 0;">(b) that I am set up at this election by <strong>${formData.politicalParty || ""}</strong> Political Party.</p>
+          <p style="margin: 10px 0;">(c) that the symbols I have chosen are:</p>
+          <div style="margin-left: 30px; margin: 12px 0; padding: 12px; background-color: #f5f5f5; border-radius: 6px;">
+            ${formData.partySymbolImage ? `<img src="${formData.partySymbolImage}" alt="${formData.partySymbol || ""}" style="width: 50px; height: 50px; object-fit: contain; border: 1px solid #ddd; background-color: white; padding: 4px; border-radius: 4px; margin-bottom: 8px;" />` : ""}
+            <p style="margin: 2px 0;">(i) <strong>${formData.symbolPreference1 || formData.partySymbol || ""}</strong></p>
+            <p style="margin: 2px 0;">(ii) <strong>${formData.symbolPreference2 || ""}</strong></p>
+            <p style="margin: 2px 0;">(iii) <strong>${formData.symbolPreference3 || ""}</strong></p>
+          </div>
+          <p style="margin: 10px 0;">(d) that my name and my *father's / husband's name have been correctly spelt out above;</p>
+          <p style="margin: 10px 0;">(e) that to the best of my knowledge and belief, I am qualified and not also disqualified for being chosen to fill the seat in the <strong>${formData.municipality || ""}</strong> Municipality.</p>
+          ${formData.category && formData.category !== "general" ? `<p style="margin: 10px 0;">Category: <strong>${getCategoryLabel(formData.category)}</strong></p>` : ""}
+        </div>
+      </div>
+      <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;" />
+      <div style="padding: 16px; border: 1px solid #ddd; border-radius: 6px; background-color: #fafafa;">
+        <p style="font-weight: 500; text-align: center; margin-bottom: 16px;">(To be filled by the Municipality Returning Officer)</p>
+        <p style="margin: 12px 0;">Serial No. of the nomination paper: <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 150px;">&nbsp;</span></p>
+        <p style="margin: 12px 0;">This nomination was delivered to me at my office at: <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 150px;">&nbsp;</span></p>
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 20px;">
+          <p style="margin: 0;">Date: <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 120px;">&nbsp;</span></p>
+          <p style="font-weight: 500; margin: 0;">Municipal Returning Officer</p>
+        </div>
       </div>
       <div style="padding: 16px; background-color: #f0fdf4; border-radius: 8px; margin-top: 20px;">
         <p style="margin: 8px 0;"><strong>Application ID:</strong> ${applicationId}</p>
@@ -1615,6 +1652,275 @@ export function ROPanel() {
     );
   }
 
+  // ==================== UNCONTESTING VIEW ====================
+  if (activeTab === "uncontesting") {
+    const uncontestingCandidates = getUncontestingCandidates();
+
+    return (
+      <div className="space-y-5 p-6 min-h-screen">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => window.history.back()}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <div>
+              <h1 className="text-xl font-semibold text-slate-800">
+                Uncontesting Candidates
+              </h1>
+              <p className="text-sm text-slate-500 mt-0.5">
+                Wards with single candidates - elected unopposed
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="bg-orange-50 border-0 shadow-sm rounded-xl">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <UserX className="h-5 w-5 text-orange-600" />
+                <Badge className="bg-orange-100 text-orange-700 text-xs">
+                  Unopposed
+                </Badge>
+              </div>
+              <div className="mt-3">
+                <p className="text-2xl font-bold text-slate-800">
+                  {uncontestingCandidates.length}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Uncontesting Candidates
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-green-50 border-0 shadow-sm rounded-xl">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <Badge className="bg-green-100 text-green-700 text-xs">
+                  Auto-Elected
+                </Badge>
+              </div>
+              <div className="mt-3">
+                <p className="text-2xl font-bold text-slate-800">
+                  {
+                    uncontestingCandidates.filter(
+                      (n) => n.status === "uncontesting",
+                    ).length
+                  }
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Marked Uncontesting
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-blue-50 border-0 shadow-sm rounded-xl">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <Trophy className="h-5 w-5 text-blue-600" />
+                <Badge className="bg-blue-100 text-blue-700 text-xs">
+                  Pending
+                </Badge>
+              </div>
+              <div className="mt-3">
+                <p className="text-2xl font-bold text-slate-800">
+                  {
+                    uncontestingCandidates.filter(
+                      (n) => n.status !== "uncontesting",
+                    ).length
+                  }
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Pending Mark as Uncontesting
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Info Card */}
+        <Card className="bg-amber-50 border-amber-200 border shadow-sm rounded-xl">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <FileText className="h-5 w-5 text-amber-600 mt-0.5" />
+              <div>
+                <h3 className="font-semibold text-amber-800">
+                  What are Uncontesting Candidates?
+                </h3>
+                <p className="text-sm text-amber-700 mt-1">
+                  When only one candidate has been approved/accepted for a
+                  particular ward after withdrawals, they are declared elected
+                  unopposed (uncontesting). These candidates do not need to go
+                  through polling.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Uncontesting Candidates List */}
+        <Card className="bg-white border-0 shadow-sm rounded-xl">
+          <CardHeader className="pb-2 px-4 pt-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-orange-100 rounded-lg">
+                  <UserX className="h-4 w-4 text-orange-600" />
+                </div>
+                <CardTitle className="text-sm font-semibold text-slate-800">
+                  Uncontesting Candidates (Single Candidate Wards)
+                </CardTitle>
+              </div>
+              <Badge className="bg-orange-100 text-orange-700 text-xs">
+                {uncontestingCandidates.length} candidates
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <FilterBar />
+
+            {uncontestingCandidates.length === 0 ? (
+              <div className="text-center py-12">
+                <UserX className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                <h3 className="font-semibold text-slate-600 mb-2">
+                  No Uncontesting Candidates
+                </h3>
+                <p className="text-sm text-slate-400">
+                  Wards with single candidates will appear here after scrutiny
+                  and withdrawal period.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {uncontestingCandidates.map((nomination) => (
+                  <div
+                    key={nomination.id}
+                    className="flex items-center justify-between p-4 rounded-lg bg-orange-50 border border-orange-200 hover:bg-orange-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                        <User className="h-5 w-5 text-orange-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">
+                          {nomination.formData.candidateName ||
+                            "Unknown Candidate"}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {nomination.applicationId} •{" "}
+                          {nomination.formData.politicalParty} •{" "}
+                          {nomination.formData.partySymbol}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {nomination.formData.municipality} -{" "}
+                          {nomination.formData.municipalWard} (Only candidate in
+                          this ward)
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {nomination.formData.partySymbolImage && (
+                        <img
+                          src={nomination.formData.partySymbolImage}
+                          alt={nomination.formData.partySymbol}
+                          className="w-10 h-10 object-contain rounded border bg-white p-1"
+                        />
+                      )}
+                      {getStatusBadge(nomination.status)}
+                      {(nomination.status === "approved" ||
+                        nomination.status === "contesting") && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56">
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <DropdownMenuItem
+                                  onSelect={(e) => e.preventDefault()}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                                <DialogHeader>
+                                  <DialogTitle>
+                                    Nomination Form -{" "}
+                                    {nomination.formData.candidateName}
+                                  </DialogTitle>
+                                </DialogHeader>
+                                <div
+                                  className="p-6 bg-white"
+                                  style={{
+                                    fontFamily:
+                                      "'Times New Roman', Times, serif",
+                                    fontSize: "12pt",
+                                    lineHeight: "1.6",
+                                  }}
+                                >
+                                  <div
+                                    dangerouslySetInnerHTML={{
+                                      __html: generateFormHTML(
+                                        nomination.formData,
+                                        nomination.submissionNumber,
+                                        nomination.applicationId,
+                                      ),
+                                    }}
+                                  />
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleStatusUpdate(
+                                  nomination.id,
+                                  "uncontesting",
+                                  "Mark as Uncontesting (Elected Unopposed)",
+                                )
+                              }
+                              className="text-orange-600"
+                            >
+                              <UserX className="h-4 w-4 mr-2" />
+                              Mark Elected Unopposed
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <OTPVerificationDialog
+          open={otpDialogOpen}
+          onOpenChange={setOtpDialogOpen}
+          onVerify={handleOtpVerify}
+          title="Confirm Uncontesting Status"
+          description="Please verify with OTP to mark this candidate as elected unopposed."
+          isLoading={isProcessing}
+        />
+      </div>
+    );
+  }
+
   // ==================== REPORTS VIEW ====================
   if (activeTab === "reports") {
     // Report definitions with simple, professional descriptions
@@ -1663,6 +1969,17 @@ export function ROPanel() {
         filterLabel: "Final Contestants",
         buttonLabel: "Generate Report",
       },
+      {
+        id: "form-uncontesting",
+        formTitle: "Uncontesting Candidates",
+        description:
+          "List of candidates elected unopposed - wards with single eligible candidates after withdrawal period.",
+        color: "orange",
+        icon: UserX,
+        statusFilter: ["uncontesting"] as NominationStatus[],
+        filterLabel: "Elected Unopposed",
+        buttonLabel: "Generate Report",
+      },
     ];
 
     const getColorClasses = (color: string) => {
@@ -1703,6 +2020,13 @@ export function ROPanel() {
           text: "text-purple-700",
           iconBg: "bg-purple-100",
           btnBg: "bg-purple-600 hover:bg-purple-700",
+        },
+        orange: {
+          bg: "bg-orange-50",
+          border: "border-orange-200",
+          text: "text-orange-700",
+          iconBg: "bg-orange-100",
+          btnBg: "bg-orange-600 hover:bg-orange-700",
         },
       };
       return colors[color] || colors.blue;
@@ -1956,6 +2280,9 @@ export function ROPanel() {
                     <th className="text-center py-3 px-4 font-semibold text-slate-700">
                       Contesting
                     </th>
+                    <th className="text-center py-3 px-4 font-semibold text-slate-700">
+                      Uncontesting
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1981,12 +2308,15 @@ export function ROPanel() {
                       <td className="text-center py-3 px-4 text-purple-600 font-medium">
                         {noms.filter((n) => n.status === "contesting").length}
                       </td>
+                      <td className="text-center py-3 px-4 text-orange-600 font-medium">
+                        {noms.filter((n) => n.status === "uncontesting").length}
+                      </td>
                     </tr>
                   ))}
                   {Object.keys(nominationsByWard).length === 0 && (
                     <tr>
                       <td
-                        colSpan={8}
+                        colSpan={9}
                         className="text-center py-8 text-slate-400"
                       >
                         No nominations data available

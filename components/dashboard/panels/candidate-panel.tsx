@@ -149,6 +149,12 @@ export function CandidatePanel() {
             Contesting
           </Badge>
         );
+      case "uncontesting":
+        return (
+          <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 text-xs font-medium">
+            Uncontesting
+          </Badge>
+        );
       default:
         return (
           <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 text-xs font-medium">
@@ -217,13 +223,15 @@ export function CandidatePanel() {
 
       <!-- Proposer Section -->
       <div style="margin-bottom: 24px;">
-        <p style="margin: 12px 0;">* I nominate as an applicant for election to the <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 200px;">${formData.municipality || ""}</span> Municipality from the <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 150px;">${formData.municipalWard || ""}</span> Municipal ward.</p>
+        <p style="margin: 12px 0;">* I nominate as a candidate for election to the <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 200px;">${formData.municipality || ""}</span> Municipality from the <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 150px;">${formData.municipalWard || ""}</span> Municipal ward.</p>
 
-        <p style="margin: 12px 0;">Applicant's name: <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 280px;">${formData.candidateName || ""}</span></p>
+        <p style="margin: 12px 0;">Candidate's name: <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 280px;">${formData.candidateName || ""}</span></p>
 
         <p style="margin: 12px 0;">Father's / Husband's name: <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 230px;">${formData.fatherOrHusbandName || ""}</span></p>
 
         <p style="margin: 12px 0;">Full postal address: <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 300px;">${formData.fullPostalAddress || ""}</span></p>
+
+        <p style="margin: 12px 0;">His name is entered at Serial No. <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 60px;">${formData.serialNoCandidate || "___"}</span> in Part No. <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 60px;">${formData.partNoCandidate || "___"}</span> of electoral roll of the Municipality.</p>
 
         <p style="margin: 16px 0;">My name is <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 120px;">${formData.proposerName || ""}</span> and it is entered at Serial No. <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 60px;">${formData.proposerSerialNo || ""}</span> in Part No. <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 60px;">${formData.proposerPartNo || ""}</span> of the electoral roll of the Municipality.</p>
 
@@ -241,24 +249,27 @@ export function CandidatePanel() {
 
       <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;" />
 
-      <!-- Applicant Declaration Section -->
+      <!-- Candidate Declaration Section -->
       <div style="margin-bottom: 24px;">
-        <p style="font-weight: 500; margin-bottom: 16px;">I, the above mentioned applicant, assent to this nomination and hereby declare:-</p>
+        <p style="font-weight: 500; margin-bottom: 16px;">I, the above-mentioned candidate, assent to this nomination and hereby declare:-</p>
 
         <div style="margin-left: 20px;">
-          <p style="margin: 10px 0;">(a) that I have completed <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 40px;">${formData.age || ""}</span> years of age.</p>
+          <p style="margin: 10px 0;">(a) that I have completed <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 40px;">${formData.age || "18"}</span> years of age.</p>
 
-          <p style="margin: 10px 0;">(b) that the symbol I have chosen is:</p>
+          <p style="margin: 10px 0;">(b) that I am set up at this election by <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 180px;">${formData.politicalParty || ""}</span> Political Party.</p>
 
-          <div style="display: flex; align-items: center; gap: 16px; margin: 12px 0 12px 30px; padding: 12px; background-color: #f5f5f5; border-radius: 6px;">
-            ${formData.partySymbolImage ? `<img src="${formData.partySymbolImage}" alt="${formData.partySymbol || ""}" style="width: 60px; height: 60px; object-fit: contain; border: 1px solid #ddd; background-color: white; padding: 4px; border-radius: 4px;" />` : ""}
-            <div>
-              <p style="font-weight: 600; margin: 0 0 4px 0;">${formData.partySymbol || ""}</p>
-              <span style="display: inline-block; padding: 2px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 10pt; background-color: #fff;">${formData.politicalParty || ""}</span>
+          <p style="margin: 10px 0;">(c) that the symbols I have chosen are, in order of preference:</p>
+
+          <div style="margin-left: 30px;">
+            <div style="display: flex; align-items: center; gap: 16px; margin: 12px 0; padding: 12px; background-color: #f5f5f5; border-radius: 6px;">
+              ${formData.partySymbolImage ? `<img src="${formData.partySymbolImage}" alt="${formData.partySymbol || ""}" style="width: 50px; height: 50px; object-fit: contain; border: 1px solid #ddd; background-color: white; padding: 4px; border-radius: 4px;" />` : ""}
+              <div>
+                <p style="margin: 2px 0;">(i) <span style="font-weight: 600;">${formData.symbolPreference1 || formData.partySymbol || ""}</span></p>
+                <p style="margin: 2px 0;">(ii) <span style="font-weight: 600;">${formData.symbolPreference2 || ""}</span></p>
+                <p style="margin: 2px 0;">(iii) <span style="font-weight: 600;">${formData.symbolPreference3 || ""}</span></p>
+              </div>
             </div>
           </div>
-
-          <p style="margin: 10px 0;">(c) that I am set up at this election by <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 180px;">${formData.politicalParty || ""}</span> Political Party.</p>
 
           <p style="margin: 10px 0;">(d) that my name and my *father's / husband's name have been correctly spelt out above;</p>
 
@@ -271,12 +282,25 @@ export function CandidatePanel() {
           <p style="margin: 0;">Date: <span style="border-bottom: 1px solid #000; padding: 0 8px; font-weight: 500; display: inline-block; min-width: 140px;">${currentDate}</span></p>
           <div style="text-align: center;">
             <div style="border-top: 1px solid #000; width: 200px; padding-top: 5px; margin-top: 30px;">
-              <span style="font-size: 10pt;">(Signature of applicant)</span>
+              <span style="font-size: 10pt;">(Signature of candidate)</span>
             </div>
           </div>
         </div>
 
         <p style="font-style: italic; font-size: 10pt; margin-top: 12px;">* Strike out whatever is not applicable.</p>
+      </div>
+
+      <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;" />
+
+      <!-- Official Use Section -->
+      <div style="padding: 16px; border: 1px solid #ddd; border-radius: 6px; background-color: #fafafa;">
+        <p style="font-weight: 500; text-align: center; margin-bottom: 16px;">(To be filled by the Municipality Returning Officer)</p>
+        <p style="margin: 12px 0;">Serial No. of the nomination paper: <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 150px;">&nbsp;</span></p>
+        <p style="margin: 12px 0;">This nomination was delivered to me at my office at: <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 150px;">&nbsp;</span></p>
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 20px;">
+          <p style="margin: 0;">Date: <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 120px;">&nbsp;</span></p>
+          <p style="font-weight: 500; margin: 0;">Municipal Returning Officer</p>
+        </div>
       </div>
 
       <!-- Footer -->

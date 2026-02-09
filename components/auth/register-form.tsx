@@ -250,12 +250,12 @@ export function RegisterForm() {
               </p>
             </div>
 
-            <div className="text-xs text-muted-foreground/60 text-center space-y-1 pt-4 border-t border-border mt-6">
+            {/* <div className="text-xs text-muted-foreground/60 text-center space-y-1 pt-4 border-t border-border mt-6">
               <p className="font-medium text-muted-foreground/80">Demo OTP</p>
               <p>
                 OTP: <span className="font-mono font-bold">123456</span>
               </p>
-            </div>
+            </div> */}
           </motion.div>
         ) : (
           <motion.div

@@ -95,6 +95,13 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
           iconColor: "text-purple-600",
           iconBgColor: "bg-purple-100",
         },
+        {
+          title: "Uncontesting",
+          icon: UserX,
+          href: "/dashboard?tab=uncontesting",
+          iconColor: "text-orange-600",
+          iconBgColor: "bg-orange-100",
+        },
       ],
     },
     {

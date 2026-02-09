@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import { useRouter } from "next/navigation";
 import { AuthState, AuthUser, LoginCredentials } from "./types";
-import { validateCredentials } from "./users";
+import { validateByPhone } from "./users";
 import {
   storeAuthUser,
   getStoredAuthUser,
@@ -47,10 +47,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (credentials: LoginCredentials) => {
-    const user = validateCredentials(credentials.email, credentials.password);
+    const user = validateByPhone(credentials.phone);
 
     if (!user) {
-      return { success: false, error: "Invalid email or password" };
+      return {
+        success: false,
+        error: "No account found with this phone number",
+      };
     }
 
     // Store pending login for OTP verification

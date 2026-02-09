@@ -10,7 +10,8 @@ export type NominationStatus =
   | "approved"
   | "rejected"
   | "withdrawn"
-  | "contesting";
+  | "contesting"
+  | "uncontesting";
 
 export interface StoredNomination {
   id: string;
@@ -389,6 +390,33 @@ export function getWithdrawnNominations(): StoredNomination[] {
 // Get contesting candidates (approved and not withdrawn)
 export function getContestingCandidates(): StoredNomination[] {
   return getNominationsByStatusFilter("contesting");
+}
+
+// Get uncontesting candidates (wards with only one approved/contesting candidate = auto-elected)
+export function getUncontestingCandidates(): StoredNomination[] {
+  const nominations = getRONominations();
+  // Get all approved/contesting nominations
+  const eligibleNominations = nominations.filter(
+    (n) =>
+      n.status === "approved" ||
+      n.status === "contesting" ||
+      n.status === "uncontesting",
+  );
+  // Group by ward
+  const byWard: Record<string, StoredNomination[]> = {};
+  eligibleNominations.forEach((n) => {
+    const ward = n.formData?.municipalWard || "Unknown";
+    if (!byWard[ward]) byWard[ward] = [];
+    byWard[ward].push(n);
+  });
+  // Find wards with only one candidate
+  const uncontesting: StoredNomination[] = [];
+  Object.values(byWard).forEach((wardNoms) => {
+    if (wardNoms.length === 1) {
+      uncontesting.push(wardNoms[0]);
+    }
+  });
+  return uncontesting;
 }
 
 // Get all unique wards from nominations
