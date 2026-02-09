@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { auth } from "@/lib/auth/next-auth";
+import { requireSuperAdmin } from "@/lib/auth/auth-guard";
+import { z } from "zod";
+export const symbolIdParamSchema = z.object({
+  id: z.string().uuid("Invalid symbol id"),
+});
+
+export const updateSymbolSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  imagePath: z.string().min(1).max(500).optional(),
+  isReserved: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+  displayOrder: z.number().int().min(0).optional(),
+});
 
 // PUT /api/admin/symbols/[id] - Update election symbol
 export async function PUT(
@@ -8,156 +20,163 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth();
-    if (!session?.user || session.user.role !== "SUPER_ADMIN") {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+    const session = await requireSuperAdmin();
 
-    const { id } = await params;
+    const { id } = symbolIdParamSchema.parse(await params);
     const body = await request.json();
-    const { name, imagePath, isReserved, displayOrder, isActive } = body;
+    const data = updateSymbolSchema.parse(body);
 
-    const existing = await db.electionSymbol.findUnique({
-      where: { id },
-    });
-
+    const existing = await db.electionSymbol.findUnique({ where: { id } });
     if (!existing) {
-      return NextResponse.json(
-        { success: false, error: "Symbol not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Symbol not found" }, { status: 404 });
     }
 
-    // Check for duplicate name (excluding current symbol)
-    if (name) {
+    // Duplicate name check
+    if (data.name) {
       const duplicate = await db.electionSymbol.findFirst({
         where: {
           id: { not: id },
-          name: { equals: name, mode: "insensitive" },
+          name: { equals: data.name, mode: "insensitive" },
         },
       });
 
       if (duplicate) {
         return NextResponse.json(
-          { success: false, error: "Another symbol with this name exists" },
+          { error: "Another symbol with this name already exists" },
           { status: 400 },
         );
       }
     }
 
-    const updateData: {
-      name?: string;
-      imagePath?: string;
-      isReserved?: boolean;
-      displayOrder?: number;
-      isActive?: boolean;
-    } = {};
-    if (name !== undefined) updateData.name = name;
-    if (imagePath !== undefined) updateData.imagePath = imagePath;
-    if (isReserved !== undefined) updateData.isReserved = isReserved;
-    if (displayOrder !== undefined) updateData.displayOrder = displayOrder;
-    if (isActive !== undefined) updateData.isActive = isActive;
-
     const symbol = await db.electionSymbol.update({
       where: { id },
-      data: updateData,
+      data,
       include: {
         parties: {
-          select: {
-            id: true,
-            name: true,
-            abbreviation: true,
-          },
+          select: { id: true, name: true, abbreviation: true },
         },
       },
     });
 
-    // Log the action
     await db.auditLog.create({
       data: {
         action: "UPDATE",
         entityType: "ElectionSymbol",
         entityId: symbol.id,
         userId: session.user.id,
-        newValues: updateData,
+        newValues: data,
         ipAddress: "api",
       },
     });
 
     return NextResponse.json({ success: true, data: symbol });
-  } catch (error) {
-    console.error("Error updating symbol:", error);
+  } catch (err: any) {
+    if (err instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Invalid input data", details: err.issues },
+        { status: 400 },
+      );
+    }
+
+    if (err.message === "UNAUTHORIZED") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (err.message === "FORBIDDEN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    console.error("PUT symbol error:", err);
     return NextResponse.json(
-      { success: false, error: "Failed to update symbol" },
+      { error: "Failed to update symbol" },
       { status: 500 },
     );
   }
 }
 
-// DELETE /api/admin/symbols/[id] - Delete election symbol
+// DELETE /api/admin/symbols/[id]
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth();
-    if (!session?.user || session.user.role !== "SUPER_ADMIN") {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+    const session = await requireSuperAdmin();
+    const { id } = symbolIdParamSchema.parse(await params);
 
-    const { id } = await params;
-
-    const existing = await db.electionSymbol.findUnique({
+    const symbol = await db.electionSymbol.findUnique({
       where: { id },
       include: {
         _count: {
-          select: { symbolPreferences: true },
+          select: {
+            symbolPreferences: true,
+            allocations: true,
+            parties: true,
+          },
         },
       },
     });
 
-    if (!existing) {
-      return NextResponse.json(
-        { success: false, error: "Symbol not found" },
-        { status: 404 },
-      );
+    if (!symbol) {
+      return NextResponse.json({ error: "Symbol not found" }, { status: 404 });
     }
 
-    // Check if symbol has preferences - soft delete instead
-    if (existing._count.symbolPreferences > 0) {
-      const symbol = await db.electionSymbol.update({
+    /**
+     * Determine if symbol is in use
+     */
+    const isUsed =
+      symbol.isReserved ||
+      symbol._count.symbolPreferences > 0 ||
+      symbol._count.allocations > 0 ||
+      symbol._count.parties > 0;
+
+    /**
+     * SOFT DELETE
+     */
+    if (isUsed) {
+      const updated = await db.electionSymbol.update({
         where: { id },
-        data: { isActive: false },
+        data: {
+          isActive: false,
+        },
       });
 
       await db.auditLog.create({
         data: {
-          action: "DELETE",
+          action: "UPDATE",
           entityType: "ElectionSymbol",
-          entityId: symbol.id,
+          entityId: id,
           userId: session.user.id,
+          oldValues: {
+            isActive: true,
+          },
           newValues: {
-            deactivated: true,
-            reason: "Has associated symbol preferences",
+            isActive: false,
+            reason: "Symbol already used or reserved",
+            usage: {
+              reserved: symbol.isReserved,
+              preferences: symbol._count.symbolPreferences,
+              allocations: symbol._count.allocations,
+              parties: symbol._count.parties,
+            },
           },
           ipAddress: "api",
+          metadata: {
+            operation: "SOFT_DELETE",
+          },
         },
       });
 
       return NextResponse.json({
         success: true,
-        data: symbol,
-        message: "Symbol deactivated (has associated preferences)",
+        data: updated,
+        message:
+          "Symbol has been deactivated because it is already in use or reserved",
       });
     }
 
-    // Hard delete if no nominations
+    /**
+     * HARD DELETE (safe)
+     */
     await db.electionSymbol.delete({
       where: { id },
     });
@@ -168,19 +187,37 @@ export async function DELETE(
         entityType: "ElectionSymbol",
         entityId: id,
         userId: session.user.id,
-        newValues: { deleted: true, name: existing.name },
+        newValues: {
+          deleted: true,
+          name: symbol.name,
+        },
         ipAddress: "api",
       },
     });
 
     return NextResponse.json({
       success: true,
-      message: "Symbol deleted successfully",
+      message: "Symbol deleted permanently",
     });
-  } catch (error) {
-    console.error("Error deleting symbol:", error);
+  } catch (err: any) {
+    if (err instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Invalid request", details: err.issues },
+        { status: 400 },
+      );
+    }
+
+    if (err.message === "UNAUTHORIZED") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (err.message === "FORBIDDEN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    console.error("DELETE symbol error:", err);
     return NextResponse.json(
-      { success: false, error: "Failed to delete symbol" },
+      { error: "Failed to delete symbol" },
       { status: 500 },
     );
   }
