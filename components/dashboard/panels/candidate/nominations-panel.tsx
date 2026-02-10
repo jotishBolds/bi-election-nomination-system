@@ -27,8 +27,10 @@ import {
   Plus,
   CreditCard,
   Building,
+  Download,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { downloadForm18PDF } from "@/lib/form18-template";
 import Link from "next/link";
 
 interface MyNomination {
@@ -76,18 +78,37 @@ export function CandidateNominationsPanel() {
   const [selectedNomination, setSelectedNomination] =
     useState<MyNomination | null>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [submissionData, setSubmissionData] = useState<{
+    count: number;
+    maxAllowed: number;
+    canSubmitMore: boolean;
+  }>({ count: 0, maxAllowed: 3, canSubmitMore: true });
 
   const fetchNominations = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/nominations/my-nominations");
+      // Fetch nominations
+      const response = await fetch("/api/candidate/my-nominations");
       const result = await response.json();
 
       if (result.success) {
-        setNominations(result.data);
+        setNominations(result.data || result.nominations || []);
       } else {
         setError(result.error || "Failed to fetch nominations");
+      }
+
+      // Fetch candidate dashboard data for submission counts
+      const dashboardResponse = await fetch("/api/dashboard/candidate");
+      if (dashboardResponse.ok) {
+        const dashboardResult = await dashboardResponse.json();
+        if (dashboardResult.success && dashboardResult.data?.submissions) {
+          setSubmissionData({
+            count: dashboardResult.data.submissions.count,
+            maxAllowed: dashboardResult.data.submissions.maxAllowed,
+            canSubmitMore: dashboardResult.data.submissions.canSubmitMore,
+          });
+        }
       }
     } catch {
       setError("Failed to connect to server");
@@ -155,6 +176,18 @@ export function CandidateNominationsPanel() {
     setIsDetailDialogOpen(true);
   };
 
+  const handleDownloadForm = async (
+    nominationId: string,
+    e?: React.MouseEvent,
+  ) => {
+    if (e) e.stopPropagation();
+    try {
+      await downloadForm18PDF(nominationId);
+    } catch (err) {
+      console.error("Failed to download form:", err);
+    }
+  };
+
   if (isLoading && nominations.length === 0) {
     return (
       <div className="space-y-6 p-6">
@@ -192,9 +225,11 @@ export function CandidateNominationsPanel() {
             />
           </Button>
           <Link href="/nomination">
-            <Button>
+            <Button disabled={!submissionData.canSubmitMore}>
               <Plus className="h-4 w-4 mr-2" />
-              New Nomination
+              {submissionData.count === 0
+                ? "Submit First Nomination (1/3)"
+                : `Update Nomination (${submissionData.count + 1}/${submissionData.maxAllowed})`}
             </Button>
           </Link>
         </div>
@@ -227,9 +262,11 @@ export function CandidateNominationsPanel() {
                 </p>
               </div>
               <Link href="/nomination">
-                <Button>
+                <Button disabled={!submissionData.canSubmitMore}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Start New Nomination
+                  {submissionData.count === 0
+                    ? "Start First Nomination (1/3)"
+                    : `Update Nomination (${submissionData.count + 1}/${submissionData.maxAllowed})`}
                 </Button>
               </Link>
             </div>
@@ -286,9 +323,19 @@ export function CandidateNominationsPanel() {
                       </div>
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon">
-                    <Eye className="h-4 w-4" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Download Form"
+                      onClick={(e) => handleDownloadForm(nomination.id, e)}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" title="View Details">
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Progress indicator */}
@@ -350,10 +397,24 @@ export function CandidateNominationsPanel() {
       <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
         <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Nomination Details</DialogTitle>
-            <DialogDescription>
-              Application No: {selectedNomination?.applicationNo}
-            </DialogDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle>Nomination Details</DialogTitle>
+                <DialogDescription>
+                  Application No: {selectedNomination?.applicationNo}
+                </DialogDescription>
+              </div>
+              {selectedNomination && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDownloadForm(selectedNomination.id)}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download PDF
+                </Button>
+              )}
+            </div>
           </DialogHeader>
 
           {selectedNomination && (

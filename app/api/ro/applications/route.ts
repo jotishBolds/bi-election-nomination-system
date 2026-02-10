@@ -74,9 +74,16 @@ export async function GET(request: NextRequest) {
       where.ward = wardFilter;
     }
 
-    // Filter by status
+    // Filter by status (supports comma-separated values)
     if (status && status !== "all") {
-      where.status = status;
+      if (status.includes(",")) {
+        where.status = { in: status.split(",") };
+      } else {
+        where.status = status;
+      }
+    } else {
+      // By default exclude DRAFT nominations - RO should only see submitted+
+      where.status = { not: "DRAFT" };
     }
 
     // Filter by ward

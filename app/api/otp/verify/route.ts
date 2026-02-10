@@ -1,8 +1,8 @@
 // OTP Verify API Route
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { hashOTP, getClientIP } from "@/lib/auth/server-utils";
-import { verifyOTP as verifyRedisOTP } from "@/lib/redis";
+import { getClientIP } from "@/lib/auth/server-utils";
+import { verifyOTP as verifyRedisOTP } from "@/lib/memory-store";
 import { z } from "zod";
 import { OTPStatus } from "@prisma/client";
 
@@ -25,11 +25,13 @@ export async function POST(request: NextRequest) {
 
     const clientIp = getClientIP(request);
 
-    // Hash the OTP to compare with stored hash
-    const otpHash = hashOTP(otp);
+    // Verify OTP from memory store (comparing plain OTP)
+    const result = await verifyRedisOTP(identifier, otp, type);
 
-    // Verify OTP from Redis/memory (comparing hashes)
-    const result = await verifyRedisOTP(identifier, otpHash, type);
+    console.log(
+      `[OTP Verify] identifier=${identifier}, type=${type}, result=`,
+      result,
+    );
 
     if (result.expired) {
       return NextResponse.json(

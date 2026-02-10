@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { hashPassword, generateOTP, hashOTP } from "@/lib/auth/server-utils";
-import { storeOTP } from "@/lib/redis";
+import { storeOTP } from "@/lib/memory-store";
 import { z } from "zod";
 import { Role } from "@prisma/client";
 
@@ -97,8 +97,8 @@ export async function POST(request: NextRequest) {
 
       const { phone, otp, registrationData } = validationResult.data;
 
-      // Verify OTP from Redis/memory
-      const { verifyOTP } = await import("@/lib/redis");
+      // Verify OTP from memory store
+      const { verifyOTP } = await import("@/lib/memory-store");
       const otpResult = await verifyOTP(phone, hashOTP(otp), "REGISTRATION");
 
       if (otpResult.expired) {

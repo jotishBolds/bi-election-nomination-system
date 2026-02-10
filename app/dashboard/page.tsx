@@ -13,6 +13,9 @@ import {
   ElectionConfigPanel,
   AuditLogsPanel,
   CMSPanel,
+  SymbolsPanel,
+  VoterRollPanel,
+  BRPaymentsPanel,
 } from "@/components/dashboard/panels/admin";
 
 // SEC Panels
@@ -33,15 +36,16 @@ import {
   ScrutinyPanel,
   WithdrawPanel,
   ContestPanel,
+  UncontestPanel,
   ROReportsPanel,
 } from "@/components/dashboard/panels/ro";
 
 // Candidate Panels
 import { CandidatePanel } from "@/components/dashboard/panels/candidate-panel";
-import {
-  CandidateNominationsPanel,
-  TrackStatusPanel,
-} from "@/components/dashboard/panels/candidate";
+import { CandidateNominationsPanel } from "@/components/dashboard/panels/candidate";
+
+// Profile Panel (shared across all roles)
+import { ProfileSettingsPanel } from "@/components/dashboard/panels/profile-settings-panel";
 
 function DashboardContent() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -87,6 +91,11 @@ function DashboardContent() {
       }
     }
 
+    // Profile settings is shared across all roles
+    if (activeTab === "profile") {
+      return <ProfileSettingsPanel />;
+    }
+
     // Handle tab-specific panels for SUPER_ADMIN
     if (user.role === "SUPER_ADMIN") {
       switch (activeTab) {
@@ -98,7 +107,13 @@ function DashboardContent() {
         case "schedule":
           return <ElectionConfigPanel />;
         case "parties":
-          return <CMSPanel />;
+          return <SymbolsPanel />;
+        case "symbols":
+          return <SymbolsPanel />;
+        case "voter-roll":
+          return <VoterRollPanel />;
+        case "br-payments":
+          return <BRPaymentsPanel />;
         case "cms":
           return <CMSPanel />;
         case "audit-logs":
@@ -141,6 +156,8 @@ function DashboardContent() {
           return <WithdrawPanel />;
         case "contest":
           return <ContestPanel />;
+        case "uncontest":
+          return <UncontestPanel />;
         case "reports":
           return <ROReportsPanel />;
         default:
@@ -153,8 +170,6 @@ function DashboardContent() {
       switch (activeTab) {
         case "nominations":
           return <CandidateNominationsPanel />;
-        case "track":
-          return <TrackStatusPanel />;
         default:
           return <CandidatePanel />;
       }

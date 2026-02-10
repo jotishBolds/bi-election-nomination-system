@@ -25,10 +25,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-import { ArrowRight, User, MapPin, AlertCircle, Loader2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { FormDescription } from "@/components/ui/form";
+
+import {
+  ArrowRight,
+  User,
+  MapPin,
+  AlertCircle,
+  Loader2,
+  Search,
+  CheckCircle2,
+  Upload,
+  FileText,
+} from "lucide-react";
 import { useNomination } from "@/app/context/nomination-context";
 
 // Types for API responses
@@ -60,22 +86,64 @@ interface ElectionConfig {
   year: number;
 }
 
-const schema = z.object({
-  districtId: z.string().min(1, "Please select a district"),
-  ulbId: z.string().min(1, "Please select a ULB"),
-  wardId: z.string().min(1, "Please select a ward"),
-  candidateName: z.string().min(2, "Applicant name is required"),
-  fatherOrHusbandName: z.string().min(2, "Father's/Husband's name is required"),
-  fullPostalAddress: z.string().min(10, "Complete address is required"),
-  category: z.enum([
-    "general",
-    "sc",
-    "st_bl",
-    "st_lt",
-    "obc_central",
-    "obc_state",
-  ]),
-});
+interface VoterRollEntry {
+  id: string;
+  epicNumber: string;
+  fullName: string;
+  relationType: string;
+  relationName: string;
+  postalAddress: string;
+}
+
+const schema = z
+  .object({
+    districtId: z.string().min(1, "Please select a district"),
+    ulbId: z.string().min(1, "Please select a ULB"),
+    wardId: z.string().min(1, "Please select a ward"),
+    candidateName: z.string().min(2, "Applicant name is required"),
+    fatherOrHusbandName: z
+      .string()
+      .min(2, "Father's/Husband's name is required"),
+    fullPostalAddress: z.string().min(10, "Complete address is required"),
+    sameAsPostalAddress: z.boolean().default(false),
+    correspondingAddress: z.string().optional(),
+    serialNoCandidate: z
+      .string()
+      .min(1, "Serial number is required")
+      .max(4, "Serial number cannot exceed 4 digits")
+      .regex(/^[0-9]+$/, "Serial number must contain only numbers"),
+    partNoCandidate: z
+      .string()
+      .min(1, "Part number is required")
+      .max(4, "Part number cannot exceed 4 digits")
+      .regex(/^[0-9]+$/, "Part number must contain only numbers"),
+    category: z.enum([
+      "general",
+      "sc",
+      "st_bl",
+      "st_lt",
+      "obc_central",
+      "obc_state",
+    ]),
+    casteCertificate: z.any().optional(),
+    affidavit: z.any().optional(),
+    addressProof: z.any().optional(),
+  })
+  .refine(
+    (data) => {
+      if (!data.sameAsPostalAddress) {
+        return (
+          data.correspondingAddress && data.correspondingAddress.length >= 10
+        );
+      }
+      return true;
+    },
+    {
+      message:
+        "Corresponding address is required when not same as postal address",
+      path: ["correspondingAddress"],
+    },
+  );
 
 interface StepBasicInfoProps {
   onNext: () => void;
@@ -92,12 +160,27 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
     null,
   );
   const [selectedWard, setSelectedWard] = useState<Ward | null>(null);
+  const [casteCertificateFile, setCasteCertificateFile] = useState<File | null>(
+    null,
+  );
+  const [affidavitFile, setAffidavitFile] = useState<File | null>(null);
+  const [addressProofFile, setAddressProofFile] = useState<File | null>(null);
+
+  // EPIC search state
+  const [epicSearch, setEpicSearch] = useState("");
+  const [epicResults, setEpicResults] = useState<VoterRollEntry[]>([]);
+  const [isSearchingEpic, setIsSearchingEpic] = useState(false);
+  const [selectedVoter, setSelectedVoter] = useState<VoterRollEntry | null>(
+    null,
+  );
+  const [epicPopoverOpen, setEpicPopoverOpen] = useState(false);
 
   // Loading states
   const [isLoadingDistricts, setIsLoadingDistricts] = useState(true);
   const [isLoadingUlbs, setIsLoadingUlbs] = useState(false);
   const [isLoadingWards, setIsLoadingWards] = useState(false);
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
+  const [isUploadingDocs, setIsUploadingDocs] = useState(false);
 
   // Error state
   const [error, setError] = useState<string | null>(null);
@@ -111,13 +194,92 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
       candidateName: formData.candidateName,
       fatherOrHusbandName: formData.fatherOrHusbandName,
       fullPostalAddress: formData.fullPostalAddress,
+      sameAsPostalAddress: formData.sameAsPostalAddress || false,
+      correspondingAddress: formData.correspondingAddress || "",
+      serialNoCandidate: formData.serialNoCandidate || "",
+      partNoCandidate: formData.partNoCandidate || "",
       category: formData.category || "general",
     },
   });
 
+  // Update form when formData changes (for pre-filling on updates)
+  useEffect(() => {
+    if (formData.candidateName || formData.districtId) {
+      console.log("Updating form with formData:", formData);
+      form.reset({
+        districtId: formData.districtId || "",
+        ulbId: formData.ulbId || "",
+        wardId: formData.wardId || "",
+        candidateName: formData.candidateName || "",
+        fatherOrHusbandName: formData.fatherOrHusbandName || "",
+        fullPostalAddress: formData.fullPostalAddress || "",
+        sameAsPostalAddress: formData.sameAsPostalAddress || false,
+        correspondingAddress: formData.correspondingAddress || "",
+        serialNoCandidate: formData.serialNoCandidate || "",
+        partNoCandidate: formData.partNoCandidate || "",
+        category: formData.category || "general",
+      });
+    }
+  }, [formData, form]);
+
   const watchDistrictId = form.watch("districtId");
   const watchUlbId = form.watch("ulbId");
   const watchWardId = form.watch("wardId");
+  const watchSameAsPostal = form.watch("sameAsPostalAddress");
+  const watchPostalAddress = form.watch("fullPostalAddress");
+  const watchCategory = form.watch("category");
+
+  // Update corresponding address when checkbox is checked
+  useEffect(() => {
+    if (watchSameAsPostal) {
+      form.setValue("correspondingAddress", watchPostalAddress);
+    }
+  }, [watchSameAsPostal, watchPostalAddress, form]);
+
+  // EPIC Search
+  const searchEpic = useCallback(async (query: string) => {
+    if (query.length < 3) {
+      setEpicResults([]);
+      return;
+    }
+    setIsSearchingEpic(true);
+    try {
+      const response = await fetch(
+        `/api/candidate/epic-search?epicNumber=${encodeURIComponent(query)}`,
+      );
+      if (!response.ok) {
+        console.error("EPIC search failed:", response.status);
+        setEpicResults([]);
+        return;
+      }
+      const data = await response.json();
+      if (data.success) {
+        setEpicResults(data.data || []);
+      } else {
+        setEpicResults([]);
+      }
+    } catch (err) {
+      console.error("EPIC search error:", err);
+      setEpicResults([]);
+    } finally {
+      setIsSearchingEpic(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (epicSearch.length >= 3) searchEpic(epicSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [epicSearch, searchEpic]);
+
+  const handleVoterSelect = (voter: VoterRollEntry) => {
+    setSelectedVoter(voter);
+    form.setValue("candidateName", voter.fullName);
+    form.setValue("fatherOrHusbandName", voter.relationName);
+    form.setValue("fullPostalAddress", voter.postalAddress);
+    setEpicPopoverOpen(false);
+  };
 
   // Fetch election config
   useEffect(() => {
@@ -215,7 +377,6 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
   useEffect(() => {
     if (watchDistrictId) {
       fetchUlbs(watchDistrictId);
-      // Reset ULB and ward if district changes
       if (formData.districtId !== watchDistrictId) {
         form.setValue("ulbId", "");
         form.setValue("wardId", "");
@@ -229,7 +390,6 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
   useEffect(() => {
     if (watchUlbId) {
       fetchWards(watchUlbId);
-      // Reset ward if ULB changes
       if (formData.ulbId !== watchUlbId) {
         form.setValue("wardId", "");
         setSelectedWard(null);
@@ -245,10 +405,73 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
     }
   }, [watchWardId, wards]);
 
-  const onSubmit = (data: z.infer<typeof schema>) => {
+  // Upload a file to Cloudinary
+  const uploadDocument = async (
+    file: File,
+    docType: string,
+  ): Promise<{ url: string; fileName: string } | null> => {
+    try {
+      const uploadData = new FormData();
+      uploadData.append("file", file);
+      uploadData.append("type", docType);
+
+      const response = await fetch("/api/nominations/documents", {
+        method: "POST",
+        body: uploadData,
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        return { url: result.data.url, fileName: file.name };
+      }
+      console.error(`Failed to upload ${docType}:`, result.error);
+      return null;
+    } catch (err) {
+      console.error(`Upload error for ${docType}:`, err);
+      return null;
+    }
+  };
+
+  const onSubmit = async (data: z.infer<typeof schema>) => {
     const selectedDistrict = districts.find((d) => d.id === data.districtId);
     const selectedUlb = ulbs.find((u) => u.id === data.ulbId);
     const wardInfo = selectedWard;
+
+    // Upload documents to Cloudinary
+    setIsUploadingDocs(true);
+    let casteCertUrl = formData.casteCertificateUrl || "";
+    let affidavitUrl = formData.affidavitUrl || "";
+    let addressProofUrl = formData.addressProofUrl || "";
+
+    try {
+      const uploads = [];
+      if (casteCertificateFile) {
+        uploads.push(
+          uploadDocument(casteCertificateFile, "casteCertificate").then((r) => {
+            if (r) casteCertUrl = r.url;
+          }),
+        );
+      }
+      if (affidavitFile) {
+        uploads.push(
+          uploadDocument(affidavitFile, "affidavit").then((r) => {
+            if (r) affidavitUrl = r.url;
+          }),
+        );
+      }
+      if (addressProofFile) {
+        uploads.push(
+          uploadDocument(addressProofFile, "addressProof").then((r) => {
+            if (r) addressProofUrl = r.url;
+          }),
+        );
+      }
+      await Promise.all(uploads);
+    } catch (err) {
+      console.error("Document upload error:", err);
+    } finally {
+      setIsUploadingDocs(false);
+    }
 
     updateFormData({
       districtId: data.districtId,
@@ -266,10 +489,22 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
       candidateName: data.candidateName,
       fatherOrHusbandName: data.fatherOrHusbandName,
       fullPostalAddress: data.fullPostalAddress,
-      serialNoCandidate: "",
-      partNoCandidate: "",
+      sameAsPostalAddress: data.sameAsPostalAddress,
+      correspondingAddress: data.sameAsPostalAddress
+        ? data.fullPostalAddress
+        : data.correspondingAddress || "",
+      serialNoCandidate: data.serialNoCandidate,
+      partNoCandidate: data.partNoCandidate,
       category: data.category,
-      casteTribeName: "",
+      casteTribeName:
+        data.category !== "general" ? formData.casteTribeName : "",
+      casteCertificateFile: casteCertificateFile?.name || "",
+      casteCertificateUrl: casteCertUrl,
+      affidavitFile: affidavitFile?.name || "",
+      affidavitUrl: affidavitUrl,
+      addressProofFile: addressProofFile?.name || "",
+      addressProofUrl: addressProofUrl,
+      epicNumber: selectedVoter?.epicNumber || epicSearch || "",
     });
     onNext();
   };
@@ -458,15 +693,110 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                 )}
               </div>
 
+              {/* EPIC Number Search */}
+              <div className="space-y-4 p-4 bg-blue-50/50 rounded-lg border border-blue-100">
+                <div className="flex items-center gap-2 text-sm font-medium text-blue-700">
+                  <Search className="h-4 w-4" />
+                  Search EPIC Number to auto-fill applicant details
+                </div>
+                <Popover
+                  open={epicPopoverOpen}
+                  onOpenChange={setEpicPopoverOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between font-normal h-10"
+                      onClick={() => setEpicPopoverOpen(true)}
+                    >
+                      {selectedVoter ? (
+                        <span className="truncate">
+                          {selectedVoter.epicNumber} - {selectedVoter.fullName}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          Search by EPIC number...
+                        </span>
+                      )}
+                      <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-[var(--radix-popover-trigger-width)] p-0"
+                    align="start"
+                  >
+                    <Command>
+                      <CommandInput
+                        placeholder="Type EPIC number (min 3 chars)..."
+                        value={epicSearch}
+                        onValueChange={setEpicSearch}
+                      />
+                      <CommandList>
+                        {isSearchingEpic && (
+                          <div className="flex items-center justify-center p-4">
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            Searching...
+                          </div>
+                        )}
+                        <CommandEmpty>
+                          {epicSearch.length < 3
+                            ? "Type at least 3 characters..."
+                            : "No voter found."}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {epicResults.map((voter) => (
+                            <CommandItem
+                              key={voter.id}
+                              value={voter.epicNumber}
+                              onSelect={() => handleVoterSelect(voter)}
+                            >
+                              <div className="flex flex-col w-full">
+                                <span className="font-medium">
+                                  {voter.epicNumber}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {voter.fullName} - {voter.relationType}:{" "}
+                                  {voter.relationName}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+
+                {selectedVoter && (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm space-y-1">
+                    <div className="flex items-center gap-2 text-green-700 font-medium">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Voter details auto-populated from Electoral Roll
+                    </div>
+                    <p className="text-green-600">
+                      <strong>EPIC:</strong> {selectedVoter.epicNumber} |{" "}
+                      <strong>{selectedVoter.relationType}:</strong>{" "}
+                      {selectedVoter.relationName}
+                    </p>
+                  </div>
+                )}
+              </div>
+
               {/* Applicant Details */}
               <FormField
                 control={form.control}
                 name="candidateName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Applicant's Full Name *</FormLabel>
+                    <FormLabel>Applicant&apos;s Full Name *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter your full name" {...field} />
+                      <Input
+                        placeholder="Enter your full name"
+                        {...field}
+                        disabled={!!selectedVoter}
+                        className={selectedVoter ? "bg-muted" : ""}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -478,11 +808,13 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                 name="fatherOrHusbandName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Father's / Husband's Name *</FormLabel>
+                    <FormLabel>Father&apos;s / Husband&apos;s Name *</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="Enter father's or husband's name"
                         {...field}
+                        disabled={!!selectedVoter}
+                        className={selectedVoter ? "bg-muted" : ""}
                       />
                     </FormControl>
                     <FormMessage />
@@ -499,8 +831,9 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                     <FormControl>
                       <Textarea
                         placeholder="Enter complete postal address"
-                        className="min-h-[100px]"
+                        className={`min-h-[100px] ${selectedVoter ? "bg-muted" : ""}`}
                         {...field}
+                        disabled={!!selectedVoter}
                       />
                     </FormControl>
                     <FormMessage />
@@ -508,6 +841,95 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                 )}
               />
 
+              {/* Corresponding Address Section */}
+              <div className="space-y-3">
+                <FormField
+                  control={form.control}
+                  name="sameAsPostalAddress"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>
+                          Corresponding address same as postal address
+                        </FormLabel>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+
+                {!watchSameAsPostal && (
+                  <FormField
+                    control={form.control}
+                    name="correspondingAddress"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Corresponding Address *</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Enter corresponding address"
+                            className="min-h-[100px]"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </div>
+
+              {/* Electoral Roll Details */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="serialNoCandidate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Serial No. in Electoral Roll *</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter 4-digit serial number"
+                          maxLength={4}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        From your electoral roll
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="partNoCandidate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Part No. in Electoral Roll *</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter 4-digit part number"
+                          maxLength={4}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        From your electoral roll
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Category Selection */}
               <div className="grid grid-cols-1 gap-4">
                 <FormField
                   control={form.control}
@@ -549,14 +971,146 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                 />
               </div>
 
+              {/* Document Uploads */}
+              <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
+                <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                  <FileText className="h-4 w-4" />
+                  Document Uploads
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="casteCertificate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Caste Certificate{" "}
+                        {watchCategory !== "general" ? "*" : "(if applicable)"}
+                      </FormLabel>
+                      <FormControl>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setCasteCertificateFile(file);
+                                field.onChange(file);
+                              }
+                            }}
+                            className="cursor-pointer"
+                          />
+                          <Upload className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </FormControl>
+                      <FormDescription>
+                        Upload PDF, JPG, or PNG (Max 5MB)
+                      </FormDescription>
+                      {casteCertificateFile && (
+                        <p className="text-xs text-green-600">
+                          ✓ {casteCertificateFile.name}
+                        </p>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="affidavit"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Affidavit *</FormLabel>
+                      <FormControl>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setAffidavitFile(file);
+                                field.onChange(file);
+                              }
+                            }}
+                            className="cursor-pointer"
+                          />
+                          <Upload className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </FormControl>
+                      <FormDescription>
+                        Upload PDF, JPG, or PNG (Max 5MB)
+                      </FormDescription>
+                      {affidavitFile && (
+                        <p className="text-xs text-green-600">
+                          ✓ {affidavitFile.name}
+                        </p>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="addressProof"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Address Proof *</FormLabel>
+                      <FormControl>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setAddressProofFile(file);
+                                field.onChange(file);
+                              }
+                            }}
+                            className="cursor-pointer"
+                          />
+                          <Upload className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </FormControl>
+                      <FormDescription>
+                        Upload PDF, JPG, or PNG (Max 5MB)
+                      </FormDescription>
+                      {addressProofFile && (
+                        <p className="text-xs text-green-600">
+                          ✓ {addressProofFile.name}
+                        </p>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
               <div className="flex justify-end pt-4">
                 <Button
                   type="submit"
                   className="bg-primary hover:bg-primary-hover"
-                  disabled={isLoadingDistricts || districts.length === 0}
+                  disabled={
+                    isLoadingDistricts ||
+                    districts.length === 0 ||
+                    isUploadingDocs
+                  }
                 >
-                  Next Step
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                  {isUploadingDocs ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Uploading Documents...
+                    </>
+                  ) : (
+                    <>
+                      Next Step
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
                 </Button>
               </div>
             </form>

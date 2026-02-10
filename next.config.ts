@@ -7,9 +7,9 @@ const nextConfig: NextConfig = {
   turbopack: {},
   // Enable standalone output for Docker
   output: "standalone",
-  // Experimental features
-  experimental: {
-    serverComponentsExternalPackages: ["@prisma/client"],
+  // Disable image optimization for local election symbol images
+  images: {
+    unoptimized: true,
   },
 };
 

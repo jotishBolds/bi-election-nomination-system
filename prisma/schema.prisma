@@ -480,11 +480,11 @@ model NominationApplication {
   submissionNumber   Int              @default(1)
   status             NominationStatus @default(DRAFT)
 
-  candidateName     String   @db.VarChar(200)
-  fatherHusbandName String   @db.VarChar(200)
-  dateOfBirth       DateTime @db.Date
-  age               Int
-  gender            Gender
+  candidateName     String    @db.VarChar(200)
+  fatherHusbandName String    @db.VarChar(200)
+  dateOfBirth       DateTime? @db.Date
+  age               Int?
+  gender            Gender?
   category          Category
   casteTribeName    String?  @db.VarChar(100)
   address           String   @db.Text
@@ -530,7 +530,7 @@ model NominationApplication {
   proposers         Proposer[]
   symbolPreferences SymbolPreference[]
   documents         Document[]
-  payments          Payment[]
+  brPayments        BRPayment[]
   statusHistory     NominationStatusHistory[]
 
   @@index([applicantProfileId])
@@ -668,41 +668,6 @@ model Document {
   @@map("documents")
 }
 
-model Payment {
-  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nominationId String        @db.Uuid
-  amount       Decimal       @db.Decimal(10, 2)
-  currency     String        @default("INR") @db.VarChar(3)
-  mode         PaymentMode
-  status       PaymentStatus @default(PENDING)
-
-  transactionId   String? @unique @db.VarChar(100)
-  orderId         String? @unique @db.VarChar(100)
-  paymentGateway  String? @db.VarChar(50)
-  gatewayResponse Json?
-
-  challanNo   String?   @db.VarChar(50)
-  bankName    String?   @db.VarChar(100)
-  branchName  String?   @db.VarChar(100)
-  depositDate DateTime?
-  verifiedBy  String?   @db.Uuid
-  verifiedAt  DateTime?
-
-  refundedAt   DateTime?
-  refundAmount Decimal?  @db.Decimal(10, 2)
-  refundReason String?   @db.Text
-
-  initiatedAt DateTime  @default(now())
-  completedAt DateTime?
-  ipAddress   String    @db.VarChar(45)
-
-  nomination NominationApplication @relation(fields: [nominationId], references: [id], onDelete: Cascade)
-
-  @@index([nominationId])
-  @@index([transactionId])
-  @@map("payments")
-}
-
 model ElectionConfig {
   id   String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name String @db.VarChar(200)
@@ -823,4 +788,42 @@ model GeneratedPDF {
   @@index([wardId])
   @@index([formType])
   @@map("generated_pdfs")
+}
+
+// Voter Roll for EPIC number search & auto-populate
+model VoterRollEntry {
+  id            String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  epicNumber    String  @unique @db.VarChar(20)
+  fullName      String  @db.VarChar(200)
+  relationType  String  @db.VarChar(20) // Father, Husband
+  relationName  String  @db.VarChar(200)
+  postalAddress String  @db.Text
+  isActive      Boolean @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([epicNumber])
+  @@index([fullName])
+  @@map("voter_roll_entries")
+}
+
+// BR Payment proof (replaces online payment)
+model BRPayment {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nominationId   String   @db.Uuid
+  brNumber       String   @db.VarChar(100) 
+  proofImageUrl  String   @db.VarChar(500) // Cloudinary URL
+  proofPublicId  String?  @db.VarChar(255) // Cloudinary public ID
+  status         PaymentStatus @default(PENDING)
+  verifiedBy     String?  @db.Uuid
+  verifiedAt     DateTime?
+  rejectionNote  String?  @db.Text
+  submittedAt    DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  nomination NominationApplication @relation(fields: [nominationId], references: [id], onDelete: Cascade)
+
+  @@index([nominationId])
+  @@index([brNumber])
+  @@map("br_payments")
 }

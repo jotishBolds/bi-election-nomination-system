@@ -21,7 +21,36 @@ export async function POST(
 
     const { id } = await params;
     const body = await request.json();
-    const { decision, checklist, remarks, rejectionReasons } = body;
+    const { decision, checklist, remarks, rejectionReasons, action } = body;
+
+    // Handle START action - mark as under scrutiny
+    if (action === "START") {
+      const application = await db.nominationApplication.findUnique({
+        where: { id },
+      });
+
+      if (!application) {
+        return NextResponse.json(
+          { success: false, error: "Application not found" },
+          { status: 404 },
+        );
+      }
+
+      if (
+        application.status === "SUBMITTED" ||
+        application.status === "RECEIVED"
+      ) {
+        await db.nominationApplication.update({
+          where: { id },
+          data: { status: "UNDER_SCRUTINY" },
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "Scrutiny started",
+      });
+    }
 
     if (!decision || !["ACCEPTED", "REJECTED"].includes(decision)) {
       return NextResponse.json(

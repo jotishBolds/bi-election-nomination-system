@@ -11,7 +11,7 @@ import {
   trackLoginAttempt,
   getLoginAttempts,
   clearLoginAttempts,
-} from "@/lib/redis";
+} from "@/lib/memory-store";
 import { Role } from "@prisma/client";
 
 // Extend the session and user types
@@ -20,6 +20,7 @@ declare module "next-auth" {
     user: {
       id: string;
       email: string;
+      phone: string;
       name: string;
       role: Role;
       roles: Role[];
@@ -31,6 +32,7 @@ declare module "next-auth" {
   interface User {
     id: string;
     email: string;
+    phone: string;
     name: string;
     role: Role;
     roles: Role[];
@@ -43,6 +45,7 @@ declare module "@auth/core/jwt" {
   interface JWT {
     id: string;
     email: string;
+    phone: string;
     name: string;
     role: Role;
     roles: Role[];
@@ -110,7 +113,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         // Verify password
         if (!user.passwordHash) {
-          throw new Error("Password not set");
+          throw new Error("Password not set. Please use OTP login.");
         }
 
         const isValidPassword = await verifyPassword(
@@ -118,6 +121,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           user.passwordHash,
         );
         if (!isValidPassword) {
+          console.warn(`[Auth] Invalid password for user: ${email}`);
           await trackLoginAttempt(email);
 
           // Lock account if max attempts reached
@@ -153,6 +157,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return {
             id: user.id,
             email: user.email || "",
+            phone: user.phone || "",
             name: user.name,
             role: primaryRole,
             roles,
@@ -200,6 +205,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return {
           id: user.id,
           email: user.email || "",
+          phone: user.phone || "",
           name: user.name,
           role: primaryRole,
           roles,
@@ -282,6 +288,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return {
           id: user.id,
           email: user.email || "",
+          phone: user.phone || "",
           name: user.name,
           role: primaryRole,
           roles,
@@ -296,6 +303,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.id = user.id;
         token.email = user.email;
+        token.phone = user.phone;
         token.name = user.name;
         token.role = user.role;
         token.roles = user.roles;
@@ -308,6 +316,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       session.user = {
         id: token.id,
         email: token.email,
+        phone: token.phone,
         name: token.name,
         role: token.role,
         roles: token.roles,

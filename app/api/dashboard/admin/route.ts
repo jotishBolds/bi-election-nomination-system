@@ -2,7 +2,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/next-auth";
 import { db } from "@/lib/db";
-import { redis } from "@/lib/redis";
 import type {
   AdminDashboardData,
   ElectionScheduleItem,
@@ -194,7 +193,6 @@ async function checkSystemHealth() {
       status: "healthy" as "healthy" | "degraded" | "down",
       latency: 0,
     },
-    redis: { status: "healthy" as "healthy" | "degraded" | "down", latency: 0 },
     storage: {
       status: "healthy" as "healthy" | "degraded" | "down",
       usedPercent: 0,
@@ -211,17 +209,6 @@ async function checkSystemHealth() {
   } catch (error) {
     health.database.status = "down";
     health.database.latency = -1;
-  }
-
-  // Check Redis
-  try {
-    const redisStart = Date.now();
-    await redis.ping();
-    health.redis.latency = Date.now() - redisStart;
-    health.redis.status = health.redis.latency < 50 ? "healthy" : "degraded";
-  } catch (error) {
-    health.redis.status = "down";
-    health.redis.latency = -1;
   }
 
   // Storage check placeholder (would need actual implementation based on storage provider)

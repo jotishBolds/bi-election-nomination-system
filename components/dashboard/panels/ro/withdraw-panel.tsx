@@ -109,7 +109,7 @@ export function WithdrawPanel() {
     setError(null);
     try {
       const params = new URLSearchParams();
-      params.append("status", "APPROVED,VALID");
+      params.append("status", "ACCEPTED,CONTESTING");
       if (wardFilter && wardFilter !== "all") {
         params.append("wardId", wardFilter);
       }
@@ -162,7 +162,7 @@ export function WithdrawPanel() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reason: withdrawReason }),
+          body: JSON.stringify({ action: "APPROVE", remarks: withdrawReason }),
         },
       );
 

@@ -2,7 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { generateOTP, hashOTP, getClientIP } from "@/lib/auth/server-utils";
-import { storeOTP, checkRateLimit } from "@/lib/redis";
+import { storeOTP, checkRateLimit } from "@/lib/memory-store";
+import { sendOTPSms, isThunderSMSConfigured } from "@/lib/sms/thundersms";
 import { z } from "zod";
 import { OTPType, OTPStatus } from "@prisma/client";
 
@@ -87,8 +88,8 @@ export async function POST(request: NextRequest) {
     const expiryMinutes = parseInt(process.env.OTP_EXPIRY_MINUTES || "5");
     const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
 
-    // Store in Redis/memory for quick verification
-    await storeOTP(identifier, otpHash, type, expiryMinutes * 60);
+    // Store PLAIN OTP in memory for quick verification (not hash!)
+    await storeOTP(identifier, otp, type, expiryMinutes * 60);
 
     // Store in database for audit (if db is available)
     try {
@@ -105,22 +106,40 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (dbError) {
-      // Log but don't fail - Redis/memory storage is primary
       console.warn("Failed to store OTP in database:", dbError);
     }
 
-    // Console log OTP for development
+    // Always log OTP to console
     console.log("========================================");
     console.log(`📱 ${type} OTP for ${identifier}: ${otp}`);
     console.log(`   Channel: ${channel}`);
     console.log(`   Expires in: ${expiryMinutes} minutes`);
     console.log("========================================");
 
+    // Send OTP via ThunderSMS if channel is sms and ThunderSMS is configured
+    let smsSent = false;
+    if (channel === "sms" && isThunderSMSConfigured()) {
+      try {
+        const smsResult = await sendOTPSms(identifier, otp, expiryMinutes);
+        smsSent = smsResult.success;
+        if (!smsResult.success) {
+          console.warn(
+            `📱 ThunderSMS failed for ${identifier}: ${smsResult.desc}`,
+          );
+        } else {
+          console.log(`📱 ThunderSMS sent successfully to ${identifier}`);
+        }
+      } catch (smsError) {
+        console.warn("ThunderSMS error:", smsError);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: `OTP sent to your ${channel === "sms" ? "phone" : "email"}`,
       expiresIn: expiryMinutes * 60, // seconds
       remaining: rateLimit.remaining,
+      smsSent,
       // In development, also return OTP for testing
       ...(process.env.NODE_ENV === "development" && { devOtp: otp }),
     });

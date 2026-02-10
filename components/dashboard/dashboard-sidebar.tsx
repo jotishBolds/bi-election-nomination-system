@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth/auth-context";
 import { UserRole } from "@/lib/auth/types";
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -41,7 +41,6 @@ import {
   Calendar,
   Vote,
   Landmark,
-  Eye,
   History,
   FileStack,
 } from "lucide-react";
@@ -105,6 +104,13 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
           iconColor: "text-purple-600",
           iconBgColor: "bg-purple-100",
         },
+        {
+          title: "Uncontest List",
+          icon: UserX,
+          href: "/dashboard?tab=uncontest",
+          iconColor: "text-red-600",
+          iconBgColor: "bg-red-100",
+        },
       ],
     },
     {
@@ -116,6 +122,18 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
           href: "/dashboard?tab=reports",
           iconColor: "text-indigo-600",
           iconBgColor: "bg-indigo-100",
+        },
+      ],
+    },
+    {
+      label: "Account",
+      items: [
+        {
+          title: "Profile Settings",
+          icon: Settings,
+          href: "/dashboard?tab=profile",
+          iconColor: "text-slate-600",
+          iconBgColor: "bg-slate-100",
         },
       ],
     },
@@ -153,14 +171,14 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
       ],
     },
     {
-      label: "Track",
+      label: "Account",
       items: [
         {
-          title: "Track Status",
-          icon: Eye,
-          href: "/dashboard?tab=track",
-          iconColor: "text-amber-600",
-          iconBgColor: "bg-amber-100",
+          title: "Profile Settings",
+          icon: Settings,
+          href: "/dashboard?tab=profile",
+          iconColor: "text-slate-600",
+          iconBgColor: "bg-slate-100",
         },
       ],
     },
@@ -240,6 +258,18 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
         },
       ],
     },
+    {
+      label: "Account",
+      items: [
+        {
+          title: "Profile Settings",
+          icon: Settings,
+          href: "/dashboard?tab=profile",
+          iconColor: "text-slate-600",
+          iconBgColor: "bg-slate-100",
+        },
+      ],
+    },
   ],
   SUPER_ADMIN: [
     {
@@ -297,6 +327,27 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
           iconColor: "text-rose-600",
           iconBgColor: "bg-rose-100",
         },
+        {
+          title: "Election Symbols",
+          icon: Landmark,
+          href: "/dashboard?tab=symbols",
+          iconColor: "text-violet-600",
+          iconBgColor: "bg-violet-100",
+        },
+        {
+          title: "Voter Roll",
+          icon: FileStack,
+          href: "/dashboard?tab=voter-roll",
+          iconColor: "text-teal-600",
+          iconBgColor: "bg-teal-100",
+        },
+        {
+          title: "BR Payments",
+          icon: Paperclip,
+          href: "/dashboard?tab=br-payments",
+          iconColor: "text-orange-600",
+          iconBgColor: "bg-orange-100",
+        },
       ],
     },
     {
@@ -330,7 +381,85 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
         },
       ],
     },
+    {
+      label: "Account",
+      items: [
+        {
+          title: "Profile Settings",
+          icon: Settings,
+          href: "/dashboard?tab=profile",
+          iconColor: "text-slate-600",
+          iconBgColor: "bg-slate-100",
+        },
+      ],
+    },
   ],
+};
+
+// Function to get dynamic CANDIDATE navigation based on submission status
+const getCandidateNavigation = (
+  submissionCount: number,
+  maxSubmissions: number,
+): NavGroup[] => {
+  const submitButtonText =
+    submissionCount === 0
+      ? "Submit New (1/3)"
+      : `Update Nomination (${Math.min(submissionCount + 1, maxSubmissions)}/3)`;
+
+  return [
+    {
+      label: "Overview",
+      items: [
+        {
+          title: "Dashboard",
+          icon: LayoutDashboard,
+          href: "/dashboard",
+          iconColor: "text-blue-600",
+          iconBgColor: "bg-blue-100",
+        },
+      ],
+    },
+    {
+      label: "Nominations",
+      items: [
+        {
+          title: "My Nominations",
+          icon: FileStack,
+          href: "/dashboard?tab=nominations",
+          iconColor: "text-indigo-600",
+          iconBgColor: "bg-indigo-100",
+        },
+        ...(submissionCount < maxSubmissions
+          ? [
+              {
+                title: submitButtonText,
+                icon: FileText,
+                href:
+                  submissionCount === 0
+                    ? "/nomination"
+                    : `/nomination?update=true&submission=${submissionCount + 1}`,
+                iconColor:
+                  submissionCount === 0 ? "text-emerald-600" : "text-blue-600",
+                iconBgColor:
+                  submissionCount === 0 ? "bg-emerald-100" : "bg-blue-100",
+              },
+            ]
+          : []),
+      ],
+    },
+    {
+      label: "Account",
+      items: [
+        {
+          title: "Profile Settings",
+          icon: Settings,
+          href: "/dashboard?tab=profile",
+          iconColor: "text-slate-600",
+          iconBgColor: "bg-slate-100",
+        },
+      ],
+    },
+  ];
 };
 
 function DashboardSidebarContent() {
@@ -338,10 +467,44 @@ function DashboardSidebarContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentTab = searchParams?.get("tab") || "";
+  const [candidateSubmissionData, setCandidateSubmissionData] = useState<{
+    count: number;
+    maxAllowed: number;
+  } | null>(null);
+
+  // Fetch candidate submission data for dynamic navigation
+  useEffect(() => {
+    if (user?.role === "CANDIDATE") {
+      const fetchSubmissionData = async () => {
+        try {
+          const response = await fetch("/api/dashboard/candidate");
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.data?.submissions) {
+              setCandidateSubmissionData({
+                count: result.data.submissions.count, // Use total count for consistency
+                maxAllowed: result.data.submissions.maxAllowed,
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch submission data:", error);
+        }
+      };
+      fetchSubmissionData();
+    }
+  }, [user?.role]);
 
   if (!user) return null;
 
-  const navGroups = ROLE_NAV_CONFIG[user.role];
+  // Use dynamic navigation for CANDIDATE, static for others
+  const navGroups =
+    user.role === "CANDIDATE" && candidateSubmissionData
+      ? getCandidateNavigation(
+          candidateSubmissionData.count,
+          candidateSubmissionData.maxAllowed,
+        )
+      : ROLE_NAV_CONFIG[user.role];
 
   return (
     <Sidebar className="border-r border-blue-100 bg-gradient-to-b from-blue-50 to-slate-50">

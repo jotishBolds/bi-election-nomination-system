@@ -1,7 +1,7 @@
 // Time-based access control and election phase management
 import "server-only";
 import { db } from "@/lib/db";
-import { redis, REDIS_KEYS } from "@/lib/redis";
+import { cacheGet, cacheSet } from "@/lib/memory-store";
 import { ElectionPhase } from "@prisma/client";
 
 interface TimeWindow {
@@ -60,8 +60,8 @@ export function checkPortalTimeWindow(): TimeWindow {
 // Get current election configuration (with caching)
 export async function getActiveElectionConfig() {
   // Try cache first
-  const cacheKey = `${REDIS_KEYS.ELECTION_CONFIG}active`;
-  const cached = await redis.get(cacheKey);
+  const cacheKey = "election_config_active";
+  const cached = await cacheGet(cacheKey);
 
   if (cached) {
     return JSON.parse(cached);
@@ -75,7 +75,7 @@ export async function getActiveElectionConfig() {
 
   if (config) {
     // Cache for 5 minutes
-    await redis.setex(cacheKey, 300, JSON.stringify(config));
+    await cacheSet(cacheKey, JSON.stringify(config), 300);
   }
 
   return config;

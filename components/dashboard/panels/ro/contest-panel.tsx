@@ -121,8 +121,8 @@ export function ContestPanel() {
       const result = await response.json();
 
       if (result.success) {
-        setCandidates(result.data.candidates || []);
-        setWardSummaries(result.data.wardSummaries || []);
+        setCandidates(result.data.contestants || []);
+        setWardSummaries(result.data.wardSummary || []);
       } else {
         setError(result.error || "Failed to fetch contest data");
       }

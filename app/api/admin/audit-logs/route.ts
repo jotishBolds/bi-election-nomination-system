@@ -20,8 +20,10 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
     const search = searchParams.get("search");
+    const format = searchParams.get("format");
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "50");
+    const limit =
+      format === "csv" ? 10000 : parseInt(searchParams.get("limit") || "50");
 
     const where: Record<string, unknown> = {};
 
@@ -107,6 +109,36 @@ export async function GET(request: NextRequest) {
         orderBy: { name: "asc" },
       }),
     ]);
+
+    // CSV export
+    if (format === "csv") {
+      const csvRows = [
+        [
+          "Timestamp",
+          "User",
+          "Action",
+          "Entity Type",
+          "Entity ID",
+          "IP Address",
+        ].join(","),
+        ...logs.map((log) =>
+          [
+            new Date(log.createdAt).toISOString(),
+            log.user?.name || "System",
+            log.action,
+            log.entityType,
+            log.entityId || "",
+            log.ipAddress || "",
+          ].join(","),
+        ),
+      ];
+      return new NextResponse(csvRows.join("\n"), {
+        headers: {
+          "Content-Type": "text/csv",
+          "Content-Disposition": `attachment; filename=audit-logs-${new Date().toISOString().split("T")[0]}.csv`,
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,

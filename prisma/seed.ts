@@ -607,12 +607,15 @@ async function main() {
     for (const ulbData of districtData.ulbs) {
       const ulb = await prisma.uLB.upsert({
         where: { code: ulbData.code },
-        update: { name: ulbData.name, type: ulbData.type },
+        update: {
+          name: ulbData.name,
+          type: ulbData.type as import("@prisma/client").ULBType,
+        },
         create: {
           districtId: district.id,
           name: ulbData.name,
           code: ulbData.code,
-          type: ulbData.type,
+          type: ulbData.type as import("@prisma/client").ULBType,
         },
       });
 

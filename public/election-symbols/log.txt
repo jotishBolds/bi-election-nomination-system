@@ -1,0 +1,214 @@
+=== IMAGE EXPORT LOG ===
+2026-02-02 15:37:41.022443
+
+SUCCESS | Row 4 | Symbol -> Symbol.png
+SUCCESS | Row 6 | Almirah -> Almirah.png
+SUCCESS | Row 7 | Apple
+(In all States and Union Territories except in the States of Arunachal Pradesh, Assam, Manipur, Meghalaya, Mizoram, Nagaland, Sikkim, Tripura, Puducherry, Tamil Nadu, Kerala & Karnataka) -> Apple.png
+SUCCESS | Row 8 | Auto- Rickshaw (In all States and Union Territories except in the States of Andhra Pradesh
+and Telangana) -> Auto- Rickshaw.png
+SUCCESS | Row 9 | Baby Walker -> Baby Walker.png
+SUCCESS | Row 10 | Balloon -> Balloon.png
+SUCCESS | Row 11 | Bangles -> Bangles.png
+SUCCESS | Row 12 | Basket containing Fruits
+(In all States and Union Territories except in the State of Tamil Nadu) -> Basket containing Fruits.png
+SUCCESS | Row 13 | Bat -> Bat.png
+SUCCESS | Row 14 | Batsman -> Batsman.png
+SUCCESS | Row 15 | Battery Torch -> Battery Torch.png
+SUCCESS | Row 16 | Bead Necklace -> Bead Necklace.png
+SUCCESS | Row 17 | Belt -> Belt.png
+SUCCESS | Row 18 | Bench -> Bench.png
+SUCCESS | Row 19 | Bicycle Pump -> Bicycle Pump.png
+SUCCESS | Row 20 | Binoculars -> Binoculars.png
+SUCCESS | Row 21 | Biscuit -> Biscuit.png
+SUCCESS | Row 22 | Black Board -> Black Board.png
+SUCCESS | Row 23 | Boat with Man and Sail -> Boat with Man and Sail.png
+SUCCESS | Row 24 | Box -> Box.png
+SUCCESS | Row 25 | Bread -> Bread.png
+SUCCESS | Row 26 | Bread Toaster -> Bread Toaster.png
+SUCCESS | Row 27 | Bricks -> Bricks.png
+SUCCESS | Row 28 | Brief Case -> Brief Case.png
+SUCCESS | Row 29 | Brush -> Brush.png
+SUCCESS | Row 30 | Bucket -> Bucket.png
+SUCCESS | Row 31 | Cake -> Cake.png
+SUCCESS | Row 32 | Calculator -> Calculator.png
+SUCCESS | Row 33 | Camera -> Camera.png
+SUCCESS | Row 34 | Can -> Can.png
+SUCCESS | Row 35 | Capsicum -> Capsicum.png
+SUCCESS | Row 36 | Carpet -> Carpet.png
+SUCCESS | Row 37 | Carrom Board -> Carrom Board.png
+SUCCESS | Row 38 | Cauliflower -> Cauliflower.png
+SUCCESS | Row 39 | CCTV Camera -> CCTV Camera.png
+SUCCESS | Row 40 | Chain -> Chain.png
+SUCCESS | Row 41 | Chakki -> Chakki.png
+SUCCESS | Row 42 | Chapati Roller -> Chapati Roller.png
+SUCCESS | Row 43 | Chappals -> Chappals.png
+SUCCESS | Row 44 | Chess Board -> Chess Board.png
+SUCCESS | Row 45 | Chimney -> Chimney.png
+SUCCESS | Row 46 | Clip -> Clip.png
+SUCCESS | Row 47 | Coat -> Coat.png
+SUCCESS | Row 48 | Coconut Farm -> Coconut Farm.png
+SUCCESS | Row 49 | Colour Tray & Brush -> Colour Tray & Brush.png
+SUCCESS | Row 50 | Computer -> Computer.png
+SUCCESS | Row 51 | Computer Mouse -> Computer Mouse.png
+SUCCESS | Row 52 | Cot
+(In all States and Union Territories except in the State of Kerala) -> Cot.png
+SUCCESS | Row 53 | Crane -> Crane.png
+SUCCESS | Row 54 | Cube -> Cube.png
+SUCCESS | Row 55 | Cup & Saucer -> Cup & Saucer.png
+SUCCESS | Row 56 | Cutting Pliers -> Cutting Pliers.png
+SUCCESS | Row 57 | Diamond -> Diamond.png
+SUCCESS | Row 58 | Diesel Pump -> Diesel Pump.png
+SUCCESS | Row 59 | Dish Antenna -> Dish Antenna.png
+SUCCESS | Row 60 | Dolli -> Dolli.png
+SUCCESS | Row 61 | Door Bell -> Door Bell.png
+SUCCESS | Row 62 | Door Handle (In all States and Union Territories
+except in the States of  Uttar Pradesh and Uttarakhand) -> Door Handle.png
+SUCCESS | Row 63 | Drill Machine -> Drill Machine.png
+SUCCESS | Row 64 | Dumbbells -> Dumbbells.png
+SUCCESS | Row 65 | Ear Rings (In all States and Union Territories
+except in the States of  Tamil Nadu, Puducherry, Kerala and Karnataka) -> Ear Rings.png
+SUCCESS | Row 66 | Electric Pole -> Electric Pole.png
+SUCCESS | Row 67 | Envelope -> Envelope.png
+SUCCESS | Row 68 | Extension Board -> Extension Board.png
+SUCCESS | Row 69 | Flute -> Flute.png
+SUCCESS | Row 70 | Football
+(In all States and Union Territories except in the States of Arunachal Pradesh, Assam, Manipur, Meghalaya, Mizoram, Nagaland, Sikkim and Tripura) -> Football.png
+SUCCESS | Row 71 | Football Player -> Football Player.png
+SUCCESS | Row 72 | Fountain -> Fountain.png
+SUCCESS | Row 73 | Frock -> Frock.png
+SUCCESS | Row 74 | Frying Pan -> Frying Pan.png
+SUCCESS | Row 75 | Funnel -> Funnel.png
+SUCCESS | Row 76 | Ganna Kisan -> Ganna Kisan.png
+SUCCESS | Row 77 | Gas Cylinder -> Gas Cylinder.png
+SUCCESS | Row 78 | Gas Stove -> Gas Stove.png
+SUCCESS | Row 79 | Gift Pack -> Gift Pack.png
+SUCCESS | Row 80 | Ginger -> Ginger.png
+SUCCESS | Row 81 | Glass Tumbler -> Glass Tumbler.png
+SUCCESS | Row 82 | Gramophone -> Gramophone.png
+SUCCESS | Row 83 | Grapes -> Grapes.png
+SUCCESS | Row 84 | Green Chilli -> Green Chilli.png
+SUCCESS | Row 85 | Hand Cart -> Hand Cart.png
+SUCCESS | Row 86 | Harmonium -> Harmonium.png
+SUCCESS | Row 88 | Head Phone -> Head Phone.png
+SUCCESS | Row 89 | Helicopter -> Helicopter.png
+SUCCESS | Row 90 | Helmet -> Helmet.png
+SUCCESS | Row 91 | Hockey and Ball -> Hockey and Ball.png
+SUCCESS | Row 92 | Hour Glass -> Hour Glass.png
+SUCCESS | Row 93 | Ice Cream
+(In all States and Union Territories except in the State of Tamil Nadu) -> Ice Cream.png
+SUCCESS | Row 94 | Immersion Rod -> Immersion Rod.png
+SUCCESS | Row 95 | Iron
+(In all States and Union Territories except in the States of Andhra Pradesh and Telangana) -> Iron.png
+SUCCESS | Row 96 | image_91 -> image_91.png
+SUCCESS | Row 98 | Kettle
+(In all States and Union Territories except in the States of Arunachal Pradesh, Assam, Manipur, Meghalaya, Mizoram, Nagaland, Sikkim, Tripura and West Bengal)” -> Kettle.png
+SUCCESS | Row 99 | Kitchen Sink -> Kitchen Sink.png
+SUCCESS | Row 100 | Lady Finger -> Lady Finger.png
+SUCCESS | Row 101 | Lady Purse (In all States and Union Territories
+except in the States of Arunachal Pradesh, Assam, Manipur, Meghalaya, Mizoram, Nagaland, Sikkim, Tripura and West Bengal) -> Lady Purse.png
+SUCCESS | Row 102 | Laptop -> Laptop.png
+SUCCESS | Row 103 | Latch -> Latch.png
+SUCCESS | Row 104 | Letter Box -> Letter Box.png
+SUCCESS | Row 105 | Lighter -> Lighter.png
+SUCCESS | Row 106 | Ludo -> Ludo.png
+SUCCESS | Row 107 | Lunch Box -> Lunch Box.png
+SUCCESS | Row 108 | Man Blowing Turha -> Man Blowing Turha.png
+SUCCESS | Row 109 | Matchbox -> Matchbox.png
+SUCCESS | Row 110 | Mike -> Mike.png
+SUCCESS | Row 111 | Mixee -> Mixee.png
+SUCCESS | Row 112 | Nail Cutter -> Nail Cutter.png
+SUCCESS | Row 113 | Neck Tie -> Neck Tie.png
+SUCCESS | Row 114 | Noodles Bowl -> Noodles Bowl.png
+SUCCESS | Row 115 | Pan -> Pan.png
+SUCCESS | Row 116 | Pants -> Pants.png
+SUCCESS | Row 117 | Peanuts -> Peanuts.png
+SUCCESS | Row 118 | Pears
+((In all States and Union Territories except in Tamil Nadu and Puducherry) -> Pears.png
+SUCCESS | Row 119 | Peas -> Peas.png
+SUCCESS | Row 120 | Pen Drive -> Pen Drive.png
+SUCCESS | Row 121 | Pen Nib with Seven Rays -> Pen Nib with Seven Rays.png
+SUCCESS | Row 122 | Pen Stand -> Pen Stand.png
+SUCCESS | Row 123 | Pencil Box -> Pencil Box.png
+SUCCESS | Row 124 | Pencil Sharpener -> Pencil Sharpener.png
+SUCCESS | Row 125 | Pendulum -> Pendulum.png
+SUCCESS | Row 126 | Pestle and Mortar -> Pestle and Mortar.png
+SUCCESS | Row 127 | Petrol Pump -> Petrol Pump.png
+SUCCESS | Row 128 | Phone Charger -> Phone Charger.png
+SUCCESS | Row 129 | Pillow -> Pillow.png
+SUCCESS | Row 130 | Pineapple -> Pineapple.png
+SUCCESS | Row 131 | Plastering Trowel -> Plastering Trowel.png
+SUCCESS | Row 132 | Plate Containing Food -> Plate Containing Food.png
+SUCCESS | Row 133 | Plate Stand -> Plate Stand.png
+SUCCESS | Row 134 | Pot -> Pot.png
+SUCCESS | Row 135 | Pressure Cooker -> Pressure Cooker.png
+SUCCESS | Row 136 | Punching Machine -> Punching Machine.png
+SUCCESS | Row 137 | Razor -> Razor.png
+SUCCESS | Row 138 | Refrigerator -> Refrigerator.png
+SUCCESS | Row 139 | Ring -> Ring.png
+SUCCESS | Row 140 | Road Roller -> Road Roller.png
+SUCCESS | Row 141 | Robot -> Robot.png
+SUCCESS | Row 142 | Room Cooler -> Room Cooler.png
+SUCCESS | Row 143 | Room Heater -> Room Heater.png
+SUCCESS | Row 144 | Rubber Stamp -> Rubber Stamp.png
+SUCCESS | Row 145 | Safety Pin -> Safety Pin.png
+SUCCESS | Row 146 | Saw
+(In all States and Union Territories except in the State of Kerala) -> Saw.png
+SUCCESS | Row 147 | School Bag -> School Bag.png
+SUCCESS | Row 148 | Scissors -> Scissors.png
+SUCCESS | Row 149 | Sewing Machine -> Sewing Machine.png
+SUCCESS | Row 150 | Ship -> Ship.png
+SUCCESS | Row 151 | Shoe -> Shoe.png
+SUCCESS | Row 152 | Shutter -> Shutter.png
+SUCCESS | Row 153 | Sitar -> Sitar.png
+SUCCESS | Row 154 | Skipping Rope -> Skipping Rope.png
+SUCCESS | Row 155 | Slate -> Slate.png
+SUCCESS | Row 156 | Soap Dish -> Soap Dish.png
+SUCCESS | Row 157 | Socks -> Socks.png
+SUCCESS | Row 158 | Sofa -> Sofa.png
+SUCCESS | Row 159 | Spanner
+(In all States and Union Territories except in the States of Bihar and Jharkhand) -> Spanner.png
+SUCCESS | Row 160 | Stapler -> Stapler.png
+SUCCESS | Row 161 | Stethoscope -> Stethoscope.png
+SUCCESS | Row 162 | Stool -> Stool.png
+SUCCESS | Row 163 | Stumps -> Stumps.png
+SUCCESS | Row 164 | Swing -> Swing.png
+SUCCESS | Row 165 | Switchboard -> Switchboard.png
+SUCCESS | Row 166 | Syringe -> Syringe.png
+SUCCESS | Row 167 | T.V. Remote -> T.V. Remote.png
+SUCCESS | Row 168 | Table -> Table.png
+SUCCESS | Row 169 | Tea Filter -> Tea Filter.png
+SUCCESS | Row 170 | Telephone -> Telephone.png
+SUCCESS | Row 171 | Television -> Television.png
+SUCCESS | Row 172 | Tennis Racket & Ball -> Tennis Racket & Ball.png
+SUCCESS | Row 173 | Tent -> Tent.png
+SUCCESS | Row 174 | Throwing a Javelin -> Throwing a Javelin.png
+SUCCESS | Row 175 | Tiller -> Tiller.png
+SUCCESS | Row 176 | Toffees -> Toffees.png
+SUCCESS | Row 177 | Tongs
+(In all States and Union Territories except in the States of Bihar and Jharkhand) -> Tongs.png
+SUCCESS | Row 178 | Tooth Brush -> Tooth Brush.png
+SUCCESS | Row 179 | Tooth Paste -> Tooth Paste.png
+SUCCESS | Row 181 | Triangle -> Triangle.png
+SUCCESS | Row 182 | Truck
+(In all States and Union Territories except in the States of Andhra Pradesh and Telangana) -> Truck.png
+SUCCESS | Row 183 | Trumpet -> Trumpet.png
+SUCCESS | Row 184 | Tube light -> Tube light.png
+SUCCESS | Row 185 | Typewriter -> Typewriter.png
+SUCCESS | Row 186 | Tyres -> Tyres.png
+SUCCESS | Row 187 | Vacuum Cleaner -> Vacuum Cleaner.png
+SUCCESS | Row 188 | Violin -> Violin.png
+SUCCESS | Row 189 | Walking Stick -> Walking Stick.png
+SUCCESS | Row 190 | Wall Hook -> Wall Hook.png
+SUCCESS | Row 192 | Walnut -> Walnut.png
+SUCCESS | Row 193 | Water Melon -> Water Melon.png
+SUCCESS | Row 197 | Whistle -> Whistle.png
+SUCCESS | Row 198 | Window -> Window.png
+SUCCESS | Row 199 | Winnower -> Winnower.png
+SUCCESS | Row 200 | Wool and Needle -> Wool and Needle.png
+SUCCESS | Row 201 | Nagrik -> Nagrik.png
+SUCCESS | Row 202 | Dustbin -> Dustbin.png
+
+----------------------
+Total Success: 191
+Total Failed : 0

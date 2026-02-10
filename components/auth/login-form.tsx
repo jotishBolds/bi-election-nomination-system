@@ -43,7 +43,7 @@ import {
 } from "@/lib/auth/validations/auth";
 
 type LoginMethod = "email" | "phone";
-type LoginStep = "credentials" | "otp";
+type LoginStep = "credentials" | "otp" | "totp";
 
 export function LoginForm() {
   const router = useRouter();
@@ -56,6 +56,7 @@ export function LoginForm() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [devOtp, setDevOtp] = useState<string | null>(null);
+  const [totpCode, setTotpCode] = useState("");
 
   // Check if user just registered
   const showRegistrationSuccess = searchParams.get("registered") === "true";
@@ -181,6 +182,7 @@ export function LoginForm() {
 
       // OTP verified, now sign in with NextAuth
       if (loginMethod === "email" && password) {
+        // First attempt without TOTP to check if TOTP is required
         const result = await signIn("credentials", {
           email: identifier,
           password: password,
@@ -189,9 +191,20 @@ export function LoginForm() {
 
         if (result?.error) {
           setError(result.error);
-        } else {
-          router.push("/dashboard");
+          return;
         }
+
+        // Check if the user needs TOTP
+        const sessionRes = await fetch("/api/auth/session");
+        const session = await sessionRes.json();
+
+        if (session?.user?.requiresTOTP && !session?.user?.totpVerified) {
+          // RO/Admin user with TOTP enabled - need authenticator code
+          setLoginStep("totp");
+          return;
+        }
+
+        router.push("/dashboard");
       } else {
         // Phone login - use phone-otp provider
         const result = await signIn("phone-otp", {
@@ -213,7 +226,47 @@ export function LoginForm() {
     }
   }
 
+  async function onTotpSubmit() {
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      if (totpCode.length !== 6) {
+        setError("Please enter a 6-digit authenticator code");
+        return;
+      }
+
+      // Sign in again with TOTP code
+      const result = await signIn("credentials", {
+        email: identifier,
+        password: password,
+        totp: totpCode,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError(
+          result.error === "Invalid authenticator code"
+            ? "Invalid authenticator code. Please check your app and try again."
+            : result.error,
+        );
+      } else {
+        router.push("/dashboard");
+      }
+    } catch {
+      setError("TOTP verification failed");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   const handleBack = () => {
+    if (loginStep === "totp") {
+      setLoginStep("otp");
+      setError(null);
+      setTotpCode("");
+      return;
+    }
     setLoginStep("credentials");
     setError(null);
     setDevOtp(null);
@@ -430,7 +483,7 @@ export function LoginForm() {
               </p>
             </div>
           </motion.div>
-        ) : (
+        ) : loginStep === "otp" ? (
           <motion.div
             key="otp"
             initial={{ opacity: 0, x: 20 }}
@@ -537,6 +590,74 @@ export function LoginForm() {
                 <p className="text-yellow-600">Check server console for OTP</p>
               </div>
             )}
+          </motion.div>
+        ) : null}
+
+        {loginStep === "totp" && (
+          <motion.div
+            key="totp"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="space-y-6"
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mb-4"
+              onClick={handleBack}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4 text-slate-500" />
+              Back
+            </Button>
+
+            <div className="text-center space-y-2">
+              <div className="mx-auto w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                <Lock className="h-6 w-6 text-orange-600" />
+              </div>
+              <h3 className="text-lg font-semibold">Authenticator Code</h3>
+              <p className="text-sm text-muted-foreground">
+                Enter the 6-digit code from your authenticator app (Google
+                Authenticator / Microsoft Authenticator)
+              </p>
+            </div>
+
+            <div className="space-y-6">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="flex flex-col items-center space-y-4">
+                <InputOTP maxLength={6} value={totpCode} onChange={setTotpCode}>
+                  <InputOTPGroup>
+                    <InputOTPSlot index={0} />
+                    <InputOTPSlot index={1} />
+                    <InputOTPSlot index={2} />
+                    <InputOTPSlot index={3} />
+                    <InputOTPSlot index={4} />
+                    <InputOTPSlot index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
+              </div>
+
+              <Button
+                className="w-full bg-primary hover:bg-primary-hover"
+                onClick={onTotpSubmit}
+                disabled={isSubmitting || totpCode.length !== 6}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  "Verify & Login"
+                )}
+              </Button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

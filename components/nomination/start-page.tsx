@@ -1,6 +1,7 @@
 // components/nomination/start-page.tsx
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Card,
@@ -29,7 +30,8 @@ interface StartPageProps {
   onApplyClick: () => void;
 }
 
-const guidelines = [
+// Dynamic guidelines function
+const getGuidelines = (electionConfig?: any) => [
   {
     icon: User,
     title: "Eligibility Criteria",
@@ -51,8 +53,9 @@ const guidelines = [
   {
     icon: IndianRupee,
     title: "Application Fee",
-    description:
-      "₹500 for General category, ₹250 for SC/ST applicants (non-refundable)",
+    description: electionConfig
+      ? `₹${electionConfig.nominationFee || 500} for General category, ₹${((electionConfig.nominationFee || 500) * (1 - (electionConfig.scStFeeDiscount || 0) / 100)).toFixed(0)} for SC/ST applicants (non-refundable)`
+      : "₹500 for General category, ₹250 for SC/ST applicants (non-refundable)",
     iconColor: "text-emerald-600",
     iconBg: "bg-emerald-100",
     cardBg: "bg-emerald-50",
@@ -60,8 +63,9 @@ const guidelines = [
   {
     icon: Calendar,
     title: "Important Dates",
-    description:
-      "Last date for submission: February 15, 2026. Scrutiny: February 18, 2026",
+    description: electionConfig
+      ? `Last date for submission: ${new Date(electionConfig.nominationEndDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}. Scrutiny: ${new Date(electionConfig.scrutinyDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`
+      : "Last date for submission: 15 Feb, 2026. Scrutiny: 16 Feb, 2026",
     iconColor: "text-rose-600",
     iconBg: "bg-rose-100",
     cardBg: "bg-rose-50",
@@ -78,9 +82,29 @@ const steps = [
 
 export function StartPage({ onApplyClick }: StartPageProps) {
   const { submissionData, canSubmitMore } = useNominationSubmission();
+  const [electionConfig, setElectionConfig] = useState<any>(null);
   const canApply = canSubmitMore();
   const submissionCount = submissionData.submissionCount;
   const maxSubmissions = submissionData.maxSubmissions;
+  const guidelines = getGuidelines(electionConfig);
+
+  // Fetch election config for dynamic content
+  useEffect(() => {
+    const fetchElectionConfig = async () => {
+      try {
+        const response = await fetch("/api/election-config");
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            setElectionConfig(result.config);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch election config:", error);
+      }
+    };
+    fetchElectionConfig();
+  }, []);
 
   return (
     <motion.div
@@ -261,18 +285,27 @@ export function StartPage({ onApplyClick }: StartPageProps) {
 
         {/* Max Submissions Warning */}
         {!canApply && (
-          <Alert className="border-amber-200 bg-amber-50">
-            <AlertTriangle className="h-4 w-4 text-amber-600" />
-            <AlertTitle className="text-amber-800">
-              Maximum Nominations Reached
+          <Alert className="border-red-200 bg-red-50">
+            <AlertTriangle className="h-4 w-4 text-red-600" />
+            <AlertTitle className="text-red-800">
+              Maximum Online Nominations Reached
             </AlertTitle>
-            <AlertDescription className="text-amber-700">
-              You have submitted the maximum allowed {maxSubmissions} nomination
-              forms online for this election. As per the election rules,
-              candidates can submit up to 3 nominations for the same ward. For
-              any additional nominations beyond this limit, please submit them
-              offline directly to the Returning Officer (RO) at your ward
-              office.
+            <AlertDescription className="text-red-700">
+              <p className="mb-2">
+                You have submitted the maximum allowed {maxSubmissions} nomination
+                forms online. As per the election rules, candidates can submit up
+                to 3 nominations for the same ward.
+              </p>
+              <div className="mt-3 p-3 bg-white rounded-lg border border-red-200">
+                <p className="font-semibold text-red-800 mb-1">
+                  Need to submit more nominations?
+                </p>
+                <p className="text-sm text-red-600">
+                  Please visit the Returning Officer (RO) at your ward office to
+                  submit additional nominations offline. Carry all required
+                  documents and identification proofs.
+                </p>
+              </div>
             </AlertDescription>
           </Alert>
         )}
@@ -297,8 +330,8 @@ export function StartPage({ onApplyClick }: StartPageProps) {
             {canApply ? (
               <>
                 {submissionCount > 0
-                  ? `Update & Submit Nomination (${Math.min(submissionCount + 1, maxSubmissions)}/3)`
-                  : "Apply for Nomination (1/3)"}
+                  ? `Update & Submit Nomination (${Math.min(submissionCount + 1, maxSubmissions)}/${maxSubmissions})`
+                  : "Submit Your First Nomination (1/3)"}
                 <ArrowRight className="ml-2 h-5 w-5" />
               </>
             ) : (

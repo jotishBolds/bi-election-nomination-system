@@ -301,7 +301,7 @@ export function SuperAdminPanel() {
           </div>
         </CardHeader>
         <CardContent className="px-4 pb-4">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="p-3 rounded-lg bg-slate-50">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs text-slate-500">Database</span>
@@ -309,17 +309,6 @@ export function SuperAdminPanel() {
               </div>
               <p className="text-sm font-medium text-slate-800">
                 {systemHealth.database.latency}ms latency
-              </p>
-            </div>
-            <div className="p-3 rounded-lg bg-slate-50">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-slate-500">Redis</span>
-                {getStatusIcon(systemHealth.redis.status)}
-              </div>
-              <p className="text-sm font-medium text-slate-800">
-                {systemHealth.redis.latency >= 0
-                  ? `${systemHealth.redis.latency}ms latency`
-                  : "Not connected"}
               </p>
             </div>
             <div className="p-3 rounded-lg bg-slate-50">

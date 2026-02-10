@@ -18,6 +18,8 @@ const initialFormData: NominationFormData = {
   candidateName: "",
   fatherOrHusbandName: "",
   fullPostalAddress: "",
+  sameAsPostalAddress: false,
+  correspondingAddress: "",
   serialNoCandidate: "",
   partNoCandidate: "",
   proposerName: "",
@@ -35,6 +37,14 @@ const initialFormData: NominationFormData = {
   shuffleCount: 0,
   category: "general",
   casteTribeName: "",
+  casteCertificateFile: "",
+  casteCertificateUrl: "",
+  affidavitFile: "",
+  affidavitUrl: "",
+  addressProofFile: "",
+  addressProofUrl: "",
+  epicNumber: "",
+  gender: "",
 };
 
 const NominationContext = createContext<NominationContextType | undefined>(

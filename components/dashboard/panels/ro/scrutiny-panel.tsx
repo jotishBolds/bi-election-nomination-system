@@ -51,23 +51,27 @@ import { Skeleton } from "@/components/ui/skeleton";
 interface Nomination {
   id: string;
   applicationNo: string;
+  candidateName: string;
   status: string;
   submittedAt: string;
-  candidate: {
-    id: string;
-    name: string;
-    phone: string;
-    email?: string;
+  applicantProfile?: {
+    user: {
+      id: string;
+      name: string;
+      phone: string;
+      email?: string;
+    };
   };
   ward: {
     id: string;
     wardNo: number;
     wardName: string;
-    reservationStatus: string;
+    reservationType?: string;
   };
   politicalParty?: {
     name: string;
     shortName: string;
+    abbreviation?: string;
   };
   documents?: Array<{
     id: string;
@@ -117,7 +121,7 @@ export function ScrutinyPanel() {
     criminalDeclarationVerified: false,
   });
   const [remarks, setRemarks] = useState("");
-  const [decision, setDecision] = useState<"APPROVED" | "REJECTED" | "">("");
+  const [decision, setDecision] = useState<"ACCEPTED" | "REJECTED" | "">("");
 
   const fetchWards = async () => {
     try {
@@ -136,7 +140,7 @@ export function ScrutinyPanel() {
     setError(null);
     try {
       const params = new URLSearchParams();
-      params.append("status", "SUBMITTED,UNDER_SCRUTINY");
+      params.append("status", "RECEIVED,UNDER_SCRUTINY");
       if (wardFilter && wardFilter !== "all") {
         params.append("wardId", wardFilter);
       }
@@ -182,7 +186,7 @@ export function ScrutinyPanel() {
     setDecision("");
 
     // Mark as under scrutiny
-    if (nomination.status === "SUBMITTED") {
+    if (nomination.status === "RECEIVED") {
       try {
         await fetch(`/api/ro/applications/${nomination.id}/scrutiny`, {
           method: "POST",
@@ -235,7 +239,7 @@ export function ScrutinyPanel() {
   const filteredNominations = nominations.filter(
     (n) =>
       n.applicationNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      n.candidate.name.toLowerCase().includes(searchQuery.toLowerCase()),
+      (n.candidateName || n.applicantProfile?.user?.name || "").toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   if (isLoading && nominations.length === 0) {
@@ -271,7 +275,7 @@ export function ScrutinyPanel() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-slate-800">
-                  {nominations.filter((n) => n.status === "SUBMITTED").length}
+                  {nominations.filter((n) => n.status === "RECEIVED").length}
                 </p>
                 <p className="text-xs text-slate-500">Pending Scrutiny</p>
               </div>
@@ -402,19 +406,19 @@ export function ScrutinyPanel() {
                           </div>
                           <div>
                             <p className="font-medium text-slate-800">
-                              {n.candidate.name}
+                              {n.candidateName || n.applicantProfile?.user?.name || "N/A"}
                             </p>
                             <p className="text-xs text-slate-400">
-                              {n.politicalParty?.shortName || "Independent"}
+                              {n.politicalParty?.shortName || n.politicalParty?.abbreviation || "Independent"}
                             </p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
-                          Ward {n.ward.wardNo}
+                          Ward {n.ward?.wardNo || "N/A"}
                           <Badge variant="outline" className="ml-2 text-xs">
-                            {n.ward.reservationStatus}
+                            {n.ward?.reservationType || "General"}
                           </Badge>
                         </div>
                       </TableCell>
@@ -462,7 +466,7 @@ export function ScrutinyPanel() {
             <DialogTitle>Scrutiny Review</DialogTitle>
             <DialogDescription>
               Application: {selectedNomination?.applicationNo} |{" "}
-              {selectedNomination?.candidate.name}
+              {selectedNomination?.candidateName || selectedNomination?.applicantProfile?.user?.name}
             </DialogDescription>
           </DialogHeader>
 
@@ -668,14 +672,14 @@ export function ScrutinyPanel() {
                     <div className="grid grid-cols-2 gap-4 mt-2">
                       <Button
                         variant={
-                          decision === "APPROVED" ? "default" : "outline"
+                          decision === "ACCEPTED" ? "default" : "outline"
                         }
                         className={
-                          decision === "APPROVED"
+                          decision === "ACCEPTED"
                             ? "bg-green-600 hover:bg-green-700"
                             : ""
                         }
-                        onClick={() => setDecision("APPROVED")}
+                        onClick={() => setDecision("ACCEPTED")}
                       >
                         <FileCheck className="h-4 w-4 mr-2" />
                         Approve
@@ -714,7 +718,7 @@ export function ScrutinyPanel() {
                     />
                   </div>
 
-                  {!allChecked && decision === "APPROVED" && (
+                  {!allChecked && decision === "ACCEPTED" && (
                     <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                       <AlertTriangle className="h-4 w-4 text-amber-600" />
                       <p className="text-sm text-amber-700">
@@ -741,16 +745,16 @@ export function ScrutinyPanel() {
                 isSubmitting ||
                 !decision ||
                 (decision === "REJECTED" && !remarks) ||
-                (decision === "APPROVED" && !allChecked)
+                (decision === "ACCEPTED" && !allChecked)
               }
             >
               {isSubmitting && (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               )}
-              {decision === "APPROVED" ? (
+              {decision === "ACCEPTED" ? (
                 <>
                   <CheckCircle className="h-4 w-4 mr-2" />
-                  Approve Application
+                  Accept Application
                 </>
               ) : decision === "REJECTED" ? (
                 <>

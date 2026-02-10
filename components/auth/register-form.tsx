@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,6 +23,19 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Loader2,
   AlertCircle,
   Mail,
@@ -31,6 +44,8 @@ import {
   CheckCircle2,
   User,
   Phone,
+  Search,
+  CreditCard,
 } from "lucide-react";
 import {
   RegistrationFormData,
@@ -38,6 +53,15 @@ import {
   OtpFormData,
   otpSchema,
 } from "@/lib/auth/validations/auth";
+
+interface VoterRollEntry {
+  id: string;
+  epicNumber: string;
+  fullName: string;
+  relationType: string;
+  relationName: string;
+  postalAddress: string;
+}
 
 type RegistrationStep = "form" | "otp";
 
@@ -50,6 +74,15 @@ export function RegisterForm() {
   const [registrationData, setRegistrationData] =
     useState<RegistrationFormData | null>(null);
   const [devOtp, setDevOtp] = useState<string | null>(null);
+
+  // EPIC search state
+  const [epicSearch, setEpicSearch] = useState("");
+  const [epicResults, setEpicResults] = useState<VoterRollEntry[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedVoter, setSelectedVoter] = useState<VoterRollEntry | null>(
+    null,
+  );
+  const [epicPopoverOpen, setEpicPopoverOpen] = useState(false);
 
   const registrationForm = useForm<RegistrationFormData>({
     resolver: zodResolver(registrationSchema),
@@ -65,35 +98,67 @@ export function RegisterForm() {
 
   const otpForm = useForm<OtpFormData>({
     resolver: zodResolver(otpSchema),
-    defaultValues: {
-      otp: "",
-    },
+    defaultValues: { otp: "" },
   });
+
+  // Search EPIC numbers
+  const searchEpic = useCallback(async (query: string) => {
+    if (query.length < 3) {
+      setEpicResults([]);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const response = await fetch(
+        `/api/candidate/epic-search?epicNumber=${encodeURIComponent(query)}`,
+      );
+      if (!response.ok) {
+        console.error("EPIC search failed:", response.status);
+        setEpicResults([]);
+        return;
+      }
+      const data = await response.json();
+      if (data.success) {
+        setEpicResults(data.data || []);
+      } else {
+        setEpicResults([]);
+      }
+    } catch (err) {
+      console.error("EPIC search error:", err);
+      setEpicResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (epicSearch.length >= 3) searchEpic(epicSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [epicSearch, searchEpic]);
+
+  const handleVoterSelect = (voter: VoterRollEntry) => {
+    setSelectedVoter(voter);
+    registrationForm.setValue("epicNo", voter.epicNumber);
+    registrationForm.setValue("name", voter.fullName);
+    setEpicPopoverOpen(false);
+  };
 
   async function onRegistrationSubmit(data: RegistrationFormData) {
     setError(null);
     setIsSubmitting(true);
-
     try {
-      // Call API to send OTP
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "send-otp",
-          data,
-        }),
+        body: JSON.stringify({ action: "send-otp", data }),
       });
-
       const result = await response.json();
-
       if (result.success) {
         setRegistrationData(data);
         setRegistrationStep("otp");
-        // Show dev OTP if available
-        if (result.devOtp) {
-          setDevOtp(result.devOtp);
-        }
+        if (result.devOtp) setDevOtp(result.devOtp);
       } else {
         setError(result.error || "Registration failed");
       }
@@ -107,15 +172,12 @@ export function RegisterForm() {
   async function onOtpSubmit(data: OtpFormData) {
     setError(null);
     setIsSubmitting(true);
-
     try {
       if (!registrationData) {
         setError("Registration data not found. Please start over.");
         setRegistrationStep("form");
         return;
       }
-
-      // Call API to verify OTP and complete registration
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -126,11 +188,8 @@ export function RegisterForm() {
           registrationData,
         }),
       });
-
       const result = await response.json();
-
       if (result.success) {
-        // Registration successful, redirect to login
         router.push("/login?registered=true");
       } else {
         setError(result.error || "OTP verification failed");
@@ -162,7 +221,7 @@ export function RegisterForm() {
             <Form {...registrationForm}>
               <form
                 onSubmit={registrationForm.handleSubmit(onRegistrationSubmit)}
-                className="space-y-6"
+                className="space-y-4"
               >
                 {error && (
                   <Alert variant="destructive">
@@ -171,6 +230,83 @@ export function RegisterForm() {
                   </Alert>
                 )}
 
+                {/* EPIC Number Search */}
+                <div className="space-y-2">
+                  <FormLabel className="text-sm font-medium">
+                    Search EPIC Number *
+                  </FormLabel>
+                  <Popover
+                    open={epicPopoverOpen}
+                    onOpenChange={setEpicPopoverOpen}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between font-normal h-10"
+                        onClick={() => setEpicPopoverOpen(true)}
+                      >
+                        {selectedVoter ? (
+                          <span className="truncate">
+                            {selectedVoter.epicNumber} -{" "}
+                            {selectedVoter.fullName}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">
+                            Search by EPIC number...
+                          </span>
+                        )}
+                        <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-[var(--radix-popover-trigger-width)] p-0"
+                      align="start"
+                    >
+                      <Command>
+                        <CommandInput
+                          placeholder="Type EPIC number (min 3 chars)..."
+                          value={epicSearch}
+                          onValueChange={setEpicSearch}
+                        />
+                        <CommandList>
+                          {isSearching && (
+                            <div className="flex items-center justify-center p-4">
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              Searching...
+                            </div>
+                          )}
+                          <CommandEmpty>
+                            {epicSearch.length < 3
+                              ? "Type at least 3 characters..."
+                              : "No voter found."}
+                          </CommandEmpty>
+                          <CommandGroup>
+                            {epicResults.map((voter) => (
+                              <CommandItem
+                                key={voter.id}
+                                value={voter.epicNumber}
+                                onSelect={() => handleVoterSelect(voter)}
+                              >
+                                <div className="flex flex-col w-full">
+                                  <span className="font-medium">
+                                    {voter.epicNumber}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {voter.fullName} - {voter.relationType}:{" "}
+                                    {voter.relationName}
+                                  </span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* EPIC Number (disabled, auto-populated) */}
                 <FormField
                   control={registrationForm.control}
                   name="epicNo"
@@ -179,13 +315,13 @@ export function RegisterForm() {
                       <FormLabel>EPIC Number</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-purple-500" />
+                          <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-purple-500" />
                           <Input
                             {...field}
                             type="text"
-                            placeholder="Enter your EPIC number"
-                            className="pl-10"
-                            disabled={isSubmitting}
+                            placeholder="Auto-populated from search"
+                            className="pl-10 bg-muted"
+                            disabled
                           />
                         </div>
                       </FormControl>
@@ -194,6 +330,7 @@ export function RegisterForm() {
                   )}
                 />
 
+                {/* Name (disabled if populated from EPIC) */}
                 <FormField
                   control={registrationForm.control}
                   name="name"
@@ -206,9 +343,9 @@ export function RegisterForm() {
                           <Input
                             {...field}
                             type="text"
-                            placeholder="Enter your full name"
-                            className="pl-10"
-                            disabled={isSubmitting}
+                            placeholder="Auto-populated from EPIC"
+                            className={`pl-10 ${selectedVoter ? "bg-muted" : ""}`}
+                            disabled={!!selectedVoter}
                           />
                         </div>
                       </FormControl>
@@ -216,6 +353,23 @@ export function RegisterForm() {
                     </FormItem>
                   )}
                 />
+
+                {/* Voter details card */}
+                {selectedVoter && (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm space-y-1">
+                    <div className="flex items-center gap-2 text-green-700 font-medium">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Voter Details (from Electoral Roll)
+                    </div>
+                    <p className="text-green-600">
+                      <strong>{selectedVoter.relationType}:</strong>{" "}
+                      {selectedVoter.relationName}
+                    </p>
+                    <p className="text-green-600">
+                      <strong>Address:</strong> {selectedVoter.postalAddress}
+                    </p>
+                  </div>
+                )}
 
                 <FormField
                   control={registrationForm.control}
@@ -379,7 +533,6 @@ export function RegisterForm() {
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
                 )}
-
                 <FormField
                   control={otpForm.control}
                   name="otp"
@@ -405,7 +558,6 @@ export function RegisterForm() {
                     </FormItem>
                   )}
                 />
-
                 <Button
                   type="submit"
                   className="w-full bg-primary hover:bg-primary-hover"

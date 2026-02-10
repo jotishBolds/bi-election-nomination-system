@@ -15,10 +15,13 @@ export default auth((req) => {
     "/register",
     "/api/auth",
     "/api/otp",
+    "/api/candidate/epic-search",
     "/_next",
     "/favicon.ico",
     "/main-logo.png",
+    "/main-logo.png",
     "/public",
+    "/election-symbols",
   ];
   const isPublicRoute = publicRoutes.some((route) =>
     pathname.startsWith(route),

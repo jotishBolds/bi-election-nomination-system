@@ -3,6 +3,7 @@ import "server-only";
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { authenticator } from "otplib";
+import speakeasy from "speakeasy";
 import crypto from "crypto";
 
 const JWT_SECRET = new TextEncoder().encode(
@@ -99,7 +100,17 @@ export function generateTOTPUri(
 }
 
 export function verifyTOTP(token: string, secret: string): boolean {
-  return authenticator.verify({ token, secret });
+  // Try speakeasy first (preferred), fallback to otplib
+  try {
+    return speakeasy.totp.verify({
+      secret,
+      encoding: "base32",
+      token,
+      window: 1,
+    });
+  } catch {
+    return authenticator.verify({ token, secret });
+  }
 }
 
 // Generate secure random token

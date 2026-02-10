@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { motion } from "framer-motion";
+import { useEffect } from "react";
 import {
   Form,
   FormControl,
@@ -50,6 +51,18 @@ export function StepProposerInfo({ onNext, onBack }: StepProposerInfoProps) {
       proposerPartNo: formData.proposerPartNo,
     },
   });
+
+  // Update form when formData changes (for pre-filling on updates)
+  useEffect(() => {
+    if (formData.proposerName) {
+      console.log("Updating proposer form with formData:", formData);
+      form.reset({
+        proposerName: formData.proposerName || "",
+        proposerSerialNo: formData.proposerSerialNo || "",
+        proposerPartNo: formData.proposerPartNo || "",
+      });
+    }
+  }, [formData, form]);
 
   const onSubmit = (data: z.infer<typeof schema>) => {
     updateFormData({

@@ -77,8 +77,8 @@ export function AuditLogsPanel() {
         params.append("action", actionFilter);
       if (entityFilter && entityFilter !== "all")
         params.append("entityType", entityFilter);
-      if (dateFrom) params.append("from", dateFrom);
-      if (dateTo) params.append("to", dateTo);
+      if (dateFrom) params.append("startDate", dateFrom);
+      if (dateTo) params.append("endDate", dateTo);
 
       const response = await fetch(`/api/admin/audit-logs?${params}`);
       const result = await response.json();
@@ -87,8 +87,8 @@ export function AuditLogsPanel() {
         setLogs(result.data);
         setPagination((prev) => ({
           ...prev,
-          total: result.total,
-          totalPages: result.totalPages,
+          total: result.pagination?.total ?? result.total ?? 0,
+          totalPages: result.pagination?.totalPages ?? result.totalPages ?? 0,
         }));
       } else {
         setError(result.error || "Failed to fetch audit logs");
@@ -135,10 +135,12 @@ export function AuditLogsPanel() {
         params.append("action", actionFilter);
       if (entityFilter && entityFilter !== "all")
         params.append("entityType", entityFilter);
-      if (dateFrom) params.append("from", dateFrom);
-      if (dateTo) params.append("to", dateTo);
+      if (dateFrom) params.append("startDate", dateFrom);
+      if (dateTo) params.append("endDate", dateTo);
 
-      const response = await fetch(`/api/admin/audit-logs/export?${params}`);
+      const response = await fetch(
+        `/api/admin/audit-logs?${params}&format=csv`,
+      );
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
