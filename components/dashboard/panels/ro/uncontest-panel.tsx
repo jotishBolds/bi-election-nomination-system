@@ -201,7 +201,7 @@ export function UncontestPanel() {
       n.applicationNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (n.candidateName || n.applicantProfile?.user?.name || "")
         .toLowerCase()
-        .includes(searchQuery.toLowerCase())
+        .includes(searchQuery.toLowerCase()),
   );
 
   if (isLoading && nominations.length === 0) {
@@ -219,10 +219,10 @@ export function UncontestPanel() {
   }
 
   const rejectedCount = nominations.filter(
-    (n) => n.status === "REJECTED"
+    (n) => n.status === "REJECTED",
   ).length;
   const withdrawnCount = nominations.filter(
-    (n) => n.status === "WITHDRAWN"
+    (n) => n.status === "WITHDRAWN",
   ).length;
 
   return (

@@ -77,7 +77,8 @@ interface Nomination {
     id: string;
     type: string;
     fileName: string;
-    url?: string;
+    originalName?: string;
+    storagePath?: string;
   }>;
 }
 
@@ -239,7 +240,9 @@ export function ScrutinyPanel() {
   const filteredNominations = nominations.filter(
     (n) =>
       n.applicationNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (n.candidateName || n.applicantProfile?.user?.name || "").toLowerCase().includes(searchQuery.toLowerCase()),
+      (n.candidateName || n.applicantProfile?.user?.name || "")
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()),
   );
 
   if (isLoading && nominations.length === 0) {
@@ -406,10 +409,14 @@ export function ScrutinyPanel() {
                           </div>
                           <div>
                             <p className="font-medium text-slate-800">
-                              {n.candidateName || n.applicantProfile?.user?.name || "N/A"}
+                              {n.candidateName ||
+                                n.applicantProfile?.user?.name ||
+                                "N/A"}
                             </p>
                             <p className="text-xs text-slate-400">
-                              {n.politicalParty?.shortName || n.politicalParty?.abbreviation || "Independent"}
+                              {n.politicalParty?.shortName ||
+                                n.politicalParty?.abbreviation ||
+                                "Independent"}
                             </p>
                           </div>
                         </div>
@@ -466,7 +473,8 @@ export function ScrutinyPanel() {
             <DialogTitle>Scrutiny Review</DialogTitle>
             <DialogDescription>
               Application: {selectedNomination?.applicationNo} |{" "}
-              {selectedNomination?.candidateName || selectedNomination?.applicantProfile?.user?.name}
+              {selectedNomination?.candidateName ||
+                selectedNomination?.applicantProfile?.user?.name}
             </DialogDescription>
           </DialogHeader>
 
@@ -643,17 +651,30 @@ export function ScrutinyPanel() {
                           <FileText className="h-5 w-5 text-slate-400" />
                           <div>
                             <p className="font-medium text-slate-800">
-                              {doc.type}
+                              {doc.type.replace(/_/g, " ")}
                             </p>
                             <p className="text-sm text-slate-400">
-                              {doc.fileName}
+                              {doc.originalName || doc.fileName}
                             </p>
                           </div>
                         </div>
-                        <Button variant="outline" size="sm">
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
-                        </Button>
+                        {doc.storagePath ? (
+                          <a
+                            href={doc.storagePath}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Button variant="outline" size="sm">
+                              <Eye className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                          </a>
+                        ) : (
+                          <Button variant="outline" size="sm" disabled>
+                            <Eye className="h-4 w-4 mr-1" />
+                            No File
+                          </Button>
+                        )}
                       </div>
                     ))}
                   </div>

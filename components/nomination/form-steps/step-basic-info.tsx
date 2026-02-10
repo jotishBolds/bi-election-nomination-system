@@ -185,6 +185,9 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
   // Error state
   const [error, setError] = useState<string | null>(null);
 
+  // Check if voter data is populated (either from current selection or loaded from existing nomination)
+  const isVoterDataPopulated = !!selectedVoter || !!formData.epicNumber;
+
   const form = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -700,19 +703,27 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                   Search EPIC Number to auto-fill applicant details
                 </div>
                 <Popover
-                  open={epicPopoverOpen}
-                  onOpenChange={setEpicPopoverOpen}
+                  open={epicPopoverOpen && !isVoterDataPopulated}
+                  onOpenChange={(open) =>
+                    !isVoterDataPopulated && setEpicPopoverOpen(open)
+                  }
                 >
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       role="combobox"
-                      className="w-full justify-between font-normal h-10"
-                      onClick={() => setEpicPopoverOpen(true)}
+                      className={`w-full justify-between font-normal h-10 ${isVoterDataPopulated ? "bg-muted cursor-not-allowed" : ""}`}
+                      onClick={() =>
+                        !isVoterDataPopulated && setEpicPopoverOpen(true)
+                      }
+                      disabled={isVoterDataPopulated}
                     >
-                      {selectedVoter ? (
+                      {selectedVoter || formData.epicNumber ? (
                         <span className="truncate">
-                          {selectedVoter.epicNumber} - {selectedVoter.fullName}
+                          {selectedVoter?.epicNumber || formData.epicNumber} -{" "}
+                          {selectedVoter?.fullName ||
+                            formData.candidateName ||
+                            ""}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">
@@ -794,8 +805,8 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                       <Input
                         placeholder="Enter your full name"
                         {...field}
-                        disabled={!!selectedVoter}
-                        className={selectedVoter ? "bg-muted" : ""}
+                        disabled={isVoterDataPopulated}
+                        className={isVoterDataPopulated ? "bg-muted" : ""}
                       />
                     </FormControl>
                     <FormMessage />
@@ -813,8 +824,8 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                       <Input
                         placeholder="Enter father's or husband's name"
                         {...field}
-                        disabled={!!selectedVoter}
-                        className={selectedVoter ? "bg-muted" : ""}
+                        disabled={isVoterDataPopulated}
+                        className={isVoterDataPopulated ? "bg-muted" : ""}
                       />
                     </FormControl>
                     <FormMessage />
@@ -831,9 +842,9 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                     <FormControl>
                       <Textarea
                         placeholder="Enter complete postal address"
-                        className={`min-h-[100px] ${selectedVoter ? "bg-muted" : ""}`}
+                        className={`min-h-[100px] ${isVoterDataPopulated ? "bg-muted" : ""}`}
                         {...field}
-                        disabled={!!selectedVoter}
+                        disabled={isVoterDataPopulated}
                       />
                     </FormControl>
                     <FormMessage />
@@ -1012,6 +1023,21 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                           ✓ {casteCertificateFile.name}
                         </p>
                       )}
+                      {!casteCertificateFile &&
+                        formData.casteCertificateUrl && (
+                          <div className="flex items-center gap-2 text-xs text-blue-600">
+                            <CheckCircle2 className="h-3 w-3" />
+                            <span>Previously uploaded</span>
+                            <a
+                              href={formData.casteCertificateUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline hover:text-blue-800"
+                            >
+                              View
+                            </a>
+                          </div>
+                        )}
                       <FormMessage />
                     </FormItem>
                   )}
@@ -1048,6 +1074,20 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                           ✓ {affidavitFile.name}
                         </p>
                       )}
+                      {!affidavitFile && formData.affidavitUrl && (
+                        <div className="flex items-center gap-2 text-xs text-blue-600">
+                          <CheckCircle2 className="h-3 w-3" />
+                          <span>Previously uploaded</span>
+                          <a
+                            href={formData.affidavitUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline hover:text-blue-800"
+                          >
+                            View
+                          </a>
+                        </div>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
@@ -1083,6 +1123,20 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                         <p className="text-xs text-green-600">
                           ✓ {addressProofFile.name}
                         </p>
+                      )}
+                      {!addressProofFile && formData.addressProofUrl && (
+                        <div className="flex items-center gap-2 text-xs text-blue-600">
+                          <CheckCircle2 className="h-3 w-3" />
+                          <span>Previously uploaded</span>
+                          <a
+                            href={formData.addressProofUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline hover:text-blue-800"
+                          >
+                            View
+                          </a>
+                        </div>
                       )}
                       <FormMessage />
                     </FormItem>

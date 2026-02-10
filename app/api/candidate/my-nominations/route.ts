@@ -38,6 +38,11 @@ export async function GET(request: NextRequest) {
         },
         politicalParty: true,
         allocatedSymbol: true,
+        brPayments: {
+          orderBy: { submittedAt: "desc" },
+          take: 1,
+        },
+        documents: true,
         scrutinizer: {
           select: {
             id: true,

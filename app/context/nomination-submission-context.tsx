@@ -34,22 +34,46 @@ function transformNominationToFormData(nomination: any): NominationFormData {
     category: (nomination.category?.toLowerCase() || "general") as any,
     casteTribeName: nomination.casteTribeName || "",
     casteCertificateFile: "",
-    casteCertificateUrl: nomination.documents?.find((d: any) => d.type === "CASTE_CERTIFICATE")?.url || "",
+    casteCertificateUrl:
+      nomination.documents?.find((d: any) => d.type === "CASTE_CERTIFICATE")
+        ?.storagePath || "",
     affidavitFile: "",
-    affidavitUrl: nomination.documents?.find((d: any) => d.type === "AFFIDAVIT")?.url || "",
+    affidavitUrl:
+      nomination.documents?.find((d: any) => d.type === "AFFIDAVIT")
+        ?.storagePath || "",
     addressProofFile: "",
-    addressProofUrl: nomination.documents?.find((d: any) => d.type === "ADDRESS_PROOF")?.url || "",
+    addressProofUrl:
+      nomination.documents?.find((d: any) => d.type === "RESIDENCE_PROOF")
+        ?.storagePath || "",
     epicNumber: nomination.applicantProfile?.epicNo || "",
     gender: (nomination.gender || "") as any,
     proposerName: nomination.proposers?.[0]?.name || "",
-    proposerSerialNo: nomination.proposers?.[0]?.serialNo || "",
-    proposerPartNo: nomination.proposers?.[0]?.partNo || "",
-    dateOfBirth: nomination.dateOfBirth ? new Date(nomination.dateOfBirth).toISOString().split("T")[0] : "",
+    proposerSerialNo:
+      nomination.proposers?.[0]?.voterSerialNo ||
+      nomination.proposers?.[0]?.serialNo ||
+      "",
+    proposerPartNo:
+      nomination.proposers?.[0]?.voterPartNo ||
+      nomination.proposers?.[0]?.partNo ||
+      "",
+    dateOfBirth: nomination.dateOfBirth
+      ? new Date(nomination.dateOfBirth).toISOString().split("T")[0]
+      : "",
     age: nomination.age?.toString() || "",
-    politicalPartyId: nomination.politicalPartyId || (nomination.isIndependent ? "independent" : ""),
-    politicalParty: nomination.politicalParty?.name || (nomination.isIndependent ? "Independent" : ""),
-    partySymbol: nomination.politicalParty?.symbol?.name || nomination.allocatedSymbol?.name || "",
-    partySymbolImage: nomination.politicalParty?.symbol?.imagePath || nomination.allocatedSymbol?.imagePath || "",
+    politicalPartyId:
+      nomination.politicalPartyId ||
+      (nomination.isIndependent ? "independent" : ""),
+    politicalParty:
+      nomination.politicalParty?.name ||
+      (nomination.isIndependent ? "Independent" : ""),
+    partySymbol:
+      nomination.politicalParty?.symbol?.name ||
+      nomination.allocatedSymbol?.name ||
+      "",
+    partySymbolImage:
+      nomination.politicalParty?.symbol?.imagePath ||
+      nomination.allocatedSymbol?.imagePath ||
+      "",
     symbolPreference1: nomination.symbolPreferences?.[0]?.symbolId || "",
     symbolPreference2: nomination.symbolPreferences?.[1]?.symbolId || "",
     symbolPreference3: nomination.symbolPreferences?.[2]?.symbolId || "",
@@ -177,19 +201,19 @@ export function NominationSubmissionProvider({
         const data = await response.json();
         if (data.success && data.nominations) {
           const rawSubmissions = data.nominations;
-          
+
           // Transform each submission to include formData
           const submissions = rawSubmissions.map((nom: any) => ({
             ...nom,
             formData: transformNominationToFormData(nom),
           }));
-          
+
           const latestSubmission = submissions[submissions.length - 1];
           const firstSubmission = submissions[0];
           const submittedCount = submissions.filter(
             (s: any) => s.status !== "DRAFT",
           ).length;
-          
+
           // Get formData from the latest submission
           const latestFormData = latestSubmission?.formData;
           const firstFormData = firstSubmission?.formData;
@@ -215,11 +239,9 @@ export function NominationSubmissionProvider({
             maxSubmissions: 3,
             applicationId: latestSubmission?.applicationNo || null,
             submissions,
-            lockedPoliticalPartyId:
-              firstFormData?.politicalPartyId || "",
+            lockedPoliticalPartyId: firstFormData?.politicalPartyId || "",
             lockedPartySymbol: firstFormData?.partySymbol || "",
-            lockedPartySymbolImage:
-              firstFormData?.partySymbolImage || "",
+            lockedPartySymbolImage: firstFormData?.partySymbolImage || "",
           });
         }
       }

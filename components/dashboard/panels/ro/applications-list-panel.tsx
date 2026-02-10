@@ -101,6 +101,8 @@ interface Nomination {
     id: string;
     type: string;
     fileName: string;
+    originalName?: string;
+    storagePath?: string;
   }>;
 }
 
@@ -245,14 +247,20 @@ export function ApplicationsListPanel() {
   };
 
   // Handle nomination status actions (receive, send to scrutiny, etc.)
-  const handleStatusAction = async (nominationId: string, action: "RECEIVE" | "SCRUTINY") => {
+  const handleStatusAction = async (
+    nominationId: string,
+    action: "RECEIVE" | "SCRUTINY",
+  ) => {
     setIsActionLoading(nominationId);
     try {
-      const response = await fetch(`/api/ro/applications/${nominationId}/action`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
+      const response = await fetch(
+        `/api/ro/applications/${nominationId}/action`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action }),
+        },
+      );
       const result = await response.json();
       if (result.success) {
         fetchNominations();
@@ -536,7 +544,9 @@ export function ApplicationsListPanel() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleStatusAction(n.id, "RECEIVE")}
+                              onClick={() =>
+                                handleStatusAction(n.id, "RECEIVE")
+                              }
                               disabled={isActionLoading === n.id}
                               title="Receive Application"
                               className="text-green-600 hover:text-green-700 hover:bg-green-50"
@@ -552,7 +562,9 @@ export function ApplicationsListPanel() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleStatusAction(n.id, "SCRUTINY")}
+                              onClick={() =>
+                                handleStatusAction(n.id, "SCRUTINY")
+                              }
                               disabled={isActionLoading === n.id}
                               title="Send to Scrutiny"
                               className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
@@ -704,15 +716,30 @@ export function ApplicationsListPanel() {
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4 text-slate-400" />
                           <div>
-                            <p className="text-sm font-medium">{doc.type}</p>
+                            <p className="text-sm font-medium">
+                              {doc.type.replace(/_/g, " ")}
+                            </p>
                             <p className="text-xs text-slate-400">
-                              {doc.fileName}
+                              {doc.originalName || doc.fileName}
                             </p>
                           </div>
                         </div>
-                        <Button variant="outline" size="sm">
-                          View
-                        </Button>
+                        {doc.storagePath ? (
+                          <a
+                            href={doc.storagePath}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Button variant="outline" size="sm">
+                              <Eye className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                          </a>
+                        ) : (
+                          <Button variant="outline" size="sm" disabled>
+                            No File
+                          </Button>
+                        )}
                       </div>
                     ))}
                   </div>

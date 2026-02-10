@@ -292,9 +292,9 @@ export function StartPage({ onApplyClick }: StartPageProps) {
             </AlertTitle>
             <AlertDescription className="text-red-700">
               <p className="mb-2">
-                You have submitted the maximum allowed {maxSubmissions} nomination
-                forms online. As per the election rules, candidates can submit up
-                to 3 nominations for the same ward.
+                You have submitted the maximum allowed {maxSubmissions}{" "}
+                nomination forms online. As per the election rules, candidates
+                can submit up to 3 nominations for the same ward.
               </p>
               <div className="mt-3 p-3 bg-white rounded-lg border border-red-200">
                 <p className="font-semibold text-red-800 mb-1">

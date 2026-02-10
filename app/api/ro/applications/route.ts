@@ -126,6 +126,7 @@ export async function GET(request: NextRequest) {
           },
           politicalParty: true,
           allocatedSymbol: true,
+          documents: true,
         },
         orderBy: { submittedAt: "desc" },
         skip: (page - 1) * limit,

@@ -1,7 +1,7 @@
 // components/nomination/nomination-flow.tsx
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 
@@ -15,12 +15,15 @@ import { PaymentPage, BRPaymentData } from "./payment-page";
 import { SuccessPage } from "./success-page";
 import { ProgressTracker } from "./progress-tracker";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   NominationProvider,
   useNomination,
 } from "@/app/context/nomination-context";
 import { useNominationSubmission } from "@/app/context/nomination-submission-context";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle, ShieldAlert, Lock } from "lucide-react";
+import Link from "next/link";
 
 type FlowStep =
   | "start"
@@ -50,44 +53,87 @@ function NominationFlowContent() {
     submissionData,
   } = useNominationSubmission();
 
-  // Load previous form data when entering the form flow
+  // Ref to prevent duplicate data loading
+  const dataLoadedRef = useRef(false);
+  const draftLoadedRef = useRef(false);
+
+  // Determine if form should be locked based on nomination status
+  const latestStatus =
+    submissionData.submissions?.[submissionData.submissions.length - 1]?.status;
+  const isFormLocked =
+    isUpdate &&
+    latestStatus &&
+    [
+      "ACCEPTED",
+      "APPROVED",
+      "REJECTED",
+      "WITHDRAWN",
+      "CONTESTING",
+      "ELECTED_UNOPPOSED",
+    ].includes(
+      typeof latestStatus === "string" ? latestStatus.toUpperCase() : "",
+    );
+
+  // Check if max submissions (3/3) reached
+  const isMaxSubmissionsReached =
+    submissionData.submissionCount >= submissionData.maxSubmissions;
+
+  // Single consolidated data loading effect for UPDATES
+  // Only runs once when submission data is available
   useEffect(() => {
-    async function loadDraft() {
-      if (flowStep === "consent" || flowStep === "form") {
+    if (!isUpdate) return;
+    if (dataLoadedRef.current) return;
+    if (submissionData.submissionCount === 0) return; // Wait for data to load
+
+    dataLoadedRef.current = true;
+
+    async function loadUpdateData() {
+      try {
         const draftData = await getDraftData();
         if (draftData) {
-          // Populate form with previous data
           updateFormData(draftData);
         }
+      } catch (error) {
+        console.error("Failed to load update data:", error);
+      }
+    }
+    loadUpdateData();
+  }, [isUpdate, submissionData.submissionCount, getDraftData, updateFormData]);
+
+  // Data loading effect for NEW submissions (draft)
+  // Only loads when entering consent or form step for first time
+  useEffect(() => {
+    if (isUpdate) return;
+    if (draftLoadedRef.current) return;
+    if (flowStep !== "consent" && flowStep !== "form") return;
+
+    draftLoadedRef.current = true;
+
+    async function loadDraft() {
+      try {
+        const draftData = await getDraftData();
+        if (draftData) {
+          updateFormData(draftData);
+        }
+      } catch (error) {
+        console.error("Failed to load draft:", error);
       }
     }
     loadDraft();
-  }, [flowStep, getDraftData, updateFormData]);
+  }, [flowStep, isUpdate, getDraftData, updateFormData]);
 
-  // For updates, load data immediately on mount - wait for submission data to be loaded first
+  // Save form data as draft (only for new submissions, not updates)
   useEffect(() => {
-    if (isUpdate && submissionData.submissionCount > 0) {
-      async function loadUpdateData() {
-        const draftData = await getDraftData();
-        if (draftData) {
-          console.log("Loading update data:", draftData);
-          updateFormData(draftData);
-        }
-      }
-      loadUpdateData();
-    }
-  }, [isUpdate, submissionData.submissionCount, getDraftData, updateFormData]);
-
-  // Save form data as draft whenever it changes
-  useEffect(() => {
+    if (isUpdate) return;
     if (flowStep === "form" || flowStep === "preview") {
       saveDraft(formData);
     }
-  }, [formData, flowStep, saveDraft]);
+  }, [formData, flowStep, saveDraft, isUpdate]);
 
   const handleFormNext = () => {
-    // Save current form data as draft
-    saveDraft(formData);
+    if (!isUpdate) {
+      saveDraft(formData);
+    }
 
     if (currentStep < 2) {
       setCurrentStep(currentStep + 1);
@@ -97,8 +143,6 @@ function NominationFlowContent() {
   };
 
   const handlePreviewNext = () => {
-    // All submissions go through payment/verification page
-    // The PaymentPage component handles whether to show BR upload (1st) or just OTP (2nd/3rd)
     setFlowStep("payment");
   };
 
@@ -111,7 +155,6 @@ function NominationFlowContent() {
   };
 
   const handlePaymentSuccess = async (brData?: BRPaymentData) => {
-    // Submit nomination data with full form data to the submission context
     const result = await submitNomination(
       {
         district: formData.district || "GANGTOK",
@@ -130,16 +173,94 @@ function NominationFlowContent() {
     }
   };
 
-  // Check if user can apply
   const handleApplyClick = () => {
     if (!canSubmitMore()) {
-      // If max submissions reached, don't proceed
       return;
     }
-    // For new submissions (1/3), show consent page first
-    // For updates (2/3, 3/3), skip directly to form since consent already given
     setFlowStep(submissionData.submissionCount === 0 ? "consent" : "form");
   };
+
+  // ---- Render locked/blocked states ----
+
+  // Block if max submissions reached (3/3)
+  if (isUpdate && isMaxSubmissionsReached) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-light to-white p-4">
+        <Card className="max-w-lg w-full">
+          <CardContent className="p-8">
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center">
+                <ShieldAlert className="h-8 w-8 text-amber-600" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-800">
+                Maximum Submissions Reached
+              </h2>
+              <p className="text-slate-600">
+                You have already submitted {submissionData.submissionCount}/
+                {submissionData.maxSubmissions} nominations. No further updates
+                can be made online.
+              </p>
+              <Alert className="bg-amber-50 border-amber-200 text-left">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertTitle className="text-amber-800">
+                  Need to make changes?
+                </AlertTitle>
+                <AlertDescription className="text-amber-700">
+                  Please visit the Returning Officer (RO) in person at the
+                  designated election office to request any modifications to
+                  your nomination.
+                </AlertDescription>
+              </Alert>
+              <Link href="/dashboard">
+                <Button variant="outline">Return to Dashboard</Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Block if form is locked (scrutiny passed, withdrawn, etc.)
+  if (isFormLocked) {
+    const statusLabel =
+      typeof latestStatus === "string"
+        ? latestStatus.toUpperCase().replace("_", " ")
+        : "PROCESSED";
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-light to-white p-4">
+        <Card className="max-w-lg w-full">
+          <CardContent className="p-8">
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
+                <Lock className="h-8 w-8 text-red-600" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-800">
+                Nomination Form Locked
+              </h2>
+              <p className="text-slate-600">
+                Your nomination has been <strong>{statusLabel}</strong>. The
+                form can no longer be edited online.
+              </p>
+              <Alert className="bg-blue-50 border-blue-200 text-left">
+                <AlertTriangle className="h-4 w-4 text-blue-600" />
+                <AlertTitle className="text-blue-800">
+                  What to do next
+                </AlertTitle>
+                <AlertDescription className="text-blue-700">
+                  If you need to make any changes, please contact the Returning
+                  Officer (RO) at the designated election office.
+                </AlertDescription>
+              </Alert>
+              <Link href="/dashboard">
+                <Button variant="outline">Return to Dashboard</Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <AnimatePresence mode="wait">

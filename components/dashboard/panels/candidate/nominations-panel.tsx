@@ -43,6 +43,7 @@ interface MyNomination {
   scrutinyRemarks?: string;
   paymentStatus?: string;
   paymentAmount?: number;
+  submissionNumber?: number;
   ward: {
     id: string;
     wardNo: number;
@@ -64,10 +65,21 @@ interface MyNomination {
     name: string;
     imageUrl?: string;
   };
+  allocatedSymbol?: {
+    name: string;
+    imageUrl?: string;
+  };
+  brPayments?: Array<{
+    id: string;
+    status: string;
+    amount?: number;
+  }>;
   documents?: Array<{
     id: string;
     type: string;
     fileName: string;
+    originalName?: string;
+    storagePath?: string;
   }>;
 }
 
@@ -345,13 +357,18 @@ export function CandidateNominationsPanel() {
                       <div className="flex items-center gap-2">
                         <div
                           className={`w-2 h-2 rounded-full ${
-                            nomination.paymentStatus === "COMPLETED"
+                            nomination.brPayments?.[0]?.status === "VERIFIED" ||
+                            nomination.brPayments?.[0]?.status === "APPROVED"
                               ? "bg-green-500"
-                              : "bg-amber-500"
+                              : nomination.brPayments?.[0]?.status ===
+                                  "REJECTED"
+                                ? "bg-red-500"
+                                : "bg-amber-500"
                           }`}
                         />
                         <span className="text-xs text-slate-500">
-                          Payment: {nomination.paymentStatus || "Pending"}
+                          BR Payment:{" "}
+                          {nomination.brPayments?.[0]?.status || "Pending"}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -371,17 +388,27 @@ export function CandidateNominationsPanel() {
                         </span>
                       </div>
                     </div>
-                    {nomination.electionSymbol && (
+                    {(nomination.allocatedSymbol ||
+                      nomination.electionSymbol) && (
                       <div className="flex items-center gap-2">
-                        {nomination.electionSymbol.imageUrl && (
+                        {(nomination.allocatedSymbol?.imageUrl ||
+                          nomination.electionSymbol?.imageUrl) && (
                           <img
-                            src={nomination.electionSymbol.imageUrl}
-                            alt={nomination.electionSymbol.name}
+                            src={
+                              nomination.allocatedSymbol?.imageUrl ||
+                              nomination.electionSymbol?.imageUrl
+                            }
+                            alt={
+                              nomination.allocatedSymbol?.name ||
+                              nomination.electionSymbol?.name ||
+                              "Symbol"
+                            }
                             className="w-6 h-6 object-contain"
                           />
                         )}
                         <span className="text-xs text-slate-500">
-                          {nomination.electionSymbol.name}
+                          {nomination.allocatedSymbol?.name ||
+                            nomination.electionSymbol?.name}
                         </span>
                       </div>
                     )}
@@ -545,16 +572,28 @@ export function CandidateNominationsPanel() {
                           <FileText className="h-5 w-5 text-slate-400" />
                           <div>
                             <p className="font-medium text-slate-800">
-                              {doc.type}
+                              {doc.type.replace(/_/g, " ")}
                             </p>
                             <p className="text-sm text-slate-400">
-                              {doc.fileName}
+                              {doc.originalName || doc.fileName}
                             </p>
                           </div>
                         </div>
-                        <Button variant="outline" size="sm">
-                          View
-                        </Button>
+                        {doc.storagePath ? (
+                          <a
+                            href={doc.storagePath}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Button variant="outline" size="sm">
+                              View
+                            </Button>
+                          </a>
+                        ) : (
+                          <Button variant="outline" size="sm" disabled>
+                            No File
+                          </Button>
+                        )}
                       </div>
                     ))}
                   </div>

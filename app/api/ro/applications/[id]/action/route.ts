@@ -6,7 +6,7 @@ import { NominationStatus } from "@prisma/client";
 // POST /api/ro/applications/[id]/action - Update application status
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await auth();
@@ -16,7 +16,7 @@ export async function POST(
     ) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -30,11 +30,17 @@ export async function POST(
     // ACCEPT: Accept after scrutiny (valid nomination)
     // CONTESTING: Add to final contestant list
     // REJECT: Reject the nomination
-    const validActions = ["RECEIVE", "SCRUTINY", "ACCEPT", "CONTESTING", "REJECT"];
+    const validActions = [
+      "RECEIVE",
+      "SCRUTINY",
+      "ACCEPT",
+      "CONTESTING",
+      "REJECT",
+    ];
     if (!validActions.includes(action)) {
       return NextResponse.json(
         { success: false, error: "Invalid action" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -53,7 +59,7 @@ export async function POST(
     if (!application) {
       return NextResponse.json(
         { success: false, error: "Application not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -75,7 +81,7 @@ export async function POST(
       if (!hasJurisdiction) {
         return NextResponse.json(
           { success: false, error: "Access denied - not in your jurisdiction" },
-          { status: 403 }
+          { status: 403 },
         );
       }
     }
@@ -101,7 +107,7 @@ export async function POST(
       default:
         return NextResponse.json(
           { success: false, error: "Invalid action" },
-          { status: 400 }
+          { status: 400 },
         );
     }
 
@@ -123,7 +129,7 @@ export async function POST(
           success: false,
           error: `Invalid status transition from ${currentStatus} to ${newStatus}`,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -163,7 +169,7 @@ export async function POST(
     console.error("Error updating application status:", error);
     return NextResponse.json(
       { success: false, error: "Failed to update application status" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

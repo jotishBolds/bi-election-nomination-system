@@ -408,14 +408,19 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
                       <div
                         key={num}
                         className={cn(
-                          "p-3 border-2 rounded-lg text-center transition-all cursor-pointer",
-                          selectingPref === num
+                          "p-3 border-2 rounded-lg text-center transition-all",
+                          isPartyLocked
+                            ? "cursor-not-allowed opacity-60"
+                            : "cursor-pointer",
+                          selectingPref === num && !isPartyLocked
                             ? "border-primary bg-primary/5 ring-2 ring-primary/30"
                             : pref
                               ? "border-green-500 bg-green-50"
                               : "border-dashed border-muted-foreground/30",
                         )}
-                        onClick={() => setSelectingPref(num as 1 | 2 | 3)}
+                        onClick={() =>
+                          !isPartyLocked && setSelectingPref(num as 1 | 2 | 3)
+                        }
                       >
                         <p className="text-xs font-medium text-muted-foreground mb-1">
                           {label}
@@ -453,7 +458,12 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
                     </div>
                   ) : (
                     <ScrollArea className="h-[400px] border rounded-lg p-4">
-                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+                      <div
+                        className={cn(
+                          "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3",
+                          isPartyLocked && "opacity-60 pointer-events-none",
+                        )}
+                      >
                         {allSymbols.map((symbol) => {
                           const prefNum = getSymbolPref(symbol.id);
                           return (

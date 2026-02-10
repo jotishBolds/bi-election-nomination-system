@@ -59,10 +59,13 @@ interface Nomination {
   status: string;
   submittedAt: string;
   scrutinyAt?: string;
-  candidate: {
-    id: string;
-    name: string;
-    phone: string;
+  candidateName: string;
+  applicantProfile?: {
+    user: {
+      id: string;
+      name: string;
+      phone: string;
+    };
   };
   ward: {
     id: string;
@@ -184,7 +187,7 @@ export function WithdrawPanel() {
   const filteredNominations = nominations.filter(
     (n) =>
       n.applicationNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      n.candidate.name.toLowerCase().includes(searchQuery.toLowerCase()),
+      n.candidateName.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   if (isLoading && nominations.length === 0) {
@@ -371,10 +374,10 @@ export function WithdrawPanel() {
                           </div>
                           <div>
                             <p className="font-medium text-slate-800">
-                              {n.candidate.name}
+                              {n.candidateName}
                             </p>
                             <p className="text-xs text-slate-400">
-                              {n.candidate.phone}
+                              {n.applicantProfile?.user?.phone || "—"}
                             </p>
                           </div>
                         </div>
@@ -438,7 +441,7 @@ export function WithdrawPanel() {
           <DialogHeader>
             <DialogTitle>Process Withdrawal</DialogTitle>
             <DialogDescription>
-              Withdraw nomination for {selectedNomination?.candidate.name}
+              Withdraw nomination for {selectedNomination?.candidateName}
             </DialogDescription>
           </DialogHeader>
 
@@ -451,7 +454,7 @@ export function WithdrawPanel() {
                   </div>
                   <div>
                     <p className="font-medium">
-                      {selectedNomination.candidate.name}
+                      {selectedNomination.candidateName}
                     </p>
                     <p className="text-sm text-slate-500">
                       Ward {selectedNomination.ward.wardNo} •{" "}
@@ -511,7 +514,7 @@ export function WithdrawPanel() {
             <AlertDialogTitle>Confirm Withdrawal</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to withdraw the nomination for{" "}
-              <strong>{selectedNomination?.candidate.name}</strong>?
+              <strong>{selectedNomination?.candidateName}</strong>?
               <br />
               <br />
               This action cannot be undone and the candidate will be removed
