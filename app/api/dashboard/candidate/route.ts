@@ -79,8 +79,11 @@ export async function GET(request: NextRequest) {
       : [];
 
     const maxAllowed = electionConfig?.maxNominationsPerCandidate || 3;
-    // Count all nominations (including drafts) for consistency
-    const totalCount = nominations.length;
+    // Count actual submissions based on submissionNumber field
+    const maxSubmissionNumber = nominations.reduce(
+      (max, nomination) => Math.max(max, nomination.submissionNumber || 0),
+      0,
+    );
     const submittedCount = nominations.filter(
       (n) => n.status !== "DRAFT",
     ).length;
@@ -181,10 +184,10 @@ export async function GET(request: NextRequest) {
           : undefined,
       },
       submissions: {
-        count: totalCount, // Use total count for consistency across the app
+        count: maxSubmissionNumber, // Use actual submission count from submissionNumber field
         submittedCount, // Also include submitted count for reference
         maxAllowed,
-        canSubmitMore: totalCount < maxAllowed,
+        canSubmitMore: maxSubmissionNumber < maxAllowed,
       },
       latestNomination: latestNomination
         ? {

@@ -299,9 +299,21 @@ export async function getCandidateNominations(applicantProfileId: string) {
           },
         },
       },
+      applicantProfile: true,
+      politicalParty: {
+        include: {
+          symbol: true,
+        },
+      },
       brPayments: true,
       documents: true,
       proposers: true,
+      symbolPreferences: {
+        include: {
+          symbol: true,
+        },
+        orderBy: { preferenceOrder: "asc" },
+      },
       statusHistory: {
         orderBy: { createdAt: "desc" },
       },

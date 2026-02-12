@@ -67,9 +67,14 @@ const schema = z.object({
 interface StepDeclarationProps {
   onNext: () => void;
   onBack: () => void;
+  isUpdate?: boolean;
 }
 
-export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
+export function StepDeclaration({
+  onNext,
+  onBack,
+  isUpdate = false,
+}: StepDeclarationProps) {
   const { formData, updateFormData } = useNomination();
   const { submissionData } = useNominationSubmission();
 
@@ -88,8 +93,8 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
   const [pref3, setPref3] = useState<ElectionSymbol | null>(null);
   const [selectingPref, setSelectingPref] = useState<1 | 2 | 3>(1);
 
-  // Check if party symbol is locked (for subsequent submissions)
-  const isPartyLocked = submissionData.submissionCount > 0;
+  // Check if party symbol is locked (for subsequent submissions or update)
+  const isPartyLocked = isUpdate || submissionData.submissionCount > 0;
 
   const form = useForm({
     resolver: zodResolver(schema),
@@ -171,22 +176,44 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
   useEffect(() => {
     if (allSymbols.length === 0) return;
     if (formData.symbolPreference1) {
-      const s1 = allSymbols.find((s) => s.name === formData.symbolPreference1);
-      if (s1) setPref1(s1);
+      const s1 = allSymbols.find(
+        (s) =>
+          s.name === formData.symbolPreference1 ||
+          s.id === formData.symbolPreference1,
+      );
+      if (s1) {
+        setPref1(s1);
+        form.setValue("symbolPreference1", s1.name);
+      }
     }
     if (formData.symbolPreference2) {
-      const s2 = allSymbols.find((s) => s.name === formData.symbolPreference2);
-      if (s2) setPref2(s2);
+      const s2 = allSymbols.find(
+        (s) =>
+          s.name === formData.symbolPreference2 ||
+          s.id === formData.symbolPreference2,
+      );
+      if (s2) {
+        setPref2(s2);
+        form.setValue("symbolPreference2", s2.name);
+      }
     }
     if (formData.symbolPreference3) {
-      const s3 = allSymbols.find((s) => s.name === formData.symbolPreference3);
-      if (s3) setPref3(s3);
+      const s3 = allSymbols.find(
+        (s) =>
+          s.name === formData.symbolPreference3 ||
+          s.id === formData.symbolPreference3,
+      );
+      if (s3) {
+        setPref3(s3);
+        form.setValue("symbolPreference3", s3.name);
+      }
     }
   }, [
     allSymbols,
     formData.symbolPreference1,
     formData.symbolPreference2,
     formData.symbolPreference3,
+    form,
   ]);
 
   // Handle symbol selection

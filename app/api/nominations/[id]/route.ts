@@ -250,6 +250,36 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       },
     });
 
+    // Update symbol preferences if provided
+    const symbolPrefs = [
+      { name: formData?.symbolPreference1, order: 1 },
+      { name: formData?.symbolPreference2, order: 2 },
+      { name: formData?.symbolPreference3, order: 3 },
+    ].filter((p) => p.name && p.name.trim() !== "");
+
+    if (symbolPrefs.length > 0) {
+      // Delete existing preferences for this nomination
+      await db.symbolPreference.deleteMany({
+        where: { nominationId: id },
+      });
+
+      // Create new preferences
+      for (const pref of symbolPrefs) {
+        const symbol = await db.electionSymbol.findFirst({
+          where: { name: pref.name },
+        });
+        if (symbol) {
+          await db.symbolPreference.create({
+            data: {
+              nominationId: id,
+              symbolId: symbol.id,
+              preferenceOrder: pref.order,
+            },
+          });
+        }
+      }
+    }
+
     // If BR data provided, create new BR payment record
     if (brNumber && brProofUrl && brProofPublicId) {
       await db.bRPayment.create({

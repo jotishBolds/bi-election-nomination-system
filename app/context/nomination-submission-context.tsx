@@ -74,9 +74,18 @@ function transformNominationToFormData(nomination: any): NominationFormData {
       nomination.politicalParty?.symbol?.imagePath ||
       nomination.allocatedSymbol?.imagePath ||
       "",
-    symbolPreference1: nomination.symbolPreferences?.[0]?.symbolId || "",
-    symbolPreference2: nomination.symbolPreferences?.[1]?.symbolId || "",
-    symbolPreference3: nomination.symbolPreferences?.[2]?.symbolId || "",
+    symbolPreference1:
+      nomination.symbolPreferences?.[0]?.symbol?.name ||
+      nomination.symbolPreferences?.[0]?.symbolId ||
+      "",
+    symbolPreference2:
+      nomination.symbolPreferences?.[1]?.symbol?.name ||
+      nomination.symbolPreferences?.[1]?.symbolId ||
+      "",
+    symbolPreference3:
+      nomination.symbolPreferences?.[2]?.symbol?.name ||
+      nomination.symbolPreferences?.[2]?.symbolId ||
+      "",
     shuffleCount: 0,
     shuffledSymbols: [],
   };
@@ -210,6 +219,12 @@ export function NominationSubmissionProvider({
 
           const latestSubmission = submissions[submissions.length - 1];
           const firstSubmission = submissions[0];
+
+          // Count actual submissions (not drafts) - this should be based on submissionNumber field
+          const maxSubmissionNumber = submissions.reduce(
+            (max: number, nom: any) => Math.max(max, nom.submissionNumber || 0),
+            0,
+          );
           const submittedCount = submissions.filter(
             (s: any) => s.status !== "DRAFT",
           ).length;
@@ -235,7 +250,7 @@ export function NominationSubmissionProvider({
             wardName: latestFormData?.wardName || "",
             reservation: latestFormData?.reservation || "",
             constituency: latestFormData?.constituency || "",
-            submissionCount: submissions.length, // Use total count for consistency
+            submissionCount: maxSubmissionNumber, // Use actual submission count
             maxSubmissions: 3,
             applicationId: latestSubmission?.applicationNo || null,
             submissions,
@@ -263,17 +278,21 @@ export function NominationSubmissionProvider({
       const brProofUrl = brData?.proofUrl || null;
       const brProofPublicId = brData?.proofPublicId || null;
 
-      // Check if this is an update (2nd or 3rd submission) vs new nomination (1st submission)
-      const isUpdate = submissionData.submissionCount > 0;
-      const existingNomination =
-        submissionData.submissions?.[submissionData.submissions.length - 1];
+      // Check if this is an update: any existing nomination should be updated, not recreated
+      const hasExistingNomination =
+        submissionData.submissions && submissionData.submissions.length > 0;
+      const existingNomination = hasExistingNomination
+        ? submissionData.submissions[0]
+        : null; // Always use the first/main nomination
 
       let nominationId: string;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let createdNomination: any = null;
+      let processedNomination: any = null;
 
-      if (isUpdate && existingNomination) {
-        // Step 1: Update existing nomination
+      if (hasExistingNomination && existingNomination) {
+        // Update existing nomination (same ID, increment submission number)
+        const nextSubmissionNumber = submissionData.submissionCount + 1;
+
         const updateResponse = await fetch(
           `/api/nominations/${existingNomination.id}`,
           {
@@ -285,7 +304,7 @@ export function NominationSubmissionProvider({
               // Only include BR data if it's provided (for fresh uploads)
               ...(brData && { brNumber, brProofUrl, brProofPublicId }),
               isUpdate: true,
-              submissionNumber: submissionData.submissionCount + 1,
+              submissionNumber: nextSubmissionNumber,
             }),
           },
         );
@@ -298,8 +317,9 @@ export function NominationSubmissionProvider({
         }
 
         nominationId = existingNomination.id;
+        processedNomination = updateResult.nomination;
       } else {
-        // Step 1: Create new nomination draft (1st submission)
+        // Create new nomination draft (1st submission only)
         const createResponse = await fetch("/api/nominations", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -322,7 +342,7 @@ export function NominationSubmissionProvider({
         }
 
         nominationId = createResult.nomination?.id;
-        createdNomination = createResult.nomination;
+        processedNomination = createResult.nomination;
         if (!nominationId) {
           console.error("No nomination ID returned");
           return null;
@@ -335,7 +355,9 @@ export function NominationSubmissionProvider({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "submit",
-          submissionNumber: isUpdate ? submissionData.submissionCount + 1 : 1,
+          submissionNumber: hasExistingNomination
+            ? submissionData.submissionCount + 1
+            : 1,
         }),
       });
 
@@ -344,22 +366,18 @@ export function NominationSubmissionProvider({
       if (!submitResponse.ok || !submitResult.success) {
         // If submit fails (e.g. missing proposers/payment), the draft is still created/updated
         console.warn(
-          isUpdate
+          hasExistingNomination
             ? "Nomination updated but submission failed:"
             : "Nomination created as draft but submission failed:",
           submitResult.error,
         );
         // Still reload data and return result so the user sees success
         await loadNominationData();
-        return isUpdate ? existingNomination : createdNomination || null;
+        return processedNomination || existingNomination || null;
       }
 
       await loadNominationData();
-      return (
-        submitResult.nomination ||
-        (isUpdate ? existingNomination : createdNomination) ||
-        null
-      );
+      return submitResult.nomination || processedNomination || null;
     } catch (error) {
       console.error("Failed to submit nomination:", error);
       return null;

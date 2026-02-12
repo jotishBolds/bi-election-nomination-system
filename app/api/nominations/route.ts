@@ -302,6 +302,28 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      // Save symbol preferences if provided
+      const symbolPrefs = [
+        { name: rawFormData?.symbolPreference1, order: 1 },
+        { name: rawFormData?.symbolPreference2, order: 2 },
+        { name: rawFormData?.symbolPreference3, order: 3 },
+      ].filter((p) => p.name && p.name.trim() !== "");
+
+      for (const pref of symbolPrefs) {
+        const symbol = await db.electionSymbol.findFirst({
+          where: { name: pref.name },
+        });
+        if (symbol) {
+          await db.symbolPreference.create({
+            data: {
+              nominationId,
+              symbolId: symbol.id,
+              preferenceOrder: pref.order,
+            },
+          });
+        }
+      }
+
       // Link BR payment from sessionStorage data passed in request
       const brNumber = rawFormData?.brNumber || body.brNumber;
       const brProofUrl = rawFormData?.brProofUrl || body.brProofUrl;

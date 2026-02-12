@@ -38,9 +38,14 @@ const schema = z.object({
 interface StepProposerInfoProps {
   onNext: () => void;
   onBack: () => void;
+  isUpdate?: boolean;
 }
 
-export function StepProposerInfo({ onNext, onBack }: StepProposerInfoProps) {
+export function StepProposerInfo({
+  onNext,
+  onBack,
+  isUpdate = false,
+}: StepProposerInfoProps) {
   const { formData, updateFormData } = useNomination();
 
   const form = useForm({
@@ -94,7 +99,12 @@ export function StepProposerInfo({ onNext, onBack }: StepProposerInfoProps) {
                   <FormItem>
                     <FormLabel>Proposer's Full Name *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter proposer's name" {...field} />
+                      <Input
+                        placeholder="Enter proposer's name"
+                        {...field}
+                        disabled={isUpdate}
+                        className={isUpdate ? "bg-muted" : ""}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -113,6 +123,8 @@ export function StepProposerInfo({ onNext, onBack }: StepProposerInfoProps) {
                           placeholder="Enter 4-digit serial number"
                           maxLength={4}
                           {...field}
+                          disabled={isUpdate}
+                          className={isUpdate ? "bg-muted" : ""}
                         />
                       </FormControl>
                       <FormMessage />
@@ -131,6 +143,8 @@ export function StepProposerInfo({ onNext, onBack }: StepProposerInfoProps) {
                           placeholder="Enter 4-digit part number"
                           maxLength={4}
                           {...field}
+                          disabled={isUpdate}
+                          className={isUpdate ? "bg-muted" : ""}
                         />
                       </FormControl>
                       <FormMessage />

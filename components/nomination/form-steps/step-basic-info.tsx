@@ -147,9 +147,13 @@ const schema = z
 
 interface StepBasicInfoProps {
   onNext: () => void;
+  isUpdate?: boolean;
 }
 
-export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
+export function StepBasicInfo({
+  onNext,
+  isUpdate = false,
+}: StepBasicInfoProps) {
   const { formData, updateFormData } = useNomination();
 
   // State for API data
@@ -187,6 +191,9 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
 
   // Check if voter data is populated (either from current selection or loaded from existing nomination)
   const isVoterDataPopulated = !!selectedVoter || !!formData.epicNumber;
+
+  // On update, disable all previously populated fields
+  const isFieldDisabled = isUpdate || isVoterDataPopulated;
 
   const form = useForm({
     resolver: zodResolver(schema),
@@ -507,7 +514,8 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
       affidavitUrl: affidavitUrl,
       addressProofFile: addressProofFile?.name || "",
       addressProofUrl: addressProofUrl,
-      epicNumber: selectedVoter?.epicNumber || epicSearch || "",
+      epicNumber:
+        selectedVoter?.epicNumber || epicSearch || formData.epicNumber || "",
     });
     onNext();
   };
@@ -573,6 +581,7 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                           <Select
                             onValueChange={field.onChange}
                             defaultValue={field.value}
+                            disabled={isUpdate}
                           >
                             <FormControl>
                               <SelectTrigger>
@@ -611,7 +620,9 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                           <Select
                             onValueChange={field.onChange}
                             defaultValue={field.value}
-                            disabled={!watchDistrictId || ulbs.length === 0}
+                            disabled={
+                              isUpdate || !watchDistrictId || ulbs.length === 0
+                            }
                           >
                             <FormControl>
                               <SelectTrigger>
@@ -647,7 +658,9 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                           <Select
                             onValueChange={field.onChange}
                             defaultValue={field.value}
-                            disabled={!watchUlbId || wards.length === 0}
+                            disabled={
+                              isUpdate || !watchUlbId || wards.length === 0
+                            }
                           >
                             <FormControl>
                               <SelectTrigger>
@@ -703,20 +716,20 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                   Search EPIC Number to auto-fill applicant details
                 </div>
                 <Popover
-                  open={epicPopoverOpen && !isVoterDataPopulated}
+                  open={epicPopoverOpen && !isFieldDisabled}
                   onOpenChange={(open) =>
-                    !isVoterDataPopulated && setEpicPopoverOpen(open)
+                    !isFieldDisabled && setEpicPopoverOpen(open)
                   }
                 >
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       role="combobox"
-                      className={`w-full justify-between font-normal h-10 ${isVoterDataPopulated ? "bg-muted cursor-not-allowed" : ""}`}
+                      className={`w-full justify-between font-normal h-10 ${isFieldDisabled ? "bg-muted cursor-not-allowed" : ""}`}
                       onClick={() =>
-                        !isVoterDataPopulated && setEpicPopoverOpen(true)
+                        !isFieldDisabled && setEpicPopoverOpen(true)
                       }
-                      disabled={isVoterDataPopulated}
+                      disabled={isFieldDisabled}
                     >
                       {selectedVoter || formData.epicNumber ? (
                         <span className="truncate">
@@ -805,8 +818,8 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                       <Input
                         placeholder="Enter your full name"
                         {...field}
-                        disabled={isVoterDataPopulated}
-                        className={isVoterDataPopulated ? "bg-muted" : ""}
+                        disabled={isFieldDisabled}
+                        className={isFieldDisabled ? "bg-muted" : ""}
                       />
                     </FormControl>
                     <FormMessage />
@@ -824,8 +837,8 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                       <Input
                         placeholder="Enter father's or husband's name"
                         {...field}
-                        disabled={isVoterDataPopulated}
-                        className={isVoterDataPopulated ? "bg-muted" : ""}
+                        disabled={isFieldDisabled}
+                        className={isFieldDisabled ? "bg-muted" : ""}
                       />
                     </FormControl>
                     <FormMessage />
@@ -842,9 +855,9 @@ export function StepBasicInfo({ onNext }: StepBasicInfoProps) {
                     <FormControl>
                       <Textarea
                         placeholder="Enter complete postal address"
-                        className={`min-h-[100px] ${isVoterDataPopulated ? "bg-muted" : ""}`}
+                        className={`min-h-[100px] ${isFieldDisabled ? "bg-muted" : ""}`}
                         {...field}
-                        disabled={isVoterDataPopulated}
+                        disabled={isFieldDisabled}
                       />
                     </FormControl>
                     <FormMessage />
