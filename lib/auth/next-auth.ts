@@ -145,10 +145,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const roles = user.roles.map((r) => r.role);
         const primaryRole = roles[0] || Role.CANDIDATE;
 
+        // Check if user is RO or SUPER_ADMIN (privileged)
+        const isPrivilegedUser =
+          roles.includes(Role.RO) || roles.includes(Role.SUPER_ADMIN);
+
         // Check TOTP requirement for RO and SUPER_ADMIN
-        const requiresTOTP =
-          (roles.includes(Role.RO) || roles.includes(Role.SUPER_ADMIN)) &&
-          user.totpSecret?.isEnabled;
+        const totpIsEnabled = user.totpSecret?.isEnabled ?? false;
+        const requiresTOTP = isPrivilegedUser && totpIsEnabled;
+
+        // For privileged users without TOTP set up, indicate setup is needed
+        const needsTOTPSetup = isPrivilegedUser && !totpIsEnabled;
 
         // If TOTP is required but not provided
         if (requiresTOTP && !totpCode) {
@@ -166,8 +172,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           };
         }
 
-        // Verify TOTP if required
-        if (requiresTOTP && totpCode && user.totpSecret?.secret) {
+        // If privileged user needs TOTP setup (not set up yet)
+        if (needsTOTPSetup && !totpCode) {
+          // Return user with flag indicating TOTP setup is needed
+          return {
+            id: user.id,
+            email: user.email || "",
+            phone: user.phone || "",
+            name: user.name,
+            role: primaryRole,
+            roles,
+            requiresTOTP: true,
+            totpVerified: false,
+          };
+        }
+
+        // Verify TOTP if provided (both for enabled TOTP and newly-set-up TOTP)
+        if (isPrivilegedUser && totpCode && user.totpSecret?.secret) {
           const isValidTOTP = verifyTOTP(totpCode, user.totpSecret.secret);
           if (!isValidTOTP) {
             throw new Error("Invalid authenticator code");
@@ -209,8 +230,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           name: user.name,
           role: primaryRole,
           roles,
-          requiresTOTP: !!requiresTOTP,
-          totpVerified: requiresTOTP ? !!totpCode : true,
+          requiresTOTP: isPrivilegedUser && !totpCode,
+          totpVerified: isPrivilegedUser ? !!totpCode : true,
         };
       },
     }),
@@ -221,6 +242,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       credentials: {
         phone: { label: "Phone", type: "tel" },
         otpVerified: { label: "OTP Verified", type: "text" },
+        totpVerified: { label: "TOTP Verified", type: "text" },
       },
       async authorize(credentials, request) {
         if (!credentials?.phone) {
@@ -229,11 +251,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const phone = credentials.phone as string;
         const otpVerified = credentials.otpVerified === "true";
-
-        // OTP must be verified before calling this provider
-        if (!otpVerified) {
-          throw new Error("OTP verification required");
-        }
+        const totpVerified = credentials.totpVerified === "true";
 
         // Find user by phone
         const user = await db.user.findUnique({
@@ -259,6 +277,27 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const roles = user.roles.map((r) => r.role);
         const primaryRole = roles[0] || Role.CANDIDATE;
 
+        // Check if user is RO or SUPER_ADMIN (privileged)
+        const isPrivilegedUser =
+          roles.includes(Role.RO) || roles.includes(Role.SUPER_ADMIN);
+
+        if (isPrivilegedUser) {
+          // RO/Admin: Require TOTP verification (not SMS OTP)
+          if (!totpVerified) {
+            throw new Error(
+              "Authenticator verification required for RO/Admin login",
+            );
+          }
+
+          // TOTP was verified via /api/auth/totp/login-verify before reaching here
+          // The client-side code handles the TOTP verification flow
+        } else {
+          // Candidate: Require SMS OTP verification (existing flow)
+          if (!otpVerified) {
+            throw new Error("OTP verification required");
+          }
+        }
+
         // Update last login
         const clientIp = getClientIP(request as Request);
         await db.user.update({
@@ -281,7 +320,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             ipAddress: clientIp,
             userAgent:
               (request as Request).headers.get("user-agent") || "Unknown",
-            metadata: { method: "phone-otp" },
+            metadata: {
+              method: isPrivilegedUser ? "phone-totp" : "phone-otp",
+            },
           },
         });
 

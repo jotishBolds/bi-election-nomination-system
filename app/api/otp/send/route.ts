@@ -5,7 +5,7 @@ import { generateOTP, hashOTP, getClientIP } from "@/lib/auth/server-utils";
 import { storeOTP, checkRateLimit } from "@/lib/memory-store";
 import { sendOTPSms, isThunderSMSConfigured } from "@/lib/sms/thundersms";
 import { z } from "zod";
-import { OTPType, OTPStatus } from "@prisma/client";
+import { OTPType, OTPStatus, Role } from "@prisma/client";
 
 const sendOTPSchema = z.object({
   identifier: z.string().min(1), // Phone or email
@@ -26,6 +26,9 @@ export async function POST(request: NextRequest) {
 
     const clientIp = getClientIP(request);
 
+    // Track if this is an RO/Admin needing TOTP setup (phone login, first time)
+    let needsTOTPSetup = false;
+
     // For LOGIN type, check if user exists in database first
     if (type === "LOGIN") {
       const isEmail = identifier.includes("@");
@@ -33,6 +36,10 @@ export async function POST(request: NextRequest) {
         where: isEmail
           ? { email: identifier.toLowerCase() }
           : { phone: identifier },
+        include: {
+          roles: { where: { isActive: true } },
+          totpSecret: true,
+        },
       });
 
       if (!user) {
@@ -54,6 +61,42 @@ export async function POST(request: NextRequest) {
           },
           { status: 403 },
         );
+      }
+
+      // Check if user is RO or SUPER_ADMIN — they use TOTP instead of SMS OTP
+      const userRoles = user.roles.map((r) => r.role);
+      const isPrivilegedUser =
+        userRoles.includes(Role.RO) || userRoles.includes(Role.SUPER_ADMIN);
+
+      if (isPrivilegedUser) {
+        const totpEnabled = user.totpSecret?.isEnabled ?? false;
+
+        if (totpEnabled) {
+          // TOTP is enabled — skip SMS OTP entirely, client shows TOTP input
+          return NextResponse.json({
+            success: true,
+            requiresTOTP: true,
+            totpEnabled: true,
+            message: "Enter the code from your authenticator app",
+          });
+        } else {
+          // TOTP not set up yet
+          if (channel === "sms") {
+            // Phone login: Send one-time SMS OTP for identity verification before TOTP setup
+            // Fall through to normal OTP sending below, but flag that TOTP setup is needed
+            needsTOTPSetup = true;
+          } else {
+            // Email login: Password already verifies identity, skip SMS OTP
+            // Client will show TOTP setup flow directly
+            return NextResponse.json({
+              success: true,
+              requiresTOTP: true,
+              totpEnabled: false,
+              message:
+                "Two-factor authentication setup required. You will be guided through the setup.",
+            });
+          }
+        }
       }
     }
 
@@ -136,10 +179,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `OTP sent to your ${channel === "sms" ? "phone" : "email"}`,
+      message: needsTOTPSetup
+        ? "OTP sent for identity verification. You will need to set up two-factor authentication."
+        : `OTP sent to your ${channel === "sms" ? "phone" : "email"}`,
       expiresIn: expiryMinutes * 60, // seconds
       remaining: rateLimit.remaining,
       smsSent,
+      // Flag for RO/Admin TOTP setup requirement
+      ...(needsTOTPSetup && { requiresTOTP: true, totpEnabled: false }),
       // In development, also return OTP for testing
       ...(process.env.NODE_ENV === "development" && { devOtp: otp }),
     });
