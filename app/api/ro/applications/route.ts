@@ -1,42 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth/next-auth";
-
-// Helper to get RO's jurisdiction filter
-async function getROJurisdictionFilter(userId: string) {
-  const userJurisdictions = await db.userJurisdiction.findMany({
-    where: { userId },
-  });
-
-  if (userJurisdictions.length === 0) {
-    return null;
-  }
-
-  const ulbIds: string[] = [];
-  const districtIds: string[] = [];
-
-  userJurisdictions.forEach((j) => {
-    if (j.ulbId) {
-      ulbIds.push(j.ulbId);
-    } else if (j.districtId) {
-      districtIds.push(j.districtId);
-    }
-  });
-
-  const wardFilter: Record<string, unknown> = {};
-  if (ulbIds.length > 0 && districtIds.length > 0) {
-    wardFilter.OR = [
-      { ulbId: { in: ulbIds } },
-      { ulb: { districtId: { in: districtIds } } },
-    ];
-  } else if (ulbIds.length > 0) {
-    wardFilter.ulbId = { in: ulbIds };
-  } else if (districtIds.length > 0) {
-    wardFilter.ulb = { districtId: { in: districtIds } };
-  }
-
-  return wardFilter;
-}
+import { buildJurisdictionFilter } from "@/lib/services/ro-jurisdiction";
 
 // GET /api/ro/applications - Get nominations in RO's jurisdiction
 export async function GET(request: NextRequest) {
@@ -55,15 +20,16 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const wardId = searchParams.get("wardId");
+    const ulbId = searchParams.get("ulbId");
     const search = searchParams.get("search");
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
 
     const where: Record<string, unknown> = {};
 
-    // Filter by RO's jurisdiction if user is RO
+    // Scope to RO's jurisdiction
     if (session.user.role === "RO") {
-      const wardFilter = await getROJurisdictionFilter(session.user.id);
+      const wardFilter = await buildJurisdictionFilter(session.user.id);
       if (!wardFilter) {
         return NextResponse.json({
           success: true,
@@ -79,9 +45,15 @@ export async function GET(request: NextRequest) {
       where.status = status;
     }
 
-    // Filter by ward
+    // Filter by specific ward (narrows within jurisdiction)
     if (wardId && wardId !== "all") {
       where.wardId = wardId;
+      delete (where as any).ward;
+    }
+
+    // Filter by ULB (narrows within jurisdiction)
+    if (ulbId && ulbId !== "all") {
+      where.ulbId = ulbId;
     }
 
     // Search by candidate name or application number

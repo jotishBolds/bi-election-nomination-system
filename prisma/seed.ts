@@ -47,7 +47,7 @@ const sikkimData = {
         {
           name: "Gyalshing Nagar Panchayat",
           code: "GNP",
-          type: "Nagar Panchayat",
+          type: "NAGAR_PANCHAYAT",
           wards: [
             {
               wardNo: 1,
@@ -90,7 +90,7 @@ const sikkimData = {
         {
           name: "Soreng Nagar Panchayat",
           code: "SNP",
-          type: "Nagar Panchayat",
+          type: "NAGAR_PANCHAYAT",
           wards: [
             {
               wardNo: 1,
@@ -127,7 +127,7 @@ const sikkimData = {
         {
           name: "Namchi Municipal Council",
           code: "NMC",
-          type: "Municipal Council",
+          type: "MUNICIPALITY",
           wards: [
             {
               wardNo: 1,
@@ -182,7 +182,7 @@ const sikkimData = {
         {
           name: "Gangtok Municipal Corporation",
           code: "GMC",
-          type: "Municipal Corporation",
+          type: "MUNICIPAL_CORPORATION",
           wards: [
             {
               wardNo: 1,
@@ -303,7 +303,7 @@ const sikkimData = {
         {
           name: "Singtam Nagar Panchayat",
           code: "STNP",
-          type: "Nagar Panchayat",
+          type: "NAGAR_PANCHAYAT",
           wards: [
             {
               wardNo: 1,
@@ -340,7 +340,7 @@ const sikkimData = {
         {
           name: "Rangpo Nagar Panchayat",
           code: "RNP",
-          type: "Nagar Panchayat",
+          type: "NAGAR_PANCHAYAT",
           wards: [
             {
               wardNo: 1,
@@ -377,7 +377,7 @@ const sikkimData = {
         {
           name: "Jorethang Nagar Panchayat",
           code: "JNP",
-          type: "Nagar Panchayat",
+          type: "NAGAR_PANCHAYAT",
           wards: [
             {
               wardNo: 1,
@@ -420,7 +420,7 @@ const sikkimData = {
         {
           name: "Mangan Nagar Panchayat",
           code: "MNP",
-          type: "Nagar Panchayat",
+          type: "NAGAR_PANCHAYAT",
           wards: [
             {
               wardNo: 1,
@@ -457,7 +457,7 @@ const sikkimData = {
         {
           name: "Pakyong Nagar Panchayat",
           code: "PNP",
-          type: "Nagar Panchayat",
+          type: "NAGAR_PANCHAYAT",
           wards: [
             {
               wardNo: 1,

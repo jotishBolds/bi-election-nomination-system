@@ -1,42 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth/next-auth";
-
-// Helper to get RO's jurisdiction filter
-async function getROJurisdictionFilter(userId: string) {
-  const userJurisdictions = await db.userJurisdiction.findMany({
-    where: { userId },
-  });
-
-  if (userJurisdictions.length === 0) {
-    return null;
-  }
-
-  const ulbIds: string[] = [];
-  const districtIds: string[] = [];
-
-  userJurisdictions.forEach((j) => {
-    if (j.ulbId) {
-      ulbIds.push(j.ulbId);
-    } else if (j.districtId) {
-      districtIds.push(j.districtId);
-    }
-  });
-
-  const wardFilter: Record<string, unknown> = {};
-  if (ulbIds.length > 0 && districtIds.length > 0) {
-    wardFilter.OR = [
-      { ulbId: { in: ulbIds } },
-      { ulb: { districtId: { in: districtIds } } },
-    ];
-  } else if (ulbIds.length > 0) {
-    wardFilter.ulbId = { in: ulbIds };
-  } else if (districtIds.length > 0) {
-    wardFilter.ulb = { districtId: { in: districtIds } };
-  }
-
-  return wardFilter;
-}
+import { buildJurisdictionFilter } from "@/lib/services/ro-jurisdiction";
 
 // GET /api/ro/contest - Get final contestant list
 export async function GET(request: NextRequest) {
@@ -63,7 +28,7 @@ export async function GET(request: NextRequest) {
 
     // Filter by RO's jurisdiction if user is RO
     if (session.user.role === "RO") {
-      const wardFilter = await getROJurisdictionFilter(session.user.id);
+      const wardFilter = await buildJurisdictionFilter(session.user.id);
       if (!wardFilter) {
         return NextResponse.json({
           success: true,

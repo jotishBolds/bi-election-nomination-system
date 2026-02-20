@@ -1,12 +1,16 @@
 // RO (Returning Officer) Service - Server-side business logic
 import "server-only";
 import { db } from "@/lib/db";
-import { NominationStatus, AuditAction, Role } from "@prisma/client";
+import { NominationStatus, AuditAction } from "@prisma/client";
 import { validateActionAllowed } from "@/lib/services/election-time";
 import {
   sendNotification,
   NotificationTemplates,
 } from "@/lib/services/notifications";
+import {
+  hasAccessToWard,
+  buildJurisdictionFilter,
+} from "@/lib/services/ro-jurisdiction";
 
 interface ReceiveNominationInput {
   nominationId: string;
@@ -32,41 +36,8 @@ interface WithdrawalInput {
   ipAddress: string;
 }
 
-// Validate RO jurisdiction
-export async function validateROJurisdiction(
-  roUserId: string,
-  wardId: string,
-): Promise<boolean> {
-  const jurisdiction = await db.userJurisdiction.findFirst({
-    where: {
-      userId: roUserId,
-      isActive: true,
-      OR: [
-        { wardId },
-        {
-          ulb: {
-            wards: {
-              some: { id: wardId },
-            },
-          },
-        },
-        {
-          district: {
-            ulbs: {
-              some: {
-                wards: {
-                  some: { id: wardId },
-                },
-              },
-            },
-          },
-        },
-      ],
-    },
-  });
-
-  return !!jurisdiction;
-}
+// NOTE: validateROJurisdiction has been replaced by hasAccessToWard()
+// from @/lib/services/ro-jurisdiction. All callers below use that directly.
 
 // Get nominations for RO's jurisdiction
 export async function getRONominations(
@@ -78,55 +49,19 @@ export async function getRONominations(
     search?: string;
   },
 ) {
-  // Get RO's jurisdictions
-  const jurisdictions = await db.userJurisdiction.findMany({
-    where: {
-      userId: roUserId,
-      isActive: true,
-    },
-    include: {
-      ward: true,
-      ulb: {
-        include: {
-          wards: true,
-        },
-      },
-      district: {
-        include: {
-          ulbs: {
-            include: {
-              wards: true,
-            },
-          },
-        },
-      },
-    },
-  });
+  const wardFilter = await buildJurisdictionFilter(roUserId);
+  if (!wardFilter) return [];
 
-  // Build ward IDs list
-  const wardIds: string[] = [];
-  for (const j of jurisdictions) {
-    if (j.wardId) {
-      wardIds.push(j.wardId);
-    } else if (j.ulb) {
-      wardIds.push(...j.ulb.wards.map((w) => w.id));
-    } else if (j.district) {
-      for (const ulb of j.district.ulbs) {
-        wardIds.push(...ulb.wards.map((w) => w.id));
-      }
-    }
-  }
-
-  const where: any = {
-    wardId: { in: wardIds },
-  };
+  const where: any = { ward: wardFilter };
 
   if (filters?.status?.length) {
     where.status = { in: filters.status };
   }
 
+  // Narrow to a specific ward (overrides broader ward filter)
   if (filters?.wardId) {
     where.wardId = filters.wardId;
+    delete where.ward;
   }
 
   if (filters?.ulbId) {
@@ -201,7 +136,7 @@ export async function receiveNomination(
     }
 
     // Validate RO jurisdiction
-    const hasJurisdiction = await validateROJurisdiction(
+    const hasJurisdiction = await hasAccessToWard(
       input.roUserId,
       nomination.wardId,
     );
@@ -303,7 +238,7 @@ export async function scrutinizeNomination(
     }
 
     // Validate RO jurisdiction
-    const hasJurisdiction = await validateROJurisdiction(
+    const hasJurisdiction = await hasAccessToWard(
       input.roUserId,
       nomination.wardId,
     );
@@ -426,7 +361,7 @@ export async function processWithdrawal(
     }
 
     // Validate RO jurisdiction
-    const hasJurisdiction = await validateROJurisdiction(
+    const hasJurisdiction = await hasAccessToWard(
       input.roUserId,
       nomination.wardId,
     );
@@ -496,54 +431,14 @@ export async function processWithdrawal(
 
 // Get statistics for RO dashboard
 export async function getRODashboardStats(roUserId: string) {
-  // Get RO's jurisdictions
-  const jurisdictions = await db.userJurisdiction.findMany({
-    where: {
-      userId: roUserId,
-      isActive: true,
-    },
-    include: {
-      ward: true,
-      ulb: {
-        include: {
-          wards: true,
-        },
-      },
-      district: {
-        include: {
-          ulbs: {
-            include: {
-              wards: true,
-            },
-          },
-        },
-      },
-    },
-  });
-
-  // Build ward IDs list
-  const wardIds: string[] = [];
-  for (const j of jurisdictions) {
-    if (j.wardId) {
-      wardIds.push(j.wardId);
-    } else if (j.ulb) {
-      wardIds.push(...j.ulb.wards.map((w) => w.id));
-    } else if (j.district) {
-      for (const ulb of j.district.ulbs) {
-        wardIds.push(...ulb.wards.map((w) => w.id));
-      }
-    }
-  }
+  const wardFilter = await buildJurisdictionFilter(roUserId);
+  const nominationWhere = wardFilter ? { ward: wardFilter } : {};
 
   // Get counts by status
   const statusCounts = await db.nominationApplication.groupBy({
     by: ["status"],
-    where: {
-      wardId: { in: wardIds },
-    },
-    _count: {
-      id: true,
-    },
+    where: nominationWhere,
+    _count: { id: true },
   });
 
   const stats = {
@@ -589,15 +484,16 @@ export async function getRODashboardStats(roUserId: string) {
   // Get ward-wise breakdown
   const wardStats = await db.nominationApplication.groupBy({
     by: ["wardId", "status"],
-    where: {
-      wardId: { in: wardIds },
-    },
-    _count: {
-      id: true,
-    },
+    where: nominationWhere,
+    _count: { id: true },
   });
 
-  return { stats, wardStats, totalWards: wardIds.length };
+  // Count total wards in jurisdiction
+  const totalWards = await db.ward.count({
+    where: wardFilter ? wardFilter : {},
+  });
+
+  return { stats, wardStats, totalWards };
 }
 
 // Mark accepted nominations as contesting (after withdrawal period)
@@ -608,7 +504,7 @@ export async function finalizeContestingCandidates(
 ): Promise<{ success: boolean; count: number; error?: string }> {
   try {
     // Validate RO jurisdiction
-    const hasJurisdiction = await validateROJurisdiction(roUserId, wardId);
+    const hasJurisdiction = await hasAccessToWard(roUserId, wardId);
     if (!hasJurisdiction) {
       return { success: false, count: 0, error: "No jurisdiction" };
     }
