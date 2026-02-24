@@ -1,21 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { auth } from "@/lib/auth/next-auth";
+import { Role } from "@prisma/client";
+import { requireRoles } from "@/lib/auth/auth-guard";
 import { buildJurisdictionFilter } from "@/lib/services/ro-jurisdiction";
 
 // GET /api/ro/reports - Get RO jurisdiction reports
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    if (
-      !session?.user ||
-      !["SUPER_ADMIN", "SES", "RO"].includes(session.user.role)
-    ) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+    const session = await requireRoles([Role.RO, Role.SES, Role.SUPER_ADMIN]);
 
     const { searchParams } = new URL(request.url);
     const reportType = searchParams.get("type") || "overview";
@@ -170,7 +162,13 @@ export async function GET(request: NextRequest) {
       success: false,
       error: "Invalid report type",
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message === "UNAUTHORIZED") {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+    if (error.message === "FORBIDDEN") {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
     console.error("Error generating RO reports:", error);
     return NextResponse.json(
       { success: false, error: "Failed to generate reports" },

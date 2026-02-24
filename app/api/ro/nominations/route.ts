@@ -1,27 +1,13 @@
-// RO Dashboard API - Get Nominations for RO
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth/next-auth";
+import { Role } from "@prisma/client";
+import { requireRoles } from "@/lib/auth/auth-guard";
 import { getRONominations, getRODashboardStats } from "@/lib/services/ro";
 import { checkPortalTimeWindow } from "@/lib/services/election-time";
 
 export async function GET(request: NextRequest) {
   try {
-    // Check authentication
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
-
-    // Check RO role
-    if (session.user.role !== "RO") {
-      return NextResponse.json(
-        { success: false, error: "Forbidden - RO access required" },
-        { status: 403 },
-      );
-    }
+    // Check authentication and role
+    const session = await requireRoles([Role.RO]);
 
     // Check portal time window
     const timeCheck = await checkPortalTimeWindow();
@@ -60,7 +46,13 @@ export async function GET(request: NextRequest) {
       page,
       limit,
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message === "UNAUTHORIZED") {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+    if (error.message === "FORBIDDEN") {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
     console.error("RO nominations GET error:", error);
     return NextResponse.json(
       { success: false, error: "Internal server error" },

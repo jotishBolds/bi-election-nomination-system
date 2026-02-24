@@ -11,6 +11,9 @@ import {
   hasAccessToWard,
   buildJurisdictionFilter,
 } from "@/lib/services/ro-jurisdiction";
+import { generateOTP, hashOTP, getClientIP } from "@/lib/auth/server-utils";
+import { storeOTP, verifyOTP } from "@/lib/redis";
+import { OTPType, OTPStatus } from "@prisma/client";
 
 interface ReceiveNominationInput {
   nominationId: string;
@@ -131,6 +134,7 @@ export async function receiveNomination(
       return { success: false, error: "Nomination not found" };
     }
 
+    // Will use this later on when we know if the status needs to be strictly in submitted status
     if (nomination.status !== NominationStatus.SUBMITTED) {
       return { success: false, error: "Nomination is not in submitted status" };
     }
@@ -200,6 +204,190 @@ export async function receiveNomination(
   } catch (error) {
     console.error("Receive nomination error:", error);
     return { success: false, error: "Failed to receive nomination" };
+  }
+}
+
+/**
+ * Sends an OTP to the RO user to authorize receiving a nomination
+ */
+export async function sendROReceiptOTP(
+  nominationId: string,
+  roUserId: string,
+  ipAddress: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Verify nomination existence and status
+    const nomination = await db.nominationApplication.findUnique({
+      where: { id: nominationId },
+      select: { status: true, wardId: true },
+    });
+
+    if (!nomination) {
+      return { success: false, error: "Nomination not found" };
+    }
+
+    // Will use this later on when we know if the status needs to be strictly in submitted status
+    if (nomination.status !== NominationStatus.SUBMITTED) {
+      return { success: false, error: "Nomination is not in submitted status" };
+    }
+
+    // Verify RO jurisdiction
+    const hasJurisdiction = await hasAccessToWard(roUserId, nomination.wardId);
+    if (!hasJurisdiction) {
+      return {
+        success: false,
+        error: "Access denied - not in your jurisdiction",
+      };
+    }
+
+    // Get RO phone number and email
+    const roUser = await db.user.findUnique({
+      where: { id: roUserId },
+      select: { phone: true, email: true },
+    });
+
+    if (!roUser || !roUser.phone) {
+      return {
+        success: false,
+        error: "RO phone number not found for verification",
+      };
+    }
+
+    const identifier = roUser.phone.trim();
+
+    // Generate 6-digit OTP
+    const otp = generateOTP(6);
+    const otpHash = hashOTP(otp);
+    const expiryMinutes = parseInt(process.env.OTP_EXPIRY_MINUTES || "15");
+    const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
+
+    // Store in Redis for quick verification
+    await storeOTP(
+      identifier,
+      otpHash,
+      "RECEIPT_CONFIRMATION",
+      expiryMinutes * 60,
+    );
+
+    // Create entry in database (OTPLog) for audit
+    await db.oTPLog.create({
+      data: {
+        userId: roUserId,
+        phone: identifier,
+        email: roUser.email,
+        otpHash,
+        type: "RECEIPT_CONFIRMATION",
+        status: OTPStatus.PENDING,
+        maxAttempts: parseInt(process.env.OTP_MAX_ATTEMPTS || "3"),
+        expiresAt,
+        ipAddress,
+      },
+    });
+
+    // Send notification to RO
+    await sendNotification(
+      roUser.phone,
+      roUser.email,
+      "Nomination Receipt Authorization",
+      NotificationTemplates.OTP(otp, expiryMinutes),
+    );
+
+    console.info(
+      `[RO-Auth] Sent receipt OTP to RO (${roUser.phone}) for nomination ${nominationId}`,
+    );
+    if (process.env.NODE_ENV === "development") {
+      console.info(`[DEV] RO OTP: ${otp}`);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("sendROReceiptOTP error:", error);
+    return { success: false, error: "Failed to send authorization OTP" };
+  }
+}
+
+/**
+ * Verifies RO OTP and marks nomination as RECEIVED
+ */
+export async function receiveNominationWithROOTP(
+  nominationId: string,
+  otp: string,
+  roUserId: string,
+  ipAddress: string,
+): Promise<{ success: boolean; nomination?: any; error?: string }> {
+  try {
+    const rawOtp = otp.trim();
+    // Get RO details
+    const roUser = await db.user.findUnique({
+      where: { id: roUserId },
+      select: { phone: true, email: true },
+    });
+
+    if (!roUser || !roUser.phone) {
+      return { success: false, error: "RO user not found or phone missing" };
+    }
+
+    const identifier = roUser.phone.trim();
+
+    // Hash provided OTP for comparison
+    const otpHash = hashOTP(rawOtp);
+
+    console.info(`[RO-Auth] Attempting verification for RO ${roUserId} (${identifier})`);
+
+    // Verify OTP via Redis first (standard pattern)
+    const verification = await verifyOTP(
+      identifier,
+      otpHash,
+      "RECEIPT_CONFIRMATION",
+    );
+
+    if (!verification.valid) {
+      console.warn(`[RO-Auth] Verification failed for ${identifier}: valid=${verification.valid}, expired=${verification.expired}, maxAttempts=${verification.maxAttemptsReached}`);
+      if (verification.expired) return { success: false, error: "OTP expired" };
+      if (verification.maxAttemptsReached)
+        return { success: false, error: "Maximum attempts reached" };
+      return { success: false, error: "Invalid OTP" };
+    }
+
+    // Update OTP log in database to VERIFIED (mirroring api/otp/verify pattern)
+    try {
+      // Find the most recent pending OTP log, allowing for 10 min clock skew if any
+      const otpLog = await db.oTPLog.findFirst({
+        where: {
+          OR: [
+            { userId: roUserId },
+            { phone: identifier },
+          ],
+          type: "RECEIPT_CONFIRMATION",
+          status: OTPStatus.PENDING,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (otpLog) {
+        await db.oTPLog.update({
+          where: { id: otpLog.id },
+          data: {
+            status: OTPStatus.VERIFIED,
+            verifiedAt: new Date(),
+          },
+        });
+        console.info(`[RO-Auth] OTP verified for RO ${roUserId} (Log ID: ${otpLog.id})`);
+      }
+    } catch (dbError) {
+      console.warn("Failed to update OTP log in database:", dbError);
+    }
+
+    // Call existing receipt logic (which handles status update, logs, and candidate notification)
+    return receiveNomination({
+      nominationId,
+      roUserId,
+      ipAddress,
+      otpVerified: true,
+    });
+  } catch (error) {
+    console.error("receiveNominationWithROOTP error:", error);
+    return { success: false, error: "Failed to verify and process receipt" };
   }
 }
 

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { auth } from "@/lib/auth/next-auth";
+import { Role } from "@prisma/client";
+import { requireRoles } from "@/lib/auth/auth-guard";
+import { hasAccessToWard } from "@/lib/services/ro-jurisdiction";
 
 // GET /api/ro/applications/[id] - Get application details
 export async function GET(
@@ -8,16 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth();
-    if (
-      !session?.user ||
-      !["SUPER_ADMIN", "SES", "RO"].includes(session.user.role)
-    ) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+    const session = await requireRoles([Role.RO, Role.SES, Role.SUPER_ADMIN]);
 
     const { id } = await params;
 
@@ -26,6 +19,7 @@ export async function GET(
       include: {
         applicantProfile: {
           include: {
+            voterRecord: true,
             user: {
               select: {
                 id: true,
@@ -40,7 +34,11 @@ export async function GET(
           include: {
             ulb: {
               include: {
-                district: true,
+                district: {
+                  include: {
+                    state: true,
+                  },
+                },
               },
             },
           },
@@ -51,6 +49,13 @@ export async function GET(
         symbolPreferences: {
           include: {
             symbol: true,
+          },
+        },
+        documents: true,
+        payments: true,
+        statusHistory: {
+          orderBy: {
+            createdAt: "desc",
           },
         },
       },
@@ -64,19 +69,8 @@ export async function GET(
     }
 
     // Verify RO has jurisdiction over this application
-    if (session.user.role === "RO") {
-      const userJurisdictions = await db.userJurisdiction.findMany({
-        where: { userId: session.user.id },
-      });
-
-      const hasJurisdiction = userJurisdictions.some((j) => {
-        if (j.ulbId) {
-          return j.ulbId === application.ward?.ulbId;
-        } else if (j.districtId) {
-          return j.districtId === application.ward?.ulb?.districtId;
-        }
-        return false;
-      });
+    if (session.user.role === Role.RO) {
+      const hasJurisdiction = await hasAccessToWard(session.user.id, application.wardId);
 
       if (!hasJurisdiction) {
         return NextResponse.json(
@@ -90,7 +84,13 @@ export async function GET(
       success: true,
       data: application,
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message === "UNAUTHORIZED") {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+    if (error.message === "FORBIDDEN" || error.message.startsWith("UNAUTHORIZED_")) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 403 });
+    }
     console.error("Error fetching application:", error);
     return NextResponse.json(
       { success: false, error: "Failed to fetch application" },

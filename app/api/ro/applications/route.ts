@@ -1,21 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { auth } from "@/lib/auth/next-auth";
-import { buildJurisdictionFilter } from "@/lib/services/ro-jurisdiction";
+import { Role } from "@prisma/client";
+import { requireRoles } from "@/lib/auth/auth-guard";
+import {
+  buildJurisdictionFilter,
+  validateFilterAccess,
+} from "@/lib/services/ro-jurisdiction";
 
 // GET /api/ro/applications - Get nominations in RO's jurisdiction
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    if (
-      !session?.user ||
-      !["SUPER_ADMIN", "SES", "RO"].includes(session.user.role)
-    ) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+    const session = await requireRoles([Role.RO, Role.SES, Role.SUPER_ADMIN]);
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
@@ -27,8 +22,18 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = {};
 
-    // Scope to RO's jurisdiction
-    if (session.user.role === "RO") {
+    // Validate and scope to RO's jurisdiction
+    if (session.user.role === Role.RO) {
+      // Validate provided territory filters
+      if ((wardId && wardId !== "all") || (ulbId && ulbId !== "all")) {
+        await validateFilterAccess({
+          userId: session.user.id,
+          role: session.user.role,
+          wardId: wardId && wardId !== "all" ? wardId : undefined,
+          ulbId: ulbId && ulbId !== "all" ? ulbId : undefined,
+        });
+      }
+
       const wardFilter = await buildJurisdictionFilter(session.user.id);
       if (!wardFilter) {
         return NextResponse.json({
@@ -91,6 +96,7 @@ export async function GET(request: NextRequest) {
           },
           politicalParty: true,
           allocatedSymbol: true,
+          proposers: true,
         },
         orderBy: { submittedAt: "desc" },
         skip: (page - 1) * limit,
@@ -109,7 +115,13 @@ export async function GET(request: NextRequest) {
         totalPages: Math.ceil(total / limit),
       },
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message === "UNAUTHORIZED") {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+    if (error.message === "FORBIDDEN" || error.message.startsWith("UNAUTHORIZED_")) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 403 });
+    }
     console.error("Error fetching applications:", error);
     return NextResponse.json(
       { success: false, error: "Failed to fetch applications" },

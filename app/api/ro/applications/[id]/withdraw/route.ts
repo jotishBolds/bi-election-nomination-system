@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { auth } from "@/lib/auth/next-auth";
+import { Role } from "@prisma/client";
+import { requireRoles } from "@/lib/auth/auth-guard";
+import { hasAccessToWard } from "@/lib/services/ro-jurisdiction";
 
 // POST /api/ro/applications/[id]/withdraw - Process withdrawal request
 export async function POST(
@@ -8,16 +10,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth();
-    if (
-      !session?.user ||
-      !["SUPER_ADMIN", "SES", "RO"].includes(session.user.role)
-    ) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+    const session = await requireRoles([Role.RO, Role.SES, Role.SUPER_ADMIN]);
 
     const { id } = await params;
     const body = await request.json();
@@ -49,19 +42,8 @@ export async function POST(
     }
 
     // Verify RO has jurisdiction
-    if (session.user.role === "RO") {
-      const userJurisdictions = await db.userJurisdiction.findMany({
-        where: { userId: session.user.id },
-      });
-
-      const hasJurisdiction = userJurisdictions.some((j) => {
-        if (j.ulbId) {
-          return j.ulbId === application.ward?.ulbId;
-        } else if (j.districtId) {
-          return j.districtId === application.ward?.ulb?.districtId;
-        }
-        return false;
-      });
+    if (session.user.role === Role.RO) {
+      const hasJurisdiction = await hasAccessToWard(session.user.id, application.wardId);
 
       if (!hasJurisdiction) {
         return NextResponse.json(
@@ -152,16 +134,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth();
-    if (
-      !session?.user ||
-      !["SUPER_ADMIN", "SES", "RO"].includes(session.user.role)
-    ) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+    const session = await requireRoles([Role.RO, Role.SES, Role.SUPER_ADMIN]);
 
     const { id } = await params;
 
@@ -194,10 +167,16 @@ export async function GET(
       success: true,
       data: application,
     });
-  } catch (error) {
-    console.error("Error fetching withdrawal details:", error);
+  } catch (error: any) {
+    if (error.message === "UNAUTHORIZED") {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+    if (error.message === "FORBIDDEN") {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
+    console.error("Error with withdrawal details:", error);
     return NextResponse.json(
-      { success: false, error: "Failed to fetch withdrawal details" },
+      { success: false, error: "Failed to process request" },
       { status: 500 },
     );
   }

@@ -1,21 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { auth } from "@/lib/auth/next-auth";
+import { Role } from "@prisma/client";
+import { requireRoles } from "@/lib/auth/auth-guard";
 import { buildJurisdictionFilter } from "@/lib/services/ro-jurisdiction";
 
 // GET /api/ro/contest - Get final contestant list
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    if (
-      !session?.user ||
-      !["SUPER_ADMIN", "SES", "RO"].includes(session.user.role)
-    ) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+    const session = await requireRoles([Role.RO, Role.SES, Role.SUPER_ADMIN]);
 
     const { searchParams } = new URL(request.url);
     const wardId = searchParams.get("wardId");
@@ -169,10 +161,16 @@ export async function GET(request: NextRequest) {
         totalWards: Object.keys(wardSummary).length,
       },
     });
-  } catch (error) {
-    console.error("Error fetching contestants:", error);
+  } catch (error: any) {
+    if (error.message === "UNAUTHORIZED") {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+    if (error.message === "FORBIDDEN") {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
+    console.error("Error fetching contest list:", error);
     return NextResponse.json(
-      { success: false, error: "Failed to fetch contestants" },
+      { success: false, error: "Failed to fetch contest list" },
       { status: 500 },
     );
   }

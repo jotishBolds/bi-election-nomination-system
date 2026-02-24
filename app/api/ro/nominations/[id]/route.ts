@@ -1,16 +1,18 @@
 // RO API - Single Nomination Actions (Receive, Scrutiny)
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth/next-auth";
 import {
   receiveNomination,
   scrutinizeNomination,
   processWithdrawal,
 } from "@/lib/services/ro";
+import { db } from "@/lib/db";
+import { Role } from "@prisma/client";
+import { requireRoles } from "@/lib/auth/auth-guard";
+import { hasAccessToWard } from "@/lib/services/ro-jurisdiction";
 import {
   checkPortalTimeWindow,
   getElectionStatus,
 } from "@/lib/services/election-time";
-import { db } from "@/lib/db";
 
 // GET - Get single nomination details
 export async function GET(
@@ -18,13 +20,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth();
-    if (!session?.user || session.user.role !== "RO") {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+    const session = await requireRoles([Role.RO]);
 
     const { id } = await params;
 
@@ -76,8 +72,14 @@ export async function GET(
       );
     }
 
-    // TODO: Add jurisdiction check - look up user's assigned ward from UserJurisdiction table
-    // For now, we just verify the user is an RO (already checked above)
+    // Verify RO has jurisdiction over this nomination
+    const hasJurisdiction = await hasAccessToWard(session.user.id, nomination.wardId);
+    if (!hasJurisdiction) {
+      return NextResponse.json(
+        { success: false, error: "Access denied - not in your jurisdiction" },
+        { status: 403 },
+      );
+    }
 
     return NextResponse.json({ success: true, nomination });
   } catch (error) {
@@ -95,13 +97,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth();
-    if (!session?.user || session.user.role !== "RO") {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+    const session = await requireRoles([Role.RO]);
 
     // Check portal time window
     const timeCheck = await checkPortalTimeWindow();
@@ -232,7 +228,13 @@ export async function POST(
           { status: 400 },
         );
     }
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message === "UNAUTHORIZED") {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+    if (error.message === "FORBIDDEN") {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
     console.error("RO nomination action error:", error);
     return NextResponse.json(
       { success: false, error: "Internal server error" },
