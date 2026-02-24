@@ -38,18 +38,20 @@ import {
 } from "recharts";
 
 interface ROReportStats {
-  totalApplications: number;
+  totalNominations: number;
   pendingScrutiny: number;
-  underScrutiny: number;
-  approved: number;
+  accepted: number;
   rejected: number;
   withdrawn: number;
-  validContestants: number;
-  totalWards: number;
-  byWard: Array<{ wardNo: number; wardName: string; count: number }>;
-  byStatus: Array<{ status: string; count: number }>;
-  byParty: Array<{ party: string; count: number }>;
-  timeline: Array<{ date: string; submissions: number; approvals: number }>;
+  contesting: number;
+  statusDistribution: Array<{ status: string; count: number }>;
+  wardDistribution: Array<{
+    wardNo: number | null;
+    name: string;
+    count: number;
+  }>;
+  partyDistribution: Array<{ name: string; count: number }>;
+  reservationDistribution?: Array<{ category: string; count: number }>;
 }
 
 const COLORS = [
@@ -120,14 +122,12 @@ export function ROReportsPanel() {
 
     const csvData = [
       ["Metric", "Value"],
-      ["Total Applications", stats.totalApplications],
+      ["Total Applications", stats.totalNominations],
       ["Pending Scrutiny", stats.pendingScrutiny],
-      ["Under Scrutiny", stats.underScrutiny],
-      ["Approved", stats.approved],
+      ["Accepted", stats.accepted],
       ["Rejected", stats.rejected],
       ["Withdrawn", stats.withdrawn],
-      ["Valid Contestants", stats.validContestants],
-      ["Total Wards", stats.totalWards],
+      ["Contesting", stats.contesting],
     ];
 
     const csvContent = csvData.map((row) => row.join(",")).join("\n");
@@ -220,7 +220,7 @@ export function ROReportsPanel() {
             </div>
             <div className="mt-3">
               <p className="text-2xl font-bold text-slate-800">
-                {stats?.totalApplications || 0}
+                {stats?.totalNominations || 0}
               </p>
               <p className="text-xs text-slate-500 mt-1">Total Applications</p>
             </div>
@@ -231,11 +231,9 @@ export function ROReportsPanel() {
             <div className="flex items-center justify-between">
               <Clock className="h-5 w-5 text-amber-600" />
               <Badge className="bg-amber-100 text-amber-700 text-xs">
-                {stats?.totalApplications
+                {stats?.totalNominations
                   ? Math.round(
-                      ((stats.pendingScrutiny + stats.underScrutiny) /
-                        stats.totalApplications) *
-                        100,
+                      (stats.pendingScrutiny / stats.totalNominations) * 100,
                     )
                   : 0}
                 %
@@ -243,7 +241,7 @@ export function ROReportsPanel() {
             </div>
             <div className="mt-3">
               <p className="text-2xl font-bold text-slate-800">
-                {(stats?.pendingScrutiny || 0) + (stats?.underScrutiny || 0)}
+                {stats?.pendingScrutiny || 0}
               </p>
               <p className="text-xs text-slate-500 mt-1">Pending Review</p>
             </div>
@@ -254,17 +252,17 @@ export function ROReportsPanel() {
             <div className="flex items-center justify-between">
               <CheckCircle className="h-5 w-5 text-emerald-600" />
               <Badge className="bg-emerald-100 text-emerald-700 text-xs">
-                {stats?.totalApplications
-                  ? Math.round((stats.approved / stats.totalApplications) * 100)
+                {stats?.totalNominations
+                  ? Math.round((stats.accepted / stats.totalNominations) * 100)
                   : 0}
                 %
               </Badge>
             </div>
             <div className="mt-3">
               <p className="text-2xl font-bold text-slate-800">
-                {stats?.approved || 0}
+                {stats?.accepted || 0}
               </p>
-              <p className="text-xs text-slate-500 mt-1">Approved</p>
+              <p className="text-xs text-slate-500 mt-1">Accepted</p>
             </div>
           </CardContent>
         </Card>
@@ -273,8 +271,8 @@ export function ROReportsPanel() {
             <div className="flex items-center justify-between">
               <XCircle className="h-5 w-5 text-red-600" />
               <Badge className="bg-red-100 text-red-700 text-xs">
-                {stats?.totalApplications
-                  ? Math.round((stats.rejected / stats.totalApplications) * 100)
+                {stats?.totalNominations
+                  ? Math.round((stats.rejected / stats.totalNominations) * 100)
                   : 0}
                 %
               </Badge>
@@ -298,7 +296,7 @@ export function ROReportsPanel() {
             </div>
             <div>
               <p className="text-xl font-bold text-slate-800">
-                {stats?.validContestants || 0}
+                {stats?.contesting || 0}
               </p>
               <p className="text-xs text-slate-500">Valid Contestants</p>
             </div>
@@ -311,7 +309,7 @@ export function ROReportsPanel() {
             </div>
             <div>
               <p className="text-xl font-bold text-slate-800">
-                {stats?.totalWards || 0}
+                {stats?.wardDistribution?.length || 0}
               </p>
               <p className="text-xs text-slate-500">Wards</p>
             </div>
@@ -337,9 +335,9 @@ export function ROReportsPanel() {
             </div>
             <div>
               <p className="text-xl font-bold text-slate-800">
-                {stats?.totalWards
+                {stats?.wardDistribution?.length
                   ? Math.round(
-                      (stats.validContestants / stats.totalWards) * 10,
+                      (stats.contesting / stats.wardDistribution.length) * 10,
                     ) / 10
                   : 0}
               </p>
@@ -359,11 +357,12 @@ export function ROReportsPanel() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {stats?.byStatus && stats.byStatus.length > 0 ? (
+            {stats?.statusDistribution &&
+            stats.statusDistribution.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
                   <Pie
-                    data={stats.byStatus}
+                    data={stats.statusDistribution}
                     dataKey="count"
                     nameKey="status"
                     cx="50%"
@@ -373,7 +372,7 @@ export function ROReportsPanel() {
                       `${status} (${(percent * 100).toFixed(0)}%)`
                     }
                   >
-                    {stats.byStatus.map((_, index) => (
+                    {stats.statusDistribution.map((_, index) => (
                       <Cell
                         key={`cell-${index}`}
                         fill={COLORS[index % COLORS.length]}
@@ -399,9 +398,9 @@ export function ROReportsPanel() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {stats?.byWard && stats.byWard.length > 0 ? (
+            {stats?.wardDistribution && stats.wardDistribution.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={stats.byWard}>
+                <BarChart data={stats.wardDistribution}>
                   <XAxis
                     dataKey="wardNo"
                     tick={{ fontSize: 12 }}
@@ -431,12 +430,12 @@ export function ROReportsPanel() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {stats?.byParty && stats.byParty.length > 0 ? (
+            {stats?.partyDistribution && stats.partyDistribution.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={stats.byParty} layout="vertical">
+                <BarChart data={stats.partyDistribution} layout="vertical">
                   <XAxis type="number" tick={{ fontSize: 12 }} />
                   <YAxis
-                    dataKey="party"
+                    dataKey="name"
                     type="category"
                     tick={{ fontSize: 11 }}
                     width={100}

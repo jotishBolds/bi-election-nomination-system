@@ -285,7 +285,7 @@ export async function createULB(
         districtId: data.districtId,
         name: data.name,
         code: data.code.toUpperCase(),
-        type: data.type,
+        type: data.type as import("@prisma/client").ULBType,
       },
     });
 

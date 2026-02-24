@@ -62,7 +62,7 @@ export async function initiatePayment(input: InitiatePaymentInput): Promise<{
       where: { id: input.nominationId },
       include: {
         applicantProfile: true,
-        payments: true,
+        brPayments: true,
       },
     });
 
@@ -71,8 +71,8 @@ export async function initiatePayment(input: InitiatePaymentInput): Promise<{
     }
 
     // Check if payment already completed
-    const existingPayment = nomination.payments?.find(
-      (p) => p.status === PaymentStatus.PAID,
+    const existingPayment = nomination.brPayments?.find(
+      (p: any) => p.status === PaymentStatus.PAID,
     );
     if (existingPayment) {
       return {

@@ -72,8 +72,11 @@ export function ElectionConfigPanel() {
       const result = await response.json();
 
       if (result.success) {
-        setConfig(result.data);
-        setEditedConfig(result.data);
+        const configData = Array.isArray(result.configs)
+          ? result.configs[0]
+          : result.configs;
+        setConfig(configData);
+        setEditedConfig(configData);
       } else {
         setError(result.error || "Failed to fetch election config");
       }
@@ -92,14 +95,14 @@ export function ElectionConfigPanel() {
     setIsSaving(true);
     try {
       const response = await fetch("/api/admin/election-config", {
-        method: "PUT",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editedConfig),
+        body: JSON.stringify({ configId: editedConfig.id, ...editedConfig }),
       });
       const result = await response.json();
 
       if (result.success) {
-        setConfig(result.data);
+        setConfig(result.config);
         setIsEditing(false);
       } else {
         alert(result.error || "Failed to save configuration");
@@ -113,10 +116,13 @@ export function ElectionConfigPanel() {
 
   const handleToggleLock = async () => {
     try {
-      const response = await fetch("/api/admin/election-config/lock", {
-        method: "POST",
+      const response = await fetch("/api/admin/election-config", {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isLocked: !config?.isLocked }),
+        body: JSON.stringify({
+          configId: config?.id,
+          isLocked: !config?.isLocked,
+        }),
       });
       const result = await response.json();
 

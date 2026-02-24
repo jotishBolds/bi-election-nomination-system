@@ -186,7 +186,7 @@ export function FormPreview({ onProceedToPayment, onBack }: FormPreviewProps) {
           {/* Proposer Section */}
           <div style={{ marginBottom: "24px" }}>
             <p style={{ margin: "12px 0" }}>
-              * I nominate as an applicant for election to the{" "}
+              * I nominate as a candidate for election to the{" "}
               <span
                 style={{
                   borderBottom: "1px solid #000",
@@ -214,7 +214,7 @@ export function FormPreview({ onProceedToPayment, onBack }: FormPreviewProps) {
             </p>
 
             <p style={{ margin: "12px 0" }}>
-              Applicant's name:{" "}
+              Candidate's name:{" "}
               <span
                 style={{
                   borderBottom: "1px solid #000",
@@ -258,7 +258,6 @@ export function FormPreview({ onProceedToPayment, onBack }: FormPreviewProps) {
               </span>
             </p>
 
-            {/*
             <p style={{ margin: "16px 0" }}>
               His name is entered at Serial No.{" "}
               <span
@@ -286,7 +285,6 @@ export function FormPreview({ onProceedToPayment, onBack }: FormPreviewProps) {
               </span>{" "}
               of electoral roll of the Municipality.
             </p>
-            */}
 
             <p style={{ margin: "16px 0" }}>
               My name is{" "}
@@ -385,10 +383,10 @@ export function FormPreview({ onProceedToPayment, onBack }: FormPreviewProps) {
             }}
           />
 
-          {/* Applicant Declaration Section */}
+          {/* Candidate Declaration Section */}
           <div style={{ marginBottom: "24px" }}>
             <p style={{ fontWeight: "500", marginBottom: "16px" }}>
-              I, the above mentioned applicant, assent to this nomination and
+              I, the above-mentioned candidate, assent to this nomination and
               hereby declare:-
             </p>
 
@@ -404,62 +402,13 @@ export function FormPreview({ onProceedToPayment, onBack }: FormPreviewProps) {
                     minWidth: "40px",
                   }}
                 >
-                  {formData.age}
+                  18
                 </span>{" "}
                 years of age.
               </p>
 
               <p style={{ margin: "10px 0" }}>
-                (b) that the symbol I have chosen is:
-              </p>
-
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "16px",
-                  margin: "12px 0 12px 30px",
-                  padding: "12px",
-                  backgroundColor: "#f5f5f5",
-                  borderRadius: "6px",
-                }}
-              >
-                {formData.partySymbolImage && (
-                  <img
-                    src={formData.partySymbolImage}
-                    alt={formData.partySymbol}
-                    style={{
-                      width: "60px",
-                      height: "60px",
-                      objectFit: "contain",
-                      border: "1px solid #ddd",
-                      backgroundColor: "white",
-                      padding: "4px",
-                      borderRadius: "4px",
-                    }}
-                  />
-                )}
-                <div>
-                  <p style={{ fontWeight: "600", margin: "0 0 4px 0" }}>
-                    {formData.partySymbol}
-                  </p>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      padding: "2px 10px",
-                      border: "1px solid #ccc",
-                      borderRadius: "4px",
-                      fontSize: "10pt",
-                      backgroundColor: "#fff",
-                    }}
-                  >
-                    {formData.politicalParty}
-                  </span>
-                </div>
-              </div>
-
-              <p style={{ margin: "10px 0" }}>
-                (c) that I am set up at this election by{" "}
+                (b) that I am set up at this election by{" "}
                 <span
                   style={{
                     borderBottom: "1px solid #000",
@@ -473,6 +422,60 @@ export function FormPreview({ onProceedToPayment, onBack }: FormPreviewProps) {
                 </span>{" "}
                 Political Party.
               </p>
+
+              <p style={{ margin: "10px 0" }}>
+                (c) that the symbols I have chosen are, in order of preference:
+              </p>
+
+              <div style={{ marginLeft: "30px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "16px",
+                    margin: "12px 0",
+                    padding: "12px",
+                    backgroundColor: "#f5f5f5",
+                    borderRadius: "6px",
+                  }}
+                >
+                  {formData.partySymbolImage && (
+                    <img
+                      src={formData.partySymbolImage}
+                      alt={formData.symbolPreference1}
+                      style={{
+                        width: "50px",
+                        height: "50px",
+                        objectFit: "contain",
+                        border: "1px solid #ddd",
+                        backgroundColor: "white",
+                        padding: "4px",
+                        borderRadius: "4px",
+                      }}
+                    />
+                  )}
+                  <div>
+                    <p style={{ margin: "2px 0" }}>
+                      (i){" "}
+                      <span style={{ fontWeight: "600" }}>
+                        {formData.symbolPreference1}
+                      </span>
+                    </p>
+                    <p style={{ margin: "2px 0" }}>
+                      (ii){" "}
+                      <span style={{ fontWeight: "600" }}>
+                        {formData.symbolPreference2}
+                      </span>
+                    </p>
+                    <p style={{ margin: "2px 0" }}>
+                      (iii){" "}
+                      <span style={{ fontWeight: "600" }}>
+                        {formData.symbolPreference3}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              </div>
 
               <p style={{ margin: "10px 0" }}>
                 (d) that my name and my *father's / husband's name have been
@@ -497,7 +500,7 @@ export function FormPreview({ onProceedToPayment, onBack }: FormPreviewProps) {
                 Municipality.
               </p>
 
-              {formData.category !== "general" && (
+              {formData.category !== "general" && formData.casteTribeName && (
                 <p style={{ margin: "10px 0" }}>
                   * I further declare that I am a member of the{" "}
                   <span
@@ -550,7 +553,7 @@ export function FormPreview({ onProceedToPayment, onBack }: FormPreviewProps) {
                   }}
                 >
                   <span style={{ fontSize: "10pt" }}>
-                    (Signature of applicant)
+                    (Signature of candidate)
                   </span>
                 </div>
               </div>

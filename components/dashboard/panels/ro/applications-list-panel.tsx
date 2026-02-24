@@ -45,40 +45,64 @@ import {
   Phone,
   Mail,
   Building,
+  Download,
+  CheckCheck,
+  Send,
+  Loader2,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { downloadForm18PDF } from "@/lib/form18-template";
 
 interface Nomination {
   id: string;
   applicationNo: string;
+  candidateName: string;
+  fatherHusbandName: string;
+  address: string;
+  dateOfBirth?: string;
+  age?: number;
+  gender?: string;
+  category: string;
   status: string;
   submittedAt: string;
   scrutinyStatus?: string;
   scrutinyAt?: string;
   scrutinyRemarks?: string;
   paymentStatus?: string;
-  candidate: {
-    id: string;
-    name: string;
-    phone: string;
-    email?: string;
-    dateOfBirth?: string;
-    address?: string;
+  applicantProfile?: {
+    user: {
+      id: string;
+      name: string;
+      phone: string;
+      email?: string;
+    };
   };
   ward: {
     id: string;
     wardNo: number;
     wardName: string;
-    reservationStatus: string;
+    reservationType?: string;
+    ulb?: {
+      name: string;
+      district?: {
+        name: string;
+      };
+    };
   };
   politicalParty?: {
     name: string;
-    shortName: string;
+    abbreviation: string;
+  };
+  allocatedSymbol?: {
+    name: string;
+    imagePath?: string;
   };
   documents?: Array<{
     id: string;
     type: string;
     fileName: string;
+    originalName?: string;
+    storagePath?: string;
   }>;
 }
 
@@ -89,6 +113,7 @@ export function ApplicationsListPanel() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [wardFilter, setWardFilter] = useState<string>("all");
+  const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
   const [selectedNomination, setSelectedNomination] =
     useState<Nomination | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
@@ -158,6 +183,11 @@ export function ApplicationsListPanel() {
         text: "text-blue-700",
         icon: <FileText className="h-3 w-3" />,
       },
+      RECEIVED: {
+        bg: "bg-cyan-100",
+        text: "text-cyan-700",
+        icon: <CheckCircle className="h-3 w-3" />,
+      },
       UNDER_SCRUTINY: {
         bg: "bg-amber-100",
         text: "text-amber-700",
@@ -167,6 +197,16 @@ export function ApplicationsListPanel() {
         bg: "bg-green-100",
         text: "text-green-700",
         icon: <CheckCircle className="h-3 w-3" />,
+      },
+      ACCEPTED: {
+        bg: "bg-green-100",
+        text: "text-green-700",
+        icon: <CheckCircle className="h-3 w-3" />,
+      },
+      CONTESTING: {
+        bg: "bg-purple-100",
+        text: "text-purple-700",
+        icon: <FileCheck className="h-3 w-3" />,
       },
       REJECTED: {
         bg: "bg-red-100",
@@ -198,11 +238,50 @@ export function ApplicationsListPanel() {
     setIsViewDialogOpen(true);
   };
 
+  const handleDownloadForm = async (nominationId: string) => {
+    try {
+      await downloadForm18PDF(nominationId);
+    } catch (err) {
+      console.error("Failed to download form:", err);
+    }
+  };
+
+  // Handle nomination status actions (receive, send to scrutiny, etc.)
+  const handleStatusAction = async (
+    nominationId: string,
+    action: "RECEIVE" | "SCRUTINY",
+  ) => {
+    setIsActionLoading(nominationId);
+    try {
+      const response = await fetch(
+        `/api/ro/applications/${nominationId}/action`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action }),
+        },
+      );
+      const result = await response.json();
+      if (result.success) {
+        fetchNominations();
+      } else {
+        setError(result.error || "Failed to perform action");
+      }
+    } catch (err) {
+      console.error("Failed to perform action:", err);
+      setError("Failed to perform action");
+    } finally {
+      setIsActionLoading(null);
+    }
+  };
+
   const filteredNominations = nominations.filter(
     (n) =>
       n.applicationNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      n.candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      n.candidate.phone.includes(searchQuery),
+      (n.candidateName || "")
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
+      (n.applicantProfile?.user?.phone || "").includes(searchQuery),
   );
 
   // Stats
@@ -412,10 +491,10 @@ export function ApplicationsListPanel() {
                           </div>
                           <div>
                             <p className="font-medium text-slate-800">
-                              {n.candidate.name}
+                              {n.candidateName}
                             </p>
                             <p className="text-xs text-slate-400">
-                              {n.candidate.phone}
+                              {n.applicantProfile?.user?.phone || ""}
                             </p>
                           </div>
                         </div>
@@ -431,7 +510,7 @@ export function ApplicationsListPanel() {
                       <TableCell>
                         {n.politicalParty ? (
                           <Badge variant="outline">
-                            {n.politicalParty.shortName}
+                            {n.politicalParty.abbreviation}
                           </Badge>
                         ) : (
                           <span className="text-sm text-slate-400">
@@ -444,13 +523,60 @@ export function ApplicationsListPanel() {
                         {new Date(n.submittedAt).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleViewNomination(n)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleViewNomination(n)}
+                            title="View Details"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDownloadForm(n.id)}
+                            title="Download FORM-18"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          {n.status === "SUBMITTED" && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() =>
+                                handleStatusAction(n.id, "RECEIVE")
+                              }
+                              disabled={isActionLoading === n.id}
+                              title="Receive Application"
+                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                            >
+                              {isActionLoading === n.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <CheckCheck className="h-4 w-4" />
+                              )}
+                            </Button>
+                          )}
+                          {n.status === "RECEIVED" && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() =>
+                                handleStatusAction(n.id, "SCRUTINY")
+                              }
+                              disabled={isActionLoading === n.id}
+                              title="Send to Scrutiny"
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            >
+                              {isActionLoading === n.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Send className="h-4 w-4" />
+                              )}
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -465,10 +591,25 @@ export function ApplicationsListPanel() {
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
         <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Application Details</DialogTitle>
-            <DialogDescription>
-              Application No: {selectedNomination?.applicationNo}
-            </DialogDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle>Application Details</DialogTitle>
+                <DialogDescription>
+                  Application No: {selectedNomination?.applicationNo}
+                </DialogDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  selectedNomination &&
+                  handleDownloadForm(selectedNomination.id)
+                }
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download PDF
+              </Button>
+            </div>
           </DialogHeader>
           {selectedNomination && (
             <Tabs defaultValue="candidate" className="mt-4">
@@ -485,13 +626,13 @@ export function ApplicationsListPanel() {
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold">
-                      {selectedNomination.candidate.name}
+                      {selectedNomination.candidateName}
                     </h3>
-                    {selectedNomination.candidate.dateOfBirth && (
+                    {selectedNomination.dateOfBirth && (
                       <p className="text-sm text-slate-500">
                         DOB:{" "}
                         {new Date(
-                          selectedNomination.candidate.dateOfBirth,
+                          selectedNomination.dateOfBirth,
                         ).toLocaleDateString()}
                       </p>
                     )}
@@ -503,30 +644,29 @@ export function ApplicationsListPanel() {
                     <div>
                       <p className="text-xs text-slate-500">Phone</p>
                       <p className="font-medium">
-                        {selectedNomination.candidate.phone}
+                        {selectedNomination.applicantProfile?.user?.phone ||
+                          "N/A"}
                       </p>
                     </div>
                   </div>
-                  {selectedNomination.candidate.email && (
+                  {selectedNomination.applicantProfile?.user?.email && (
                     <div className="flex items-center gap-2">
                       <Mail className="h-4 w-4 text-slate-400" />
                       <div>
                         <p className="text-xs text-slate-500">Email</p>
                         <p className="font-medium">
-                          {selectedNomination.candidate.email}
+                          {selectedNomination.applicantProfile.user.email}
                         </p>
                       </div>
                     </div>
                   )}
                 </div>
-                {selectedNomination.candidate.address && (
+                {selectedNomination.address && (
                   <div className="flex items-start gap-2 pt-4 border-t">
                     <Building className="h-4 w-4 text-slate-400 mt-0.5" />
                     <div>
                       <p className="text-xs text-slate-500">Address</p>
-                      <p className="text-sm">
-                        {selectedNomination.candidate.address}
-                      </p>
+                      <p className="text-sm">{selectedNomination.address}</p>
                     </div>
                   </div>
                 )}
@@ -557,7 +697,7 @@ export function ApplicationsListPanel() {
                 <div className="pt-4 border-t">
                   <p className="text-sm text-slate-500">Reservation Status</p>
                   <Badge className="mt-1">
-                    {selectedNomination.ward.reservationStatus.replace(
+                    {(selectedNomination.ward.reservationType || "N/A").replace(
                       "-",
                       " ",
                     )}
@@ -576,15 +716,30 @@ export function ApplicationsListPanel() {
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4 text-slate-400" />
                           <div>
-                            <p className="text-sm font-medium">{doc.type}</p>
+                            <p className="text-sm font-medium">
+                              {doc.type.replace(/_/g, " ")}
+                            </p>
                             <p className="text-xs text-slate-400">
-                              {doc.fileName}
+                              {doc.originalName || doc.fileName}
                             </p>
                           </div>
                         </div>
-                        <Button variant="outline" size="sm">
-                          View
-                        </Button>
+                        {doc.storagePath ? (
+                          <a
+                            href={doc.storagePath}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Button variant="outline" size="sm">
+                              <Eye className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                          </a>
+                        ) : (
+                          <Button variant="outline" size="sm" disabled>
+                            No File
+                          </Button>
+                        )}
                       </div>
                     ))}
                   </div>

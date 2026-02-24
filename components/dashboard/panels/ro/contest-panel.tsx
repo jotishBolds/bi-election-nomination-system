@@ -49,27 +49,41 @@ interface Candidate {
   status: string;
   serialNo?: number;
   ballotOrder?: number;
-  candidate: {
-    id: string;
-    name: string;
-    phone: string;
-    email?: string;
-    photoUrl?: string;
+  candidateName: string;
+  applicantProfile?: {
+    user: {
+      id: string;
+      name: string;
+      phone: string;
+      email?: string;
+    };
   };
   ward: {
     id: string;
     wardNo: number;
     wardName: string;
-    reservationStatus: string;
+    reservationType?: string;
+    ulb?: {
+      name: string;
+      district?: {
+        name: string;
+      };
+    };
   };
   politicalParty?: {
     name: string;
     shortName: string;
   };
-  electionSymbol?: {
+  allocatedSymbol?: {
     name: string;
-    imageUrl?: string;
+    imagePath?: string;
   };
+  documents?: Array<{
+    id: string;
+    type: string;
+    fileName: string;
+    storagePath?: string;
+  }>;
 }
 
 interface WardSummary {
@@ -77,7 +91,8 @@ interface WardSummary {
   wardNo: number;
   wardName: string;
   totalCandidates: number;
-  reservationStatus: string;
+  reservationStatus?: string;
+  reservationType?: string;
 }
 
 export function ContestPanel() {
@@ -112,7 +127,6 @@ export function ContestPanel() {
     setError(null);
     try {
       const params = new URLSearchParams();
-      params.append("status", "VALID");
       if (wardFilter && wardFilter !== "all") {
         params.append("wardId", wardFilter);
       }
@@ -121,8 +135,8 @@ export function ContestPanel() {
       const result = await response.json();
 
       if (result.success) {
-        setCandidates(result.data.candidates || []);
-        setWardSummaries(result.data.wardSummaries || []);
+        setCandidates(result.data.contestants || []);
+        setWardSummaries(result.data.wardSummary || []);
       } else {
         setError(result.error || "Failed to fetch contest data");
       }
@@ -160,11 +174,11 @@ export function ContestPanel() {
       ...candidates.map((c, idx) => [
         idx + 1,
         c.applicationNo,
-        c.candidate.name,
+        c.candidateName,
         c.ward.wardNo,
         c.ward.wardName,
         c.politicalParty?.shortName || "Independent",
-        c.electionSymbol?.name || "—",
+        c.allocatedSymbol?.name || "—",
       ]),
     ];
 
@@ -185,7 +199,7 @@ export function ContestPanel() {
   const filteredCandidates = candidates.filter(
     (c) =>
       c.applicationNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.candidate.name.toLowerCase().includes(searchQuery.toLowerCase()),
+      c.candidateName.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   if (isLoading && candidates.length === 0) {
@@ -403,20 +417,12 @@ export function ContestPanel() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          {c.candidate.photoUrl ? (
-                            <img
-                              src={c.candidate.photoUrl}
-                              alt={c.candidate.name}
-                              className="w-10 h-10 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                              <User className="h-5 w-5 text-blue-600" />
-                            </div>
-                          )}
+                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                            <User className="h-5 w-5 text-blue-600" />
+                          </div>
                           <div>
                             <p className="font-medium text-slate-800">
-                              {c.candidate.name}
+                              {c.candidateName}
                             </p>
                             <p className="text-xs text-slate-400">
                               {c.applicationNo}
@@ -446,17 +452,17 @@ export function ContestPanel() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {c.electionSymbol ? (
+                        {c.allocatedSymbol ? (
                           <div className="flex items-center gap-2">
-                            {c.electionSymbol.imageUrl && (
+                            {c.allocatedSymbol.imagePath && (
                               <img
-                                src={c.electionSymbol.imageUrl}
-                                alt={c.electionSymbol.name}
+                                src={c.allocatedSymbol.imagePath}
+                                alt={c.allocatedSymbol.name}
                                 className="w-6 h-6 object-contain"
                               />
                             )}
                             <span className="text-sm text-slate-600">
-                              {c.electionSymbol.name}
+                              {c.allocatedSymbol.name}
                             </span>
                           </div>
                         ) : (
@@ -501,27 +507,19 @@ export function ContestPanel() {
             <div className="space-y-6 mt-4">
               {/* Candidate Info */}
               <div className="flex items-center gap-4">
-                {selectedCandidate.candidate.photoUrl ? (
-                  <img
-                    src={selectedCandidate.candidate.photoUrl}
-                    alt={selectedCandidate.candidate.name}
-                    className="w-20 h-20 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center">
-                    <User className="h-10 w-10 text-blue-600" />
-                  </div>
-                )}
+                <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center">
+                  <User className="h-10 w-10 text-blue-600" />
+                </div>
                 <div>
                   <h3 className="text-lg font-semibold">
-                    {selectedCandidate.candidate.name}
+                    {selectedCandidate.candidateName}
                   </h3>
                   <p className="text-sm text-slate-500">
-                    {selectedCandidate.candidate.phone}
+                    {selectedCandidate.applicantProfile?.user?.phone || "—"}
                   </p>
-                  {selectedCandidate.candidate.email && (
+                  {selectedCandidate.applicantProfile?.user?.email && (
                     <p className="text-sm text-slate-400">
-                      {selectedCandidate.candidate.email}
+                      {selectedCandidate.applicantProfile.user.email}
                     </p>
                   )}
                 </div>
@@ -540,7 +538,9 @@ export function ContestPanel() {
                   {selectedCandidate.ward.wardName}
                 </p>
                 <Badge className="mt-2">
-                  {selectedCandidate.ward.reservationStatus.replace("-", " ")}
+                  {(
+                    selectedCandidate.ward.reservationType || "General"
+                  ).replace("-", " ")}
                 </Badge>
               </div>
 
@@ -564,17 +564,17 @@ export function ContestPanel() {
                       Election Symbol
                     </span>
                   </div>
-                  {selectedCandidate.electionSymbol ? (
+                  {selectedCandidate.allocatedSymbol ? (
                     <div className="flex items-center gap-2">
-                      {selectedCandidate.electionSymbol.imageUrl && (
+                      {selectedCandidate.allocatedSymbol.imagePath && (
                         <img
-                          src={selectedCandidate.electionSymbol.imageUrl}
-                          alt={selectedCandidate.electionSymbol.name}
+                          src={selectedCandidate.allocatedSymbol.imagePath}
+                          alt={selectedCandidate.allocatedSymbol.name}
                           className="w-8 h-8 object-contain"
                         />
                       )}
                       <p className="font-semibold">
-                        {selectedCandidate.electionSymbol.name}
+                        {selectedCandidate.allocatedSymbol.name}
                       </p>
                     </div>
                   ) : (

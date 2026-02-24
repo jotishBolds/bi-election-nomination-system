@@ -96,7 +96,7 @@ export async function getRONominations(
           user: true,
         },
       },
-      payments: true,
+      brPayments: true,
       documents: true,
       proposers: true,
       symbolPreferences: {

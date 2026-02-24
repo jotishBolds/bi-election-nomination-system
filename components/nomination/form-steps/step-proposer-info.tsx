@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { motion } from "framer-motion";
+import { useEffect } from "react";
 import {
   Form,
   FormControl,
@@ -37,9 +38,14 @@ const schema = z.object({
 interface StepProposerInfoProps {
   onNext: () => void;
   onBack: () => void;
+  isUpdate?: boolean;
 }
 
-export function StepProposerInfo({ onNext, onBack }: StepProposerInfoProps) {
+export function StepProposerInfo({
+  onNext,
+  onBack,
+  isUpdate = false,
+}: StepProposerInfoProps) {
   const { formData, updateFormData } = useNomination();
 
   const form = useForm({
@@ -50,6 +56,18 @@ export function StepProposerInfo({ onNext, onBack }: StepProposerInfoProps) {
       proposerPartNo: formData.proposerPartNo,
     },
   });
+
+  // Update form when formData changes (for pre-filling on updates)
+  useEffect(() => {
+    if (formData.proposerName) {
+      console.log("Updating proposer form with formData:", formData);
+      form.reset({
+        proposerName: formData.proposerName || "",
+        proposerSerialNo: formData.proposerSerialNo || "",
+        proposerPartNo: formData.proposerPartNo || "",
+      });
+    }
+  }, [formData, form]);
 
   const onSubmit = (data: z.infer<typeof schema>) => {
     updateFormData({
@@ -81,7 +99,12 @@ export function StepProposerInfo({ onNext, onBack }: StepProposerInfoProps) {
                   <FormItem>
                     <FormLabel>Proposer's Full Name *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter proposer's name" {...field} />
+                      <Input
+                        placeholder="Enter proposer's name"
+                        {...field}
+                        disabled={isUpdate}
+                        className={isUpdate ? "bg-muted" : ""}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -100,6 +123,8 @@ export function StepProposerInfo({ onNext, onBack }: StepProposerInfoProps) {
                           placeholder="Enter 4-digit serial number"
                           maxLength={4}
                           {...field}
+                          disabled={isUpdate}
+                          className={isUpdate ? "bg-muted" : ""}
                         />
                       </FormControl>
                       <FormMessage />
@@ -118,6 +143,8 @@ export function StepProposerInfo({ onNext, onBack }: StepProposerInfoProps) {
                           placeholder="Enter 4-digit part number"
                           maxLength={4}
                           {...field}
+                          disabled={isUpdate}
+                          className={isUpdate ? "bg-muted" : ""}
                         />
                       </FormControl>
                       <FormMessage />

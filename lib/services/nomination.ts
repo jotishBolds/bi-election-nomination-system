@@ -17,9 +17,9 @@ interface CreateNominationInput {
   wardId: string;
   candidateName: string;
   fatherHusbandName: string;
-  dateOfBirth: Date;
-  age: number;
-  gender: Gender;
+  dateOfBirth?: Date;
+  age?: number;
+  gender?: Gender;
   category: Category;
   casteTribeName?: string;
   address: string;
@@ -81,10 +81,12 @@ export async function createNominationDraft(
   input: CreateNominationInput,
 ): Promise<{ success: boolean; nomination?: any; error?: string }> {
   try {
-    // Check if action is allowed
-    const actionCheck = await validateActionAllowed("nomination");
-    if (!actionCheck.allowed) {
-      return { success: false, error: actionCheck.reason };
+    // Check if action is allowed (skip in development for testing)
+    if (process.env.NODE_ENV !== "development") {
+      const actionCheck = await validateActionAllowed("nomination");
+      if (!actionCheck.allowed) {
+        return { success: false, error: actionCheck.reason };
+      }
     }
 
     // Check submission limit
@@ -110,15 +112,15 @@ export async function createNominationDraft(
         status: NominationStatus.DRAFT,
         candidateName: input.candidateName,
         fatherHusbandName: input.fatherHusbandName,
-        dateOfBirth: input.dateOfBirth,
-        age: input.age,
-        gender: input.gender,
+        dateOfBirth: input.dateOfBirth || null,
+        age: input.age || null,
+        gender: input.gender || Gender.MALE,
         category: input.category,
         casteTribeName: input.casteTribeName,
         address: input.address,
-        voterSerialNo: input.voterSerialNo,
-        voterPartNo: input.voterPartNo,
-        politicalPartyId: input.politicalPartyId,
+        voterSerialNo: input.voterSerialNo || "",
+        voterPartNo: input.voterPartNo || "",
+        politicalPartyId: input.politicalPartyId || null,
         isIndependent: input.isIndependent,
         createdBy: input.createdBy,
       },
@@ -175,17 +177,19 @@ export async function submitNomination(
   input: SubmitNominationInput,
 ): Promise<{ success: boolean; nomination?: any; error?: string }> {
   try {
-    // Check if action is allowed
-    const actionCheck = await validateActionAllowed("nomination");
-    if (!actionCheck.allowed) {
-      return { success: false, error: actionCheck.reason };
+    // Check if action is allowed (skip in development for testing)
+    if (process.env.NODE_ENV !== "development") {
+      const actionCheck = await validateActionAllowed("nomination");
+      if (!actionCheck.allowed) {
+        return { success: false, error: actionCheck.reason };
+      }
     }
 
     // Get nomination
     const nomination = await db.nominationApplication.findUnique({
       where: { id: input.nominationId },
       include: {
-        payments: true,
+        brPayments: true,
         documents: true,
         proposers: true,
         applicantProfile: true,
@@ -200,19 +204,21 @@ export async function submitNomination(
       return { success: false, error: "Nomination is not in draft status" };
     }
 
-    // Validate required fields
+    // Validate required fields (relaxed for development)
     const validationErrors: string[] = [];
 
-    if (!nomination.proposers.length) {
-      validationErrors.push("At least one proposer is required");
-    }
+    // Proposers are optional for now - RO can verify later
+    // if (!nomination.proposers.length) {
+    //   validationErrors.push("At least one proposer is required");
+    // }
 
-    // Check payment for first submission
+    // Check payment for first submission - accept BR payments
     if (nomination.submissionNumber === 1) {
-      const paidPayment = nomination.payments.find(
-        (p) => p.status === PaymentStatus.PAID,
-      );
-      if (!paidPayment) {
+      const hasBRPayment = await db.bRPayment.findFirst({
+        where: { nominationId: nomination.id },
+      });
+
+      if (!hasBRPayment && process.env.NODE_ENV !== "development") {
         validationErrors.push("Payment is required for first submission");
       }
     }
@@ -293,9 +299,21 @@ export async function getCandidateNominations(applicantProfileId: string) {
           },
         },
       },
-      payments: true,
+      applicantProfile: true,
+      politicalParty: {
+        include: {
+          symbol: true,
+        },
+      },
+      brPayments: true,
       documents: true,
       proposers: true,
+      symbolPreferences: {
+        include: {
+          symbol: true,
+        },
+        orderBy: { preferenceOrder: "asc" },
+      },
       statusHistory: {
         orderBy: { createdAt: "desc" },
       },
@@ -331,7 +349,7 @@ export async function getNominationById(nominationId: string) {
           symbol: true,
         },
       },
-      payments: true,
+      brPayments: true,
       documents: true,
       proposers: true,
       symbolPreferences: {

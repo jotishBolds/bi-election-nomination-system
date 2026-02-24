@@ -58,7 +58,7 @@ export async function GET(
           orderBy: { createdAt: "asc" },
         },
         documents: true,
-        payments: true,
+        brPayments: true,
         statusHistory: {
           orderBy: { createdAt: "desc" },
         },

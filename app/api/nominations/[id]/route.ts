@@ -156,6 +156,157 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 }
 
+// PUT - Update nomination with full form data (for 2nd/3rd submissions)
+export async function PUT(request: NextRequest, { params }: RouteParams) {
+  try {
+    const session = await auth();
+    const { id } = await params;
+
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
+
+    const body = await request.json();
+    const {
+      formData,
+      isUpdate,
+      submissionNumber,
+      brNumber,
+      brProofUrl,
+      brProofPublicId,
+    } = body;
+
+    if (!formData || !isUpdate) {
+      return NextResponse.json(
+        { success: false, error: "Invalid request format" },
+        { status: 400 },
+      );
+    }
+
+    const clientIp = getClientIP(request);
+
+    // Verify ownership
+    const nomination = await getNominationById(id);
+    if (!nomination) {
+      return NextResponse.json(
+        { success: false, error: "Nomination not found" },
+        { status: 404 },
+      );
+    }
+
+    if (nomination.applicantProfile.userId !== session.user.id) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 403 },
+      );
+    }
+
+    // Update nomination with new form data
+    const updatedNomination = await db.nominationApplication.update({
+      where: { id },
+      data: {
+        candidateName: formData.candidateName || nomination.candidateName,
+        fatherHusbandName:
+          formData.fatherOrHusbandName ||
+          formData.fatherHusbandName ||
+          nomination.fatherHusbandName,
+        address:
+          formData.fullPostalAddress || formData.address || nomination.address,
+        voterSerialNo:
+          formData.serialNoCandidate ||
+          formData.voterSerialNo ||
+          nomination.voterSerialNo,
+        voterPartNo:
+          formData.partNoCandidate ||
+          formData.voterPartNo ||
+          nomination.voterPartNo,
+        submissionNumber: submissionNumber || nomination.submissionNumber,
+        updatedAt: new Date(),
+        // Update dates if provided
+        ...(formData.dateOfBirth && {
+          dateOfBirth: new Date(formData.dateOfBirth),
+        }),
+        ...(formData.age && { age: parseInt(formData.age, 10) }),
+      },
+      include: {
+        ward: {
+          include: {
+            ulb: {
+              include: {
+                district: true,
+              },
+            },
+          },
+        },
+        applicantProfile: {
+          include: {
+            user: true,
+          },
+        },
+        brPayments: true,
+      },
+    });
+
+    // Update symbol preferences if provided
+    const symbolPrefs = [
+      { name: formData?.symbolPreference1, order: 1 },
+      { name: formData?.symbolPreference2, order: 2 },
+      { name: formData?.symbolPreference3, order: 3 },
+    ].filter((p) => p.name && p.name.trim() !== "");
+
+    if (symbolPrefs.length > 0) {
+      // Delete existing preferences for this nomination
+      await db.symbolPreference.deleteMany({
+        where: { nominationId: id },
+      });
+
+      // Create new preferences
+      for (const pref of symbolPrefs) {
+        const symbol = await db.electionSymbol.findFirst({
+          where: { name: pref.name },
+        });
+        if (symbol) {
+          await db.symbolPreference.create({
+            data: {
+              nominationId: id,
+              symbolId: symbol.id,
+              preferenceOrder: pref.order,
+            },
+          });
+        }
+      }
+    }
+
+    // If BR data provided, create new BR payment record
+    if (brNumber && brProofUrl && brProofPublicId) {
+      await db.bRPayment.create({
+        data: {
+          nominationId: id,
+          brNumber,
+          proofImageUrl: brProofUrl,
+          proofPublicId: brProofPublicId,
+          status: "PENDING",
+        },
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      nomination: updatedNomination,
+      message: "Nomination updated successfully",
+    });
+  } catch (error) {
+    console.error("Update nomination with form data error:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to update nomination" },
+      { status: 500 },
+    );
+  }
+}
+
 // POST - Submit nomination (special action)
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {

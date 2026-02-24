@@ -22,10 +22,26 @@ export interface NominationFormData {
   candidateName: string;
   fatherOrHusbandName: string;
   fullPostalAddress: string;
+  sameAsPostalAddress: boolean;
+  correspondingAddress: string;
   serialNoCandidate: string;
   partNoCandidate: string;
   category: "general" | "sc" | "st_bl" | "st_lt" | "obc_central" | "obc_state";
   casteTribeName: string;
+
+  // Document uploads (file names and Cloudinary URLs)
+  casteCertificateFile: string;
+  casteCertificateUrl: string;
+  affidavitFile: string;
+  affidavitUrl: string;
+  addressProofFile: string;
+  addressProofUrl: string;
+
+  // EPIC number
+  epicNumber: string;
+
+  // Gender
+  gender: "MALE" | "FEMALE" | "OTHER" | "";
 
   // Step 2: Proposer Details
   proposerName: string;

@@ -45,6 +45,7 @@ export async function GET(
         },
         politicalParty: true,
         allocatedSymbol: true,
+        documents: true,
         proposers: true,
         symbolPreferences: {
           include: {

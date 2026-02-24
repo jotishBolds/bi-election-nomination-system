@@ -13,9 +13,9 @@ export async function GET(request: NextRequest) {
     const wardId = searchParams.get("wardId");
     const format = searchParams.get("format"); // "json" | "csv"
 
-    // Only approved nominations that haven't been withdrawn
+    // Only approved/contesting nominations that haven't been withdrawn
     const where: Record<string, unknown> = {
-      status: "APPROVED",
+      status: { in: ["ACCEPTED", "CONTESTING", "ELECTED_UNOPPOSED"] },
     };
 
     // Filter by RO's jurisdiction if user is RO
@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
         },
         politicalParty: true,
         allocatedSymbol: true,
+        documents: true,
       },
       orderBy: [{ ward: { wardNo: "asc" } }, { candidateName: "asc" }],
     });
@@ -115,6 +116,8 @@ export async function GET(request: NextRequest) {
       ulbName: string | undefined;
       districtName: string | undefined;
       reservation: string | null | undefined;
+      reservationStatus: string | null | undefined;
+      totalCandidates: number;
       contestants: Array<{
         id: string;
         applicationNo: string;
@@ -136,9 +139,12 @@ export async function GET(request: NextRequest) {
             ulbName: c.ward?.ulb?.name,
             districtName: c.ward?.ulb?.district?.name,
             reservation: c.ward?.reservationType,
+            reservationStatus: c.ward?.reservationType,
+            totalCandidates: 0,
             contestants: [],
           };
         }
+        acc[wardKey].totalCandidates += 1;
         acc[wardKey].contestants.push({
           id: c.id,
           applicationNo: c.applicationNo,

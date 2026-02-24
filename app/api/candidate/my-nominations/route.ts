@@ -38,6 +38,11 @@ export async function GET(request: NextRequest) {
         },
         politicalParty: true,
         allocatedSymbol: true,
+        brPayments: {
+          orderBy: { submittedAt: "desc" },
+          take: 1,
+        },
+        documents: true,
         scrutinizer: {
           select: {
             id: true,
@@ -48,9 +53,14 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    // Calculate summary
+    // Calculate summary based on actual submissions
+    const maxSubmissionNumber = nominations.reduce(
+      (max, nomination) => Math.max(max, nomination.submissionNumber || 0),
+      0,
+    );
+
     const summary = {
-      total: nominations.length,
+      total: maxSubmissionNumber, // Use actual submission count
       draft: nominations.filter((n) => n.status === "DRAFT").length,
       submitted: nominations.filter((n) =>
         ["SUBMITTED", "RECEIVED", "UNDER_SCRUTINY"].includes(n.status),

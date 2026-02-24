@@ -32,6 +32,11 @@ import {
   Phone,
   ArrowLeft,
   CheckCircle2,
+  Shield,
+  QrCode,
+  Smartphone,
+  Copy,
+  Check,
 } from "lucide-react";
 import {
   LoginFormData,
@@ -43,7 +48,13 @@ import {
 } from "@/lib/auth/validations/auth";
 
 type LoginMethod = "email" | "phone";
-type LoginStep = "credentials" | "otp";
+type LoginStep = "credentials" | "otp" | "totp" | "totp-setup";
+
+interface TOTPSetupData {
+  secret: string;
+  qrCode: string;
+  otpauthUrl: string;
+}
 
 export function LoginForm() {
   const router = useRouter();
@@ -56,6 +67,20 @@ export function LoginForm() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [devOtp, setDevOtp] = useState<string | null>(null);
+  const [totpCode, setTotpCode] = useState("");
+
+  // TOTP setup state
+  const [totpSetupData, setTotpSetupData] = useState<TOTPSetupData | null>(
+    null,
+  );
+  const [totpSetupToken, setTotpSetupToken] = useState("");
+  const [totpSetupStep, setTotpSetupStep] = useState<
+    "qr" | "verify" | "complete"
+  >("qr");
+  const [copied, setCopied] = useState(false);
+  // Track if this is an RO/Admin user needing TOTP setup during phone login
+  const [isPrivilegedNeedsTOTPSetup, setIsPrivilegedNeedsTOTPSetup] =
+    useState(false);
 
   // Check if user just registered
   const showRegistrationSuccess = searchParams.get("registered") === "true";
@@ -91,7 +116,7 @@ export function LoginForm() {
       setIdentifier(data.email);
       setPassword(data.password);
 
-      // Send OTP for login - this will check if user exists
+      // Send OTP for login - this will check if user exists and role
       const response = await fetch("/api/otp/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -105,9 +130,22 @@ export function LoginForm() {
       const result = await response.json();
 
       if (result.success) {
-        setLoginStep("otp");
-        if (result.devOtp) {
-          setDevOtp(result.devOtp);
+        // Check if this is an RO/Admin requiring TOTP
+        if (result.requiresTOTP) {
+          if (result.totpEnabled) {
+            // TOTP is set up — go directly to TOTP input
+            setLoginStep("totp");
+          } else {
+            // TOTP not set up — need to set it up first
+            // For email login, password already verifies identity
+            await initiateTOTPSetup(data.email);
+          }
+        } else {
+          // Regular candidate — normal OTP flow
+          setLoginStep("otp");
+          if (result.devOtp) {
+            setDevOtp(result.devOtp);
+          }
         }
       } else {
         // Show the error from OTP API (user not found, etc.)
@@ -128,7 +166,7 @@ export function LoginForm() {
       setPhoneNumber(data.phone);
       setIdentifier(data.phone);
 
-      // Send OTP to phone
+      // Send OTP to phone - this checks role and TOTP status
       const response = await fetch("/api/otp/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -142,15 +180,101 @@ export function LoginForm() {
       const result = await response.json();
 
       if (result.success) {
-        setLoginStep("otp");
-        if (result.devOtp) {
-          setDevOtp(result.devOtp);
+        // Check if this is an RO/Admin requiring TOTP
+        if (result.requiresTOTP) {
+          if (result.totpEnabled) {
+            // TOTP is enabled — go directly to TOTP input (no SMS sent)
+            setLoginStep("totp");
+          } else {
+            // TOTP not set up — SMS OTP was sent for identity verification
+            // After OTP verification, will redirect to TOTP setup
+            setIsPrivilegedNeedsTOTPSetup(true);
+            setLoginStep("otp");
+            if (result.devOtp) {
+              setDevOtp(result.devOtp);
+            }
+          }
+        } else {
+          // Regular candidate — normal SMS OTP flow
+          setIsPrivilegedNeedsTOTPSetup(false);
+          setLoginStep("otp");
+          if (result.devOtp) {
+            setDevOtp(result.devOtp);
+          }
         }
       } else {
         setError(result.error || "Failed to send OTP");
       }
     } catch {
       setError("Failed to send OTP");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  /** Initiate TOTP setup for RO/Admin during login */
+  async function initiateTOTPSetup(ident: string) {
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/auth/totp/login-setup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier: ident }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setTotpSetupData(result.data);
+        setTotpSetupStep("qr");
+        setLoginStep("totp-setup");
+      } else {
+        setError(result.error || "Failed to initiate TOTP setup");
+      }
+    } catch {
+      setError("Failed to set up two-factor authentication");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  /** Verify TOTP setup token and enable TOTP */
+  async function onTotpSetupVerify() {
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      if (totpSetupToken.length !== 6) {
+        setError("Please enter a 6-digit code from your authenticator app");
+        return;
+      }
+
+      const response = await fetch("/api/auth/totp/login-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identifier,
+          token: totpSetupToken,
+          action: "enable",
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setTotpSetupStep("complete");
+        // After short delay, proceed to TOTP login
+        setTimeout(() => {
+          setTotpCode("");
+          setLoginStep("totp");
+        }, 2000);
+      } else {
+        setError(result.error || "Invalid code. Please try again.");
+      }
+    } catch {
+      setError("Failed to verify authenticator code");
     } finally {
       setIsSubmitting(false);
     }
@@ -179,8 +303,9 @@ export function LoginForm() {
         return;
       }
 
-      // OTP verified, now sign in with NextAuth
+      // OTP verified — now check the login flow
       if (loginMethod === "email" && password) {
+        // Email login for candidate (RO/Admin skip OTP entirely)
         const result = await signIn("credentials", {
           email: identifier,
           password: password,
@@ -189,11 +314,32 @@ export function LoginForm() {
 
         if (result?.error) {
           setError(result.error);
-        } else {
-          router.push("/dashboard");
+          return;
         }
+
+        // Check if the user needs TOTP (shouldn't happen for candidates,
+        // but handle edge case)
+        const sessionRes = await fetch("/api/auth/session");
+        const session = await sessionRes.json();
+
+        if (session?.user?.requiresTOTP && !session?.user?.totpVerified) {
+          setLoginStep("totp");
+          return;
+        }
+
+        router.push("/dashboard");
       } else {
-        // Phone login - use phone-otp provider
+        // Phone login
+
+        // Check if this was a TOTP setup flow (RO/Admin phone login, first time)
+        // We tracked this flag when OTP was sent
+        if (isPrivilegedNeedsTOTPSetup) {
+          // RO/Admin without TOTP — identity verified via SMS, now set up TOTP
+          await initiateTOTPSetup(identifier);
+          return;
+        }
+
+        // Regular candidate — complete phone login
         const result = await signIn("phone-otp", {
           phone: identifier,
           otpVerified: "true",
@@ -213,10 +359,97 @@ export function LoginForm() {
     }
   }
 
+  async function onTotpSubmit() {
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      if (totpCode.length !== 6) {
+        setError("Please enter a 6-digit authenticator code");
+        return;
+      }
+
+      // Verify TOTP via public endpoint first
+      const verifyResponse = await fetch("/api/auth/totp/login-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identifier,
+          token: totpCode,
+        }),
+      });
+
+      const verifyResult = await verifyResponse.json();
+
+      if (!verifyResult.success) {
+        setError(
+          verifyResult.error ||
+            "Invalid authenticator code. Please check your app and try again.",
+        );
+        return;
+      }
+
+      // TOTP verified — now sign in
+      if (loginMethod === "email" && password) {
+        // Email login with TOTP
+        const result = await signIn("credentials", {
+          email: identifier,
+          password: password,
+          totp: totpCode,
+          redirect: false,
+        });
+
+        if (result?.error) {
+          setError(
+            result.error === "Invalid authenticator code"
+              ? "Invalid authenticator code. Please check your app and try again."
+              : result.error,
+          );
+        } else {
+          router.push("/dashboard");
+        }
+      } else {
+        // Phone login with TOTP (RO/Admin)
+        const result = await signIn("phone-otp", {
+          phone: identifier,
+          totpVerified: "true",
+          redirect: false,
+        });
+
+        if (result?.error) {
+          setError(result.error);
+        } else {
+          router.push("/dashboard");
+        }
+      }
+    } catch {
+      setError("TOTP verification failed");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   const handleBack = () => {
+    if (loginStep === "totp") {
+      setLoginStep("credentials");
+      setError(null);
+      setTotpCode("");
+      setIsPrivilegedNeedsTOTPSetup(false);
+      return;
+    }
+    if (loginStep === "totp-setup") {
+      setLoginStep("credentials");
+      setError(null);
+      setTotpSetupData(null);
+      setTotpSetupToken("");
+      setTotpSetupStep("qr");
+      setIsPrivilegedNeedsTOTPSetup(false);
+      return;
+    }
     setLoginStep("credentials");
     setError(null);
     setDevOtp(null);
+    setIsPrivilegedNeedsTOTPSetup(false);
     otpForm.reset();
   };
 
@@ -243,6 +476,14 @@ export function LoginForm() {
       setError("Failed to resend OTP");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleCopySecret = async () => {
+    if (totpSetupData?.secret) {
+      await navigator.clipboard.writeText(totpSetupData.secret);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -430,7 +671,7 @@ export function LoginForm() {
               </p>
             </div>
           </motion.div>
-        ) : (
+        ) : loginStep === "otp" ? (
           <motion.div
             key="otp"
             initial={{ opacity: 0, x: 20 }}
@@ -517,7 +758,7 @@ export function LoginForm() {
 
             <div className="text-center">
               <p className="text-sm text-muted-foreground">
-                Didn't receive the code?{" "}
+                Didn&apos;t receive the code?{" "}
                 <button
                   type="button"
                   className="text-primary hover:underline font-medium"
@@ -537,6 +778,247 @@ export function LoginForm() {
                 <p className="text-yellow-600">Check server console for OTP</p>
               </div>
             )}
+          </motion.div>
+        ) : null}
+
+        {/* TOTP Setup Step - For RO/Admin first-time setup during login */}
+        {loginStep === "totp-setup" && (
+          <motion.div
+            key="totp-setup"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="space-y-6"
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mb-2"
+              onClick={handleBack}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4 text-slate-500" />
+              Back
+            </Button>
+
+            <div className="text-center space-y-2">
+              <div className="mx-auto w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                <Shield className="h-6 w-6 text-orange-600" />
+              </div>
+              <h3 className="text-lg font-semibold">
+                Setup Two-Factor Authentication
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                As an RO/Admin, you must set up authenticator app access for
+                secure login.
+              </p>
+            </div>
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            {totpSetupStep === "qr" && totpSetupData && (
+              <div className="space-y-5">
+                {/* Step 1: QR Code */}
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-sm flex items-center gap-2">
+                    <span className="bg-orange-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
+                      1
+                    </span>
+                    Scan QR code with your authenticator app
+                  </h4>
+                  <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <Smartphone className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
+                    <p className="text-xs text-blue-800">
+                      Use <strong>Google Authenticator</strong> or{" "}
+                      <strong>Microsoft Authenticator</strong>
+                    </p>
+                  </div>
+                  <div className="flex justify-center p-3 bg-white border rounded-lg">
+                    <img
+                      src={totpSetupData.qrCode}
+                      alt="TOTP QR Code"
+                      className="w-44 h-44"
+                    />
+                  </div>
+                </div>
+
+                {/* Manual Key */}
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-xs flex items-center gap-2 text-muted-foreground">
+                    <QrCode className="h-3 w-3" />
+                    Can&apos;t scan? Enter this key manually:
+                  </h4>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 p-2 bg-slate-100 rounded text-xs font-mono break-all">
+                      {totpSetupData.secret}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCopySecret}
+                    >
+                      {copied ? (
+                        <Check className="h-3 w-3 text-green-600" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                <Button
+                  className="w-full"
+                  onClick={() => setTotpSetupStep("verify")}
+                >
+                  Continue to Verification
+                </Button>
+              </div>
+            )}
+
+            {totpSetupStep === "verify" && (
+              <div className="space-y-4">
+                <h4 className="font-semibold text-sm flex items-center gap-2">
+                  <span className="bg-orange-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">
+                    2
+                  </span>
+                  Enter the 6-digit code from your app
+                </h4>
+
+                <div className="flex flex-col items-center space-y-4">
+                  <InputOTP
+                    maxLength={6}
+                    value={totpSetupToken}
+                    onChange={setTotpSetupToken}
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                  <p className="text-xs text-muted-foreground">
+                    Enter the 6-digit code shown in your authenticator app
+                  </p>
+                </div>
+
+                <Button
+                  className="w-full bg-green-600 hover:bg-green-700"
+                  onClick={onTotpSetupVerify}
+                  disabled={isSubmitting || totpSetupToken.length !== 6}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      Verify & Enable
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => setTotpSetupStep("qr")}
+                >
+                  Back to QR Code
+                </Button>
+              </div>
+            )}
+
+            {totpSetupStep === "complete" && (
+              <div className="text-center space-y-3">
+                <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="h-7 w-7 text-green-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-green-800">
+                  Setup Complete!
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Two-factor authentication has been enabled. Redirecting to
+                  login...
+                </p>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* TOTP Login Step - For RO/Admin with TOTP already enabled */}
+        {loginStep === "totp" && (
+          <motion.div
+            key="totp"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="space-y-6"
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mb-4"
+              onClick={handleBack}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4 text-slate-500" />
+              Back
+            </Button>
+
+            <div className="text-center space-y-2">
+              <div className="mx-auto w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                <Shield className="h-6 w-6 text-orange-600" />
+              </div>
+              <h3 className="text-lg font-semibold">Authenticator Code</h3>
+              <p className="text-sm text-muted-foreground">
+                Enter the 6-digit code from your authenticator app (Google
+                Authenticator / Microsoft Authenticator)
+              </p>
+            </div>
+
+            <div className="space-y-6">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="flex flex-col items-center space-y-4">
+                <InputOTP maxLength={6} value={totpCode} onChange={setTotpCode}>
+                  <InputOTPGroup>
+                    <InputOTPSlot index={0} />
+                    <InputOTPSlot index={1} />
+                    <InputOTPSlot index={2} />
+                    <InputOTPSlot index={3} />
+                    <InputOTPSlot index={4} />
+                    <InputOTPSlot index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
+              </div>
+
+              <Button
+                className="w-full bg-primary hover:bg-primary-hover"
+                onClick={onTotpSubmit}
+                disabled={isSubmitting || totpCode.length !== 6}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  "Verify & Login"
+                )}
+              </Button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

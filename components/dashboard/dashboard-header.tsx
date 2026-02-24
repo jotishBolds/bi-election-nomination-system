@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/auth-context";
 import { ROLE_LABELS, ROLE_COLORS } from "@/lib/auth/types";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { LogOut, User, ChevronDown, Bell } from "lucide-react";
 
 export function DashboardHeader() {
   const { user, logout } = useAuth();
+  const router = useRouter();
 
   if (!user) return null;
 
@@ -71,7 +73,9 @@ export function DashboardHeader() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => router.push("/dashboard?tab=profile")}
+            >
               <User className="mr-2 h-4 w-4" />
               Profile Settings
             </DropdownMenuItem>

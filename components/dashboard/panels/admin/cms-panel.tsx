@@ -114,8 +114,8 @@ export function CMSPanel() {
     setError(null);
     try {
       const [partiesRes, symbolsRes] = await Promise.all([
-        fetch("/api/admin/cms/parties"),
-        fetch("/api/admin/cms/symbols"),
+        fetch("/api/admin/parties"),
+        fetch("/api/admin/symbols"),
       ]);
 
       const partiesData = await partiesRes.json();
@@ -138,8 +138,8 @@ export function CMSPanel() {
     setIsSubmitting(true);
     try {
       const url = editingParty
-        ? `/api/admin/cms/parties/${editingParty.id}`
-        : "/api/admin/cms/parties";
+        ? `/api/admin/parties/${editingParty.id}`
+        : "/api/admin/parties";
       const method = editingParty ? "PUT" : "POST";
 
       const response = await fetch(url, {
@@ -167,8 +167,8 @@ export function CMSPanel() {
     setIsSubmitting(true);
     try {
       const url = editingSymbol
-        ? `/api/admin/cms/symbols/${editingSymbol.id}`
-        : "/api/admin/cms/symbols";
+        ? `/api/admin/symbols/${editingSymbol.id}`
+        : "/api/admin/symbols";
       const method = editingSymbol ? "PUT" : "POST";
 
       const response = await fetch(url, {
@@ -195,7 +195,7 @@ export function CMSPanel() {
   const handleDeleteParty = async (id: string) => {
     if (!confirm("Are you sure you want to delete this party?")) return;
     try {
-      const response = await fetch(`/api/admin/cms/parties/${id}`, {
+      const response = await fetch(`/api/admin/parties/${id}`, {
         method: "DELETE",
       });
       const result = await response.json();
@@ -210,7 +210,7 @@ export function CMSPanel() {
   const handleDeleteSymbol = async (id: string) => {
     if (!confirm("Are you sure you want to delete this symbol?")) return;
     try {
-      const response = await fetch(`/api/admin/cms/symbols/${id}`, {
+      const response = await fetch(`/api/admin/symbols/${id}`, {
         method: "DELETE",
       });
       const result = await response.json();
@@ -224,7 +224,7 @@ export function CMSPanel() {
 
   const handleTogglePartyStatus = async (party: PoliticalParty) => {
     try {
-      const response = await fetch(`/api/admin/cms/parties/${party.id}`, {
+      const response = await fetch(`/api/admin/parties/${party.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: !party.isActive }),

@@ -69,9 +69,8 @@ export async function GET(request: NextRequest) {
                 },
               },
             },
-            payments: {
-              where: { status: "PAID" },
-              orderBy: { completedAt: "desc" },
+            brPayments: {
+              orderBy: { submittedAt: "desc" },
               take: 1,
             },
           },
@@ -80,13 +79,18 @@ export async function GET(request: NextRequest) {
       : [];
 
     const maxAllowed = electionConfig?.maxNominationsPerCandidate || 3;
+    // Count actual submissions based on submissionNumber field
+    const maxSubmissionNumber = nominations.reduce(
+      (max, nomination) => Math.max(max, nomination.submissionNumber || 0),
+      0,
+    );
     const submittedCount = nominations.filter(
       (n) => n.status !== "DRAFT",
     ).length;
 
-    // Generate application ID for the user
+    // Generate dynamic application ID for the user using last 4 chars + random
     const applicationId = user.applicantProfile
-      ? `MC${electionConfig?.year || 2026}-${user.id.slice(-4).toUpperCase()}`
+      ? `MC${electionConfig?.year || 2026}-${user.id.slice(-4).toUpperCase()}${Math.random().toString(36).substring(2, 4).toUpperCase()}`
       : undefined;
 
     // Build election schedule from config (no fallback - config required)
@@ -180,9 +184,10 @@ export async function GET(request: NextRequest) {
           : undefined,
       },
       submissions: {
-        count: submittedCount,
+        count: maxSubmissionNumber, // Use actual submission count from submissionNumber field
+        submittedCount, // Also include submitted count for reference
         maxAllowed,
-        canSubmitMore: submittedCount < maxAllowed,
+        canSubmitMore: maxSubmissionNumber < maxAllowed,
       },
       latestNomination: latestNomination
         ? {
@@ -194,11 +199,13 @@ export async function GET(request: NextRequest) {
             ulbName: latestNomination.ward.ulb.name,
             districtName: latestNomination.ward.ulb.district.name,
             reservation: latestNomination.ward.reservationType || "UR",
-            paymentStatus:
-              latestNomination.payments[0]?.status.toLowerCase() || "pending",
-            paymentAmount: latestNomination.payments[0]?.amount
-              ? Number(latestNomination.payments[0].amount)
-              : undefined,
+            brVerificationStatus:
+              (
+                latestNomination as any
+              ).brPayments?.[0]?.status?.toLowerCase() || "pending",
+            brNumber:
+              (latestNomination as any).brPayments?.[0]?.brNumber || undefined,
+            // Remove paymentStatus and paymentAmount as we're using BR verification now
           }
         : undefined,
       allNominations: nominations.map((n) => ({

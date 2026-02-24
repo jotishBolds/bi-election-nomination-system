@@ -1,12 +1,11 @@
 // components/nomination/form-steps/step-declaration.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { motion } from "framer-motion";
-import { format, differenceInYears } from "date-fns";
 import Image from "next/image";
 import {
   Form,
@@ -26,23 +25,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 import {
   ArrowLeft,
   ArrowRight,
   FileSignature,
-  CalendarIcon,
-  Shuffle,
   AlertCircle,
   CheckCircle2,
   Loader2,
@@ -59,29 +51,30 @@ interface PoliticalParty {
   symbolImage: string | null;
 }
 
-interface IndependentSymbol {
+interface ElectionSymbol {
   id: string;
   name: string;
-  image: string;
+  imagePath: string;
 }
 
 const schema = z.object({
-  dateOfBirth: z
-    .date({ message: "Date of birth is required" })
-    .optional()
-    .refine((date) => !date || date <= new Date(), {
-      message: "Date of birth cannot be in the future",
-    }),
   politicalPartyId: z.string().min(1, "Political party is required"),
-  symbolPreference1: z.string().min(1, "Symbol preference is required"),
+  symbolPreference1: z.string().min(1, "1st symbol preference is required"),
+  symbolPreference2: z.string().optional(),
+  symbolPreference3: z.string().optional(),
 });
 
 interface StepDeclarationProps {
   onNext: () => void;
   onBack: () => void;
+  isUpdate?: boolean;
 }
 
-export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
+export function StepDeclaration({
+  onNext,
+  onBack,
+  isUpdate = false,
+}: StepDeclarationProps) {
   const { formData, updateFormData } = useNomination();
   const { submissionData } = useNominationSubmission();
 
@@ -89,50 +82,53 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
   const [politicalParties, setPoliticalParties] = useState<PoliticalParty[]>(
     [],
   );
-  const [independentSymbols, setIndependentSymbols] = useState<
-    IndependentSymbol[]
-  >([]);
+  const [allSymbols, setAllSymbols] = useState<ElectionSymbol[]>([]);
   const [isLoadingParties, setIsLoadingParties] = useState(true);
+  const [isLoadingSymbols, setIsLoadingSymbols] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // State for form logic
-  const [age, setAge] = useState<number | null>(null);
-  const [shuffleCount, setShuffleCount] = useState(formData.shuffleCount || 0);
-  const [selectedSymbol, setSelectedSymbol] =
-    useState<IndependentSymbol | null>(null);
-  const [shuffledSymbols, setShuffledSymbols] = useState<IndependentSymbol[]>(
-    formData.shuffledSymbols || [],
-  );
-  const [isShuffleDisabled, setIsShuffleDisabled] = useState(
-    formData.shuffleCount >= 3,
-  );
+  // Symbol preferences state
+  const [pref1, setPref1] = useState<ElectionSymbol | null>(null);
+  const [pref2, setPref2] = useState<ElectionSymbol | null>(null);
+  const [pref3, setPref3] = useState<ElectionSymbol | null>(null);
+  const [selectingPref, setSelectingPref] = useState<1 | 2 | 3>(1);
 
-  // Check if party symbol is locked (for subsequent submissions)
-  const isPartyLocked = submissionData.submissionCount > 0;
+  // Check if party symbol is locked (for subsequent submissions or update)
+  const isPartyLocked = isUpdate || submissionData.submissionCount > 0;
 
   const form = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
-      dateOfBirth: formData.dateOfBirth
-        ? new Date(formData.dateOfBirth)
-        : undefined,
       politicalPartyId: formData.politicalPartyId || "",
       symbolPreference1: formData.symbolPreference1 || "",
+      symbolPreference2: formData.symbolPreference2 || "",
+      symbolPreference3: formData.symbolPreference3 || "",
     },
   });
 
-  const selectedPartyId = form.watch("politicalPartyId");
-  const watchDOB = form.watch("dateOfBirth");
-
-  // Fetch parties and symbols on mount
+  // Update form when formData changes (for pre-filling on updates)
   useEffect(() => {
-    const fetchPartiesAndSymbols = async () => {
+    if (formData.politicalPartyId) {
+      console.log("Updating declaration form with formData:", formData);
+      form.reset({
+        politicalPartyId: formData.politicalPartyId || "",
+        symbolPreference1: formData.symbolPreference1 || "",
+        symbolPreference2: formData.symbolPreference2 || "",
+        symbolPreference3: formData.symbolPreference3 || "",
+      });
+    }
+  }, [formData, form]);
+
+  const selectedPartyId = form.watch("politicalPartyId");
+
+  // Fetch parties on mount
+  useEffect(() => {
+    const fetchParties = async () => {
       try {
         setIsLoadingParties(true);
         const response = await fetch("/api/election/parties");
         const data = await response.json();
         if (data.success) {
-          // Add independent option to parties list
           const partiesWithIndependent: PoliticalParty[] = [
             ...data.data.parties,
             {
@@ -144,7 +140,6 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
             },
           ];
           setPoliticalParties(partiesWithIndependent);
-          setIndependentSymbols(data.data.independentSymbols || []);
         } else {
           setError("Failed to load parties. Please refresh the page.");
         }
@@ -155,197 +150,140 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
         setIsLoadingParties(false);
       }
     };
-    fetchPartiesAndSymbols();
+    fetchParties();
   }, []);
 
-  // Calculate age when DOB changes
+  // Fetch ALL election symbols for independent candidates
   useEffect(() => {
-    if (watchDOB) {
-      const calculatedAge = differenceInYears(new Date(), watchDOB);
-      setAge(calculatedAge);
-    }
-  }, [watchDOB]);
+    const fetchSymbols = async () => {
+      try {
+        setIsLoadingSymbols(true);
+        const response = await fetch("/api/election/symbols");
+        const data = await response.json();
+        if (data.success) {
+          setAllSymbols(data.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch symbols:", err);
+      } finally {
+        setIsLoadingSymbols(false);
+      }
+    };
+    fetchSymbols();
+  }, []);
 
-  // Get random symbols from available pool
-  const getRandomSymbols = useCallback(
-    (count: number, exclude: string[] = []): IndependentSymbol[] => {
-      const available = independentSymbols.filter(
-        (s) => !exclude.includes(s.id),
+  // Restore previously selected preferences from formData
+  useEffect(() => {
+    if (allSymbols.length === 0) return;
+    if (formData.symbolPreference1) {
+      const s1 = allSymbols.find(
+        (s) =>
+          s.name === formData.symbolPreference1 ||
+          s.id === formData.symbolPreference1,
       );
-      const shuffled = [...available].sort(() => Math.random() - 0.5);
-      return shuffled.slice(0, count);
-    },
-    [independentSymbols],
-  );
-
-  // Handle party change
-  useEffect(() => {
-    if (isLoadingParties) return; // Wait for parties to load
-
-    if (isPartyLocked) {
-      // For subsequent submissions, use locked party data
-      if (submissionData.lockedPoliticalPartyId === "independent") {
-        // For independent, restore all shuffled symbols from formData if available
-        if (formData.shuffledSymbols && formData.shuffledSymbols.length > 0) {
-          setShuffledSymbols(formData.shuffledSymbols);
-          setShuffleCount(
-            formData.shuffleCount || formData.shuffledSymbols.length,
-          );
-          // Find and set the previously selected symbol from the shuffled symbols
-          const previouslySelected = formData.shuffledSymbols.find(
-            (s) => s.name === submissionData.lockedPartySymbol,
-          );
-          if (previouslySelected) {
-            setSelectedSymbol(previouslySelected);
-          } else {
-            // Fallback to first symbol if not found
-            setSelectedSymbol(formData.shuffledSymbols[0]);
-          }
-        } else {
-          // Fallback to single locked symbol if no shuffled symbols saved
-          const lockedSymbol = {
-            id: "locked",
-            name: submissionData.lockedPartySymbol,
-            image: submissionData.lockedPartySymbolImage,
-          };
-          setShuffledSymbols([lockedSymbol]);
-          setSelectedSymbol(lockedSymbol);
-        }
-        form.setValue("politicalPartyId", "independent");
-        form.setValue("symbolPreference1", submissionData.lockedPartySymbol);
-      } else {
-        // For party candidates, set the locked party
-        const party = politicalParties.find(
-          (p) => p.id === submissionData.lockedPoliticalPartyId,
-        );
-        if (party) {
-          setSelectedSymbol({
-            id: party.id,
-            name: party.symbol,
-            image: party.symbolImage || "",
-          });
-          form.setValue(
-            "politicalPartyId",
-            submissionData.lockedPoliticalPartyId,
-          );
-          form.setValue("symbolPreference1", party.symbol);
-        }
+      if (s1) {
+        setPref1(s1);
+        form.setValue("symbolPreference1", s1.name);
       }
-      setIsShuffleDisabled(true);
-      return;
     }
-
-    if (selectedPartyId === "independent") {
-      // Check if we have saved shuffled symbols to restore
-      if (formData.shuffledSymbols && formData.shuffledSymbols.length > 0) {
-        setShuffledSymbols(formData.shuffledSymbols);
-        setShuffleCount(
-          formData.shuffleCount || formData.shuffledSymbols.length,
-        );
-        setIsShuffleDisabled(formData.shuffleCount >= 3);
-        // Find and set the selected symbol
-        if (formData.partySymbol) {
-          const savedSelected = formData.shuffledSymbols.find(
-            (s) => s.name === formData.partySymbol,
-          );
-          if (savedSelected) {
-            setSelectedSymbol(savedSelected);
-          }
-        }
-      } else if (independentSymbols.length > 0) {
-        // First time selecting independent - show first random symbol
-        setSelectedSymbol(null);
-        setShuffledSymbols([]);
-        const randomSymbol = getRandomSymbols(1)[0];
-        if (randomSymbol) {
-          setShuffledSymbols([randomSymbol]);
-          setSelectedSymbol(randomSymbol);
-          form.setValue("symbolPreference1", randomSymbol.name);
-        }
-        setShuffleCount(1); // First symbol counts as first shuffle
+    if (formData.symbolPreference2) {
+      const s2 = allSymbols.find(
+        (s) =>
+          s.name === formData.symbolPreference2 ||
+          s.id === formData.symbolPreference2,
+      );
+      if (s2) {
+        setPref2(s2);
+        form.setValue("symbolPreference2", s2.name);
       }
-    } else if (selectedPartyId) {
-      // For party candidates, set the party symbol and reset shuffle count
-      const party = politicalParties.find((p) => p.id === selectedPartyId);
-      if (party && party.symbolImage) {
-        setSelectedSymbol({
-          id: party.id,
-          name: party.symbol,
-          image: party.symbolImage,
-        });
-        form.setValue("symbolPreference1", party.symbol);
-        setShuffleCount(0); // Reset shuffle count when switching to party
-        setShuffledSymbols([]);
-        setIsShuffleDisabled(false);
+    }
+    if (formData.symbolPreference3) {
+      const s3 = allSymbols.find(
+        (s) =>
+          s.name === formData.symbolPreference3 ||
+          s.id === formData.symbolPreference3,
+      );
+      if (s3) {
+        setPref3(s3);
+        form.setValue("symbolPreference3", s3.name);
       }
     }
   }, [
-    selectedPartyId,
+    allSymbols,
+    formData.symbolPreference1,
+    formData.symbolPreference2,
+    formData.symbolPreference3,
     form,
-    isPartyLocked,
-    submissionData,
-    formData.shuffledSymbols,
-    formData.shuffleCount,
-    formData.partySymbol,
-    politicalParties,
-    independentSymbols,
-    isLoadingParties,
-    getRandomSymbols,
   ]);
 
-  // Handle shuffle for independent candidates - add new symbol to the list
-  const handleShuffle = () => {
-    if (shuffleCount >= 3) return;
+  // Handle symbol selection
+  const handleSymbolClick = (symbol: ElectionSymbol) => {
+    if (isPartyLocked) return;
 
-    // Get available symbols (excluding already shuffled ones)
-    const usedIds = shuffledSymbols.map((s) => s.id);
-    const availableSymbols = independentSymbols.filter(
-      (symbol) => !usedIds.includes(symbol.id),
-    );
+    // Check if already selected in any preference
+    const isAlreadyPref1 = pref1?.id === symbol.id;
+    const isAlreadyPref2 = pref2?.id === symbol.id;
+    const isAlreadyPref3 = pref3?.id === symbol.id;
 
-    if (availableSymbols.length === 0) return;
-
-    // Get a random symbol from available symbols
-    const randomIndex = Math.floor(Math.random() * availableSymbols.length);
-    const newSymbol = availableSymbols[randomIndex];
-
-    // Add to shuffled symbols list
-    const updatedShuffledSymbols = [...shuffledSymbols, newSymbol];
-    setShuffledSymbols(updatedShuffledSymbols);
-    setShuffleCount((prev) => prev + 1);
-
-    // Auto-select the new symbol if no selection yet
-    if (!selectedSymbol) {
-      setSelectedSymbol(newSymbol);
-      form.setValue("symbolPreference1", newSymbol.name);
+    // If clicking on an already-selected symbol, remove it
+    if (isAlreadyPref1) {
+      setPref1(null);
+      form.setValue("symbolPreference1", "");
+      return;
+    }
+    if (isAlreadyPref2) {
+      setPref2(null);
+      form.setValue("symbolPreference2", "");
+      return;
+    }
+    if (isAlreadyPref3) {
+      setPref3(null);
+      form.setValue("symbolPreference3", "");
+      return;
     }
 
-    if (shuffleCount + 1 >= 3) {
-      setIsShuffleDisabled(true);
+    // Assign to the currently selecting preference slot
+    if (selectingPref === 1) {
+      setPref1(symbol);
+      form.setValue("symbolPreference1", symbol.name);
+      setSelectingPref(2);
+    } else if (selectingPref === 2) {
+      setPref2(symbol);
+      form.setValue("symbolPreference2", symbol.name);
+      setSelectingPref(3);
+    } else if (selectingPref === 3) {
+      setPref3(symbol);
+      form.setValue("symbolPreference3", symbol.name);
+      setSelectingPref(1);
     }
   };
 
-  // Handle symbol selection from shuffled list
-  const handleSymbolSelect = (symbol: IndependentSymbol) => {
-    if (isPartyLocked) return;
-    setSelectedSymbol(symbol);
-    form.setValue("symbolPreference1", symbol.name);
+  // Get preference badge for a symbol
+  const getSymbolPref = (symbolId: string): number | null => {
+    if (pref1?.id === symbolId) return 1;
+    if (pref2?.id === symbolId) return 2;
+    if (pref3?.id === symbolId) return 3;
+    return null;
   };
 
   const onSubmit = (data: z.infer<typeof schema>) => {
     const party = politicalParties.find((p) => p.id === data.politicalPartyId);
+    const isIndependent = data.politicalPartyId === "independent";
+
     updateFormData({
-      dateOfBirth: data.dateOfBirth?.toISOString() || "",
-      age: age?.toString() || "",
+      dateOfBirth: "",
+      age: "",
       politicalPartyId: data.politicalPartyId,
       politicalParty: party?.name || "Independent",
-      partySymbol: selectedSymbol?.name || "",
-      partySymbolImage: selectedSymbol?.image || "",
-      symbolPreference1: data.symbolPreference1,
-      symbolPreference2: "",
-      symbolPreference3: "",
-      shuffleCount: shuffleCount,
-      shuffledSymbols: shuffledSymbols, // Save all shuffled symbols for persistence
+      partySymbol: isIndependent ? pref1?.name || "" : party?.symbol || "",
+      partySymbolImage: isIndependent
+        ? pref1?.imagePath || ""
+        : party?.symbolImage || "",
+      symbolPreference1: pref1?.name || data.symbolPreference1 || "",
+      symbolPreference2: pref2?.name || "",
+      symbolPreference3: pref3?.name || "",
+      shuffleCount: 0,
+      shuffledSymbols: [],
     });
     onNext();
   };
@@ -387,76 +325,6 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              {/* Date of Birth and Age */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="dateOfBirth"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Date of Birth *</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "w-full pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground",
-                              )}
-                            >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            disabled={(date) =>
-                              date > new Date() || date < new Date("1900-01-01")
-                            }
-                            initialFocus
-                            captionLayout="dropdown"
-                            fromYear={1940}
-                            toYear={2010}
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="space-y-2">
-                  <FormLabel>Completed Age (Years)</FormLabel>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={age !== null ? `${age} years` : ""}
-                      disabled
-                      placeholder="Age will be calculated"
-                      className="bg-muted"
-                    />
-                    {age !== null && age >= 21 && (
-                      <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    )}
-                    {age !== null && age < 21 && (
-                      <AlertCircle className="h-5 w-5 text-destructive" />
-                    )}
-                  </div>
-                  {age !== null && age < 21 && (
-                    <p className="text-xs text-destructive">
-                      Must be at least 21 years old
-                    </p>
-                  )}
-                </div>
-              </div>
-
               {/* Political Party Selection */}
               <FormField
                 control={form.control}
@@ -503,165 +371,191 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
                 )}
               />
 
-              {/* Symbol Selection */}
-              <div className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="symbolPreference1"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Symbol Preference *</FormLabel>
-                      <FormControl>
-                        <Input {...field} className="hidden" />
-                      </FormControl>
+              {/* Party Symbol Display (non-independent) */}
+              {selectedPartyId && !isIndependent && (
+                <div className="space-y-2">
+                  <FormLabel>Party Symbol</FormLabel>
+                  {(() => {
+                    const party = politicalParties.find(
+                      (p) => p.id === selectedPartyId,
+                    );
+                    return party?.symbolImage ? (
+                      <div className="p-4 border rounded-lg bg-muted/30">
+                        <div className="flex items-center gap-4">
+                          <div className="relative w-20 h-20 border rounded-lg bg-white p-2">
+                            <Image
+                              src={party.symbolImage}
+                              alt={party.symbol}
+                              fill
+                              className="object-contain"
+                            />
+                          </div>
+                          <div>
+                            <p className="font-medium">{party.symbol}</p>
+                            <Badge variant="secondary">Party Symbol</Badge>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+              )}
 
-                      {/* Party Symbol Display */}
-                      {selectedPartyId &&
-                        !isIndependent &&
-                        selectedSymbol?.image && (
-                          <div className="p-4 border rounded-lg bg-muted/30">
-                            <p className="text-sm text-muted-foreground mb-2">
-                              Party Symbol
+              {/* Independent Symbol Selection - New Design */}
+              {isIndependent && (
+                <div className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="symbolPreference1"
+                    render={() => (
+                      <FormItem>
+                        <FormLabel>Symbol Preferences *</FormLabel>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      Select up to <strong>3 symbol preferences</strong> in
+                      order. Click on a symbol to assign it as your 1st, 2nd, or
+                      3rd preference. Click a selected symbol again to deselect
+                      it.
+                    </AlertDescription>
+                  </Alert>
+
+                  {/* Selected Preferences Display */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {[
+                      { label: "1st Preference", pref: pref1, num: 1 },
+                      { label: "2nd Preference", pref: pref2, num: 2 },
+                      { label: "3rd Preference", pref: pref3, num: 3 },
+                    ].map(({ label, pref, num }) => (
+                      <div
+                        key={num}
+                        className={cn(
+                          "p-3 border-2 rounded-lg text-center transition-all",
+                          isPartyLocked
+                            ? "cursor-not-allowed opacity-60"
+                            : "cursor-pointer",
+                          selectingPref === num && !isPartyLocked
+                            ? "border-primary bg-primary/5 ring-2 ring-primary/30"
+                            : pref
+                              ? "border-green-500 bg-green-50"
+                              : "border-dashed border-muted-foreground/30",
+                        )}
+                        onClick={() =>
+                          !isPartyLocked && setSelectingPref(num as 1 | 2 | 3)
+                        }
+                      >
+                        <p className="text-xs font-medium text-muted-foreground mb-1">
+                          {label}
+                        </p>
+                        {pref ? (
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="relative w-12 h-12">
+                              <Image
+                                src={pref.imagePath}
+                                alt={pref.name}
+                                fill
+                                className="object-contain"
+                              />
+                            </div>
+                            <p className="text-xs font-medium truncate w-full">
+                              {pref.name}
                             </p>
-                            <div className="flex items-center gap-4">
-                              <div className="relative w-20 h-20 border rounded-lg bg-white p-2">
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground py-4">
+                            {selectingPref === num
+                              ? "Click a symbol below..."
+                              : "Not selected"}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* All Symbols Grid in ScrollArea */}
+                  {isLoadingSymbols ? (
+                    <div className="flex items-center justify-center p-8">
+                      <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                      Loading symbols...
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-[400px] border rounded-lg p-4">
+                      <div
+                        className={cn(
+                          "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3",
+                          isPartyLocked && "opacity-60 pointer-events-none",
+                        )}
+                      >
+                        {allSymbols.map((symbol) => {
+                          const prefNum = getSymbolPref(symbol.id);
+                          return (
+                            <motion.div
+                              key={symbol.id}
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              className={cn(
+                                "relative p-2 border-2 rounded-lg cursor-pointer transition-all",
+                                prefNum === 1
+                                  ? "border-primary bg-primary/10 ring-2 ring-primary/30"
+                                  : prefNum === 2
+                                    ? "border-blue-500 bg-blue-50 ring-2 ring-blue-300"
+                                    : prefNum === 3
+                                      ? "border-amber-500 bg-amber-50 ring-2 ring-amber-300"
+                                      : "border-muted hover:border-primary/50 hover:bg-muted/50",
+                              )}
+                              onClick={() => handleSymbolClick(symbol)}
+                            >
+                              <div className="relative w-full aspect-square mb-1">
                                 <Image
-                                  src={selectedSymbol.image}
-                                  alt={selectedSymbol.name}
+                                  src={symbol.imagePath}
+                                  alt={symbol.name}
                                   fill
-                                  className="object-contain"
+                                  className="object-contain p-1"
                                 />
                               </div>
-                              <div>
-                                <p className="font-medium">
-                                  {selectedSymbol.name}
-                                </p>
-                                <Badge variant="secondary">Party Symbol</Badge>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                      {/* Independent Symbol Selection */}
-                      {isIndependent && (
-                        <div className="space-y-4">
-                          <Alert>
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertDescription>
-                              Independent candidates can shuffle up to{" "}
-                              <strong>3 symbols</strong>. Each shuffle reveals a
-                              new symbol. After all 3 shuffles, select one
-                              symbol from the list below.
-                            </AlertDescription>
-                          </Alert>
-
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm text-muted-foreground">
-                              Symbols revealed:{" "}
-                              <span className="font-bold text-primary">
-                                {shuffleCount}/3
-                              </span>
-                            </p>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={handleShuffle}
-                              disabled={
-                                isShuffleDisabled ||
-                                shuffleCount >= 3 ||
-                                isPartyLocked ||
-                                independentSymbols.length === 0
-                              }
-                            >
-                              <Shuffle className="mr-2 h-4 w-4" />
-                              {shuffleCount >= 3
-                                ? "All Symbols Revealed"
-                                : `Reveal Next Symbol (${3 - shuffleCount} left)`}
-                            </Button>
-                          </div>
-
-                          {/* Display All Shuffled Symbols */}
-                          {shuffledSymbols.length > 0 && (
-                            <div className="space-y-3">
-                              <p className="text-sm font-medium text-muted-foreground">
-                                {shuffleCount >= 3
-                                  ? "Select one symbol from the options below:"
-                                  : "Your revealed symbols (keep shuffling to see more):"}
+                              <p className="text-[10px] text-center font-medium truncate">
+                                {symbol.name}
                               </p>
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {shuffledSymbols.map((symbol, index) => (
-                                  <motion.div
-                                    key={symbol.id}
-                                    initial={{ scale: 0.8, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    transition={{
-                                      duration: 0.3,
-                                      delay: index * 0.1,
-                                    }}
-                                    className={cn(
-                                      "relative p-4 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md",
-                                      selectedSymbol?.id === symbol.id
-                                        ? "border-primary bg-primary/5 ring-2 ring-primary/30"
-                                        : "border-muted hover:border-primary/50",
-                                    )}
-                                    onClick={() => handleSymbolSelect(symbol)}
-                                  >
-                                    <div className="relative w-full aspect-square mb-3">
-                                      <Image
-                                        src={symbol.image}
-                                        alt={symbol.name}
-                                        fill
-                                        className="object-contain"
-                                      />
-                                    </div>
-                                    <p className="text-sm text-center font-medium">
-                                      {symbol.name}
-                                    </p>
-                                    {selectedSymbol?.id === symbol.id && (
-                                      <div className="absolute top-2 right-2">
-                                        <CheckCircle2 className="h-5 w-5 text-primary" />
-                                      </div>
-                                    )}
-                                    <Badge
-                                      variant={
-                                        selectedSymbol?.id === symbol.id
-                                          ? "default"
+                              {prefNum && (
+                                <div className="absolute -top-2 -right-2">
+                                  <Badge
+                                    variant={
+                                      prefNum === 1
+                                        ? "default"
+                                        : prefNum === 2
+                                          ? "secondary"
                                           : "outline"
-                                      }
-                                      className="w-full mt-2 justify-center"
-                                    >
-                                      {selectedSymbol?.id === symbol.id
-                                        ? "Selected"
-                                        : `Option ${index + 1}`}
-                                    </Badge>
-                                  </motion.div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {shuffleCount >= 3 && (
-                            <p className="text-xs text-muted-foreground text-center">
-                              All 3 symbols revealed. Please select your
-                              preferred symbol above.
-                            </p>
-                          )}
-
-                          {shuffleCount < 3 && shuffleCount > 0 && (
-                            <p className="text-xs text-amber-600 text-center">
-                              Click &quot;Reveal Next Symbol&quot; to see more
-                              options before making your final selection.
-                            </p>
-                          )}
-                        </div>
-                      )}
-
-                      <FormMessage />
-                    </FormItem>
+                                    }
+                                    className={cn(
+                                      "h-5 w-5 p-0 flex items-center justify-center text-[10px] rounded-full",
+                                      prefNum === 1 && "bg-primary text-white",
+                                      prefNum === 2 && "bg-blue-500 text-white",
+                                      prefNum === 3 &&
+                                        "bg-amber-500 text-white",
+                                    )}
+                                  >
+                                    {prefNum}
+                                  </Badge>
+                                </div>
+                              )}
+                            </motion.div>
+                          );
+                        })}
+                      </div>
+                    </ScrollArea>
                   )}
-                />
-              </div>
+
+                  <p className="text-xs text-muted-foreground text-center">
+                    Showing all {allSymbols.length} available symbols. Select
+                    your 1st, 2nd, and 3rd preferences.
+                  </p>
+                </div>
+              )}
 
               <div className="flex justify-between pt-4">
                 <Button type="button" variant="outline" onClick={onBack}>
@@ -671,7 +565,7 @@ export function StepDeclaration({ onNext, onBack }: StepDeclarationProps) {
                 <Button
                   type="submit"
                   className="bg-primary hover:bg-primary-hover"
-                  disabled={(age !== null && age < 21) || isLoadingParties}
+                  disabled={isLoadingParties}
                 >
                   Preview Form
                   <ArrowRight className="ml-2 h-4 w-4" />

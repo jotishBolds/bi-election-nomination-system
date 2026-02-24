@@ -1,4 +1,5 @@
 // Database Seed Script for Sikkim Municipality Election 2026
+import "dotenv/config";
 import { PrismaClient, Role, ReservationType } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
@@ -607,12 +608,15 @@ async function main() {
     for (const ulbData of districtData.ulbs) {
       const ulb = await prisma.uLB.upsert({
         where: { code: ulbData.code },
-        update: { name: ulbData.name, type: ulbData.type },
+        update: {
+          name: ulbData.name,
+          type: ulbData.type as import("@prisma/client").ULBType,
+        },
         create: {
           districtId: district.id,
           name: ulbData.name,
           code: ulbData.code,
-          type: ulbData.type,
+          type: ulbData.type as import("@prisma/client").ULBType,
         },
       });
 

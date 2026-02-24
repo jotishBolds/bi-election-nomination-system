@@ -19,6 +19,7 @@ import {
   FileText,
   Clock,
   RefreshCw,
+  Receipt,
 } from "lucide-react";
 import {
   Dialog,
@@ -27,8 +28,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import html2PDF from "jspdf-html2canvas";
 import { useCandidateDashboard } from "@/hooks/use-dashboard";
+import { downloadForm18PDF, getForm18PreviewHTML } from "@/lib/form18-template";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function CandidatePanel() {
@@ -37,6 +38,22 @@ export function CandidatePanel() {
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<
     string | null
   >(null);
+  const [pdfPreviewHTML, setPdfPreviewHTML] = useState<string>("");
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+
+  // Load PDF preview when view is clicked
+  const loadPdfPreview = async (nominationId: string) => {
+    setIsLoadingPreview(true);
+    try {
+      const html = await getForm18PreviewHTML(nominationId);
+      setPdfPreviewHTML(html);
+    } catch (error) {
+      console.error("Failed to load PDF preview:", error);
+      setPdfPreviewHTML('<p class="error">Failed to load preview</p>');
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     const statusLower = status.toLowerCase();
@@ -94,25 +111,26 @@ export function CandidatePanel() {
     }
   };
 
-  const getPaymentBadge = (paymentStatus: string) => {
-    const statusLower = paymentStatus?.toLowerCase() || "pending";
+  const getBRVerificationBadge = (brStatus: string) => {
+    const statusLower = brStatus?.toLowerCase() || "pending";
     switch (statusLower) {
       case "paid":
+      case "verified":
         return (
-          <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 text-xs font-medium">
-            Paid
+          <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-xs font-medium">
+            Verified
           </Badge>
         );
-      case "failed":
+      case "rejected":
         return (
           <Badge className="bg-red-100 text-red-700 hover:bg-red-100 text-xs font-medium">
-            Failed
+            Rejected
           </Badge>
         );
       default:
         return (
           <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 text-xs font-medium">
-            Pending
+            Under Review
           </Badge>
         );
     }
@@ -122,77 +140,11 @@ export function CandidatePanel() {
     setSelectedSubmissionId(nomination.id);
     setIsGeneratingPdf(true);
 
-    const tempDiv = document.createElement("div");
-    tempDiv.style.position = "absolute";
-    tempDiv.style.left = "-9999px";
-    tempDiv.style.top = "-9999px";
-    tempDiv.style.width = "794px";
-    tempDiv.style.fontFamily = "'Times New Roman', Times, serif";
-    tempDiv.style.fontSize = "12pt";
-    tempDiv.style.lineHeight = "1.6";
-    tempDiv.style.backgroundColor = "#ffffff";
-    tempDiv.style.color = "#000000";
-    tempDiv.style.padding = "40px";
-
-    const currentDate = new Date().toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    });
-
-    tempDiv.innerHTML = `
-      <div style="text-align: center; margin-bottom: 24px;">
-        <h1 style="font-size: 18pt; font-weight: bold; margin: 0 0 8px 0;">FORM-18</h1>
-        <p style="font-size: 10pt; color: #666666; margin: 0 0 8px 0;">[See sub-rule (3) of rule 25]</p>
-        <h2 style="font-size: 14pt; font-weight: bold; text-decoration: underline; margin: 0 0 8px 0;">NOMINATION PAPER</h2>
-        <p style="font-size: 11pt; color: #666666; margin: 0;">Municipality Election 2026</p>
-      </div>
-      <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;" />
-      <div style="margin-bottom: 24px;">
-        <p style="margin: 12px 0;">Application No: <strong>${nomination.applicationNo}</strong></p>
-        <p style="margin: 12px 0;">Ward: <strong>${nomination.wardName}</strong></p>
-        <p style="margin: 12px 0;">ULB: <strong>${nomination.ulbName}</strong></p>
-        <p style="margin: 12px 0;">District: <strong>${nomination.districtName}</strong></p>
-        <p style="margin: 12px 0;">Status: <strong>${nomination.status.toUpperCase()}</strong></p>
-      </div>
-      <div style="margin-top: 40px; text-align: center; font-size: 10pt; color: #666;">
-        <p style="margin: 0;">Application ID: ${nomination.applicationNo}</p>
-        <p style="margin: 4px 0 0 0;">Generated on: ${currentDate}</p>
-      </div>
-    `;
-
-    document.body.appendChild(tempDiv);
-
     try {
-      await html2PDF(tempDiv, {
-        jsPDF: {
-          unit: "pt",
-          format: "a4",
-          orientation: "portrait",
-        },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          scrollX: 0,
-          scrollY: 0,
-          logging: false,
-        },
-        imageType: "image/jpeg",
-        imageQuality: 0.98,
-        margin: {
-          top: 40,
-          right: 40,
-          bottom: 40,
-          left: 40,
-        },
-        autoResize: true,
-        output: `FORM-18_Nomination_${nomination.applicationNo}.pdf`,
-      });
+      await downloadForm18PDF(nomination.id);
     } catch (error) {
       console.error("PDF generation failed:", error);
     } finally {
-      document.body.removeChild(tempDiv);
       setIsGeneratingPdf(false);
       setSelectedSubmissionId(null);
     }
@@ -251,7 +203,8 @@ export function CandidatePanel() {
     daysRemaining,
   } = data;
   const status = latestNomination?.status || "draft";
-  const paymentStatus = latestNomination?.paymentStatus || "pending";
+  const brVerificationStatus =
+    latestNomination?.brVerificationStatus || "pending";
 
   return (
     <div className="space-y-5 p-6 min-h-screen">
@@ -379,26 +332,40 @@ export function CandidatePanel() {
         <Card className="bg-blue-50 border-0 shadow-sm rounded-xl">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <IndianRupee className="h-5 w-5 text-blue-600" />
+              <Receipt className="h-5 w-5 text-blue-600" />
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500">Payment Status</span>
-                {getPaymentBadge(paymentStatus)}
+                <span className="text-xs text-slate-500">BR Verification</span>
+                {getBRVerificationBadge(brVerificationStatus)}
               </div>
             </div>
             <div className="mt-3">
-              {paymentStatus === "paid" ? (
+              {brVerificationStatus === "verified" ||
+              brVerificationStatus === "paid" ? (
                 <>
                   <p className="text-2xl font-bold text-slate-800">
-                    ₹{latestNomination?.paymentAmount || 0}
+                    {latestNomination?.brNumber
+                      ? `BR-${latestNomination.brNumber}`
+                      : "Verified"}
                   </p>
                   <p className="text-xs text-slate-500 mt-1">
-                    Payment Completed
+                    BR Verified by Admin
+                  </p>
+                </>
+              ) : brVerificationStatus === "rejected" ? (
+                <>
+                  <p className="text-2xl font-bold text-slate-800">Rejected</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    BR Verification Rejected
                   </p>
                 </>
               ) : (
                 <>
-                  <p className="text-2xl font-bold text-slate-800">--</p>
-                  <p className="text-xs text-slate-500 mt-1">Payment Pending</p>
+                  <p className="text-2xl font-bold text-slate-800">
+                    Under Review
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    BR Under Admin Review
+                  </p>
                 </>
               )}
             </div>
@@ -478,17 +445,45 @@ export function CandidatePanel() {
 
                 <Dialog>
                   <DialogTrigger asChild>
-                    <Button size="sm" variant="outline" className="h-8 text-xs">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs"
+                      onClick={() => loadPdfPreview(latestNomination.id)}
+                    >
                       <Eye className="h-3 w-3 mr-1" />
                       View
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-md">
+                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>
                         Nomination - {latestNomination.applicationNo}
                       </DialogTitle>
                     </DialogHeader>
+
+                    {/* Form Preview Section */}
+                    {isLoadingPreview ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                        <span>Loading preview...</span>
+                      </div>
+                    ) : pdfPreviewHTML ? (
+                      <div className="space-y-4">
+                        <div className="border-t pt-4">
+                          <h4 className="font-medium text-sm mb-3 flex items-center">
+                            <FileText className="h-4 w-4 mr-2" />
+                            Form 18 Preview
+                          </h4>
+                          <div
+                            className="border rounded-lg p-4 bg-white max-h-96 overflow-y-auto"
+                            dangerouslySetInnerHTML={{ __html: pdfPreviewHTML }}
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* Original Details Section */}
                     <div className="space-y-3">
                       <div className="grid grid-cols-2 gap-3">
                         <div className="p-3 rounded-lg bg-slate-50">
@@ -498,9 +493,17 @@ export function CandidatePanel() {
                           </p>
                         </div>
                         <div className="p-3 rounded-lg bg-slate-50">
-                          <p className="text-xs text-slate-500">Payment</p>
+                          <p className="text-xs text-slate-500">
+                            BR Verification
+                          </p>
                           <p className="text-sm font-medium capitalize">
-                            {latestNomination.paymentStatus}
+                            {latestNomination.brVerificationStatus === "paid" ||
+                            latestNomination.brVerificationStatus === "verified"
+                              ? "Verified"
+                              : latestNomination.brVerificationStatus ===
+                                  "rejected"
+                                ? "Rejected"
+                                : "Under Review"}
                           </p>
                         </div>
                         <div className="p-3 rounded-lg bg-slate-50">

@@ -29,6 +29,7 @@ export interface CandidateDashboardData {
   user: UserInfo;
   submissions: {
     count: number;
+    submittedCount: number; // Add submittedCount for consistency
     maxAllowed: number;
     canSubmitMore: boolean;
   };
@@ -41,8 +42,8 @@ export interface CandidateDashboardData {
     ulbName: string;
     districtName: string;
     reservation: string;
-    paymentStatus: string;
-    paymentAmount?: number;
+    brVerificationStatus: string; // Changed from paymentStatus to brVerificationStatus
+    brNumber?: string; // Add brNumber field
   };
   allNominations: Array<{
     id: string;
@@ -136,7 +137,6 @@ export interface AdminDashboardData {
   };
   systemHealth: {
     database: { status: "healthy" | "degraded" | "down"; latency: number };
-    redis: { status: "healthy" | "degraded" | "down"; latency: number };
     storage: { status: "healthy" | "degraded" | "down"; usedPercent: number };
   };
   nominationStats: {

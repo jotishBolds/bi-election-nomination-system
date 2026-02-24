@@ -4,6 +4,8 @@ import { z } from "zod";
 import { requireRoles, requireSuperAdmin } from "@/lib/auth/auth-guard";
 import {} from "@/lib/auth/auth-guard";
 import { Role } from "@prisma/client";
+import fs from "fs";
+import path from "path";
 
 /* =============================
    GET SYMBOLS (Query Params)
@@ -23,6 +25,13 @@ export const createSymbolSchema = z.object({
   isReserved: z.boolean().optional(),
   isActive: z.boolean().optional(),
   displayOrder: z.number().int().min(0).optional(),
+});
+
+/* =============================
+   SEED SYMBOLS FROM PUBLIC (Body)
+============================= */
+export const seedSymbolsSchema = z.object({
+  seedFromPublic: z.literal(true),
 });
 
 /* ---------------- GET SYMBOLS ---------------- */
@@ -106,6 +115,101 @@ export async function POST(request: NextRequest) {
     const session = await requireSuperAdmin();
 
     const body = await request.json();
+
+    // Check if this is a seed request
+    const seedResult = seedSymbolsSchema.safeParse(body);
+    if (seedResult.success) {
+      try {
+        // Seed symbols from public directory
+        const publicSymbolsPath = path.join(
+          process.cwd(),
+          "public",
+          "election-symbols",
+        );
+        const files = fs
+          .readdirSync(publicSymbolsPath)
+          .filter((file) => file.endsWith(".png"));
+
+        console.log(
+          `Found ${files.length} PNG files in public/election-symbols`,
+        );
+
+        const createdSymbols = [];
+        let displayOrder = 1;
+
+        for (const file of files) {
+          // Convert filename to symbol name: remove .png, replace special chars with spaces, title case
+          const baseName = file.replace(".png", "");
+          const symbolName = baseName
+            .replace(/[^a-zA-Z0-9]/g, " ") // Replace special chars with spaces
+            .split(" ")
+            .filter((word) => word.length > 0)
+            .map(
+              (word) =>
+                word.charAt(0).toUpperCase() + word.slice(1).toLowerCase(),
+            )
+            .join(" ")
+            .trim();
+          const imagePath = `/election-symbols/${file}`;
+
+          // Check if symbol already exists
+          const existing = await db.electionSymbol.findFirst({
+            where: {
+              name: { equals: symbolName, mode: "insensitive" },
+            },
+          });
+
+          if (!existing) {
+            try {
+              const symbol = await db.electionSymbol.create({
+                data: {
+                  name: symbolName,
+                  imagePath,
+                  isReserved: false,
+                  isActive: true,
+                  displayOrder,
+                },
+              });
+              createdSymbols.push(symbol);
+              displayOrder++;
+            } catch (createError) {
+              console.error(
+                `Failed to create symbol "${symbolName}":`,
+                createError,
+              );
+              // Continue with next symbol
+            }
+          }
+        }
+
+        console.log(`Successfully created ${createdSymbols.length} symbols`);
+
+        await db.auditLog.create({
+          data: {
+            action: "CREATE",
+            entityType: "ElectionSymbol",
+            entityId: null,
+            userId: session.user.id,
+            newValues: { count: createdSymbols.length, operation: "bulk-seed" },
+            ipAddress: "api",
+          },
+        });
+
+        return NextResponse.json({
+          success: true,
+          data: createdSymbols,
+          message: `Seeded ${createdSymbols.length} symbols from public directory`,
+        });
+      } catch (seedError) {
+        console.error("Seed error:", seedError);
+        return NextResponse.json(
+          { error: "Failed to seed symbols from public directory" },
+          { status: 500 },
+        );
+      }
+    }
+
+    // Regular symbol creation
     const data = createSymbolSchema.parse(body);
 
     const existing = await db.electionSymbol.findFirst({

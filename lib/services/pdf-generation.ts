@@ -665,7 +665,7 @@ export async function generateNominationPDF(
         proposers: {
           orderBy: { createdAt: "asc" },
         },
-        payments: true,
+        brPayments: true,
       },
     });
 
@@ -676,6 +676,7 @@ export async function generateNominationPDF(
     // Prepare data
     const profile = nomination.applicantProfile!;
     const voterRecord = profile.voterRecord;
+    const brPayment = (nomination as any).brPayments?.[0];
     const data: NominationData = {
       applicationNo: nomination.applicationNo,
       candidateName: voterRecord?.name ?? nomination.candidateName,
@@ -683,7 +684,7 @@ export async function generateNominationPDF(
         voterRecord?.fatherHusbandName ?? nomination.fatherHusbandName,
       dateOfBirth: voterRecord?.dateOfBirth ?? nomination.dateOfBirth,
       age: voterRecord?.age ?? nomination.age,
-      gender: nomination.gender,
+      gender: nomination.gender ?? "MALE",
       address: voterRecord?.address ?? nomination.address,
       epicNo: voterRecord?.epicNo ?? profile.epicNo,
       category: profile.category,
@@ -700,11 +701,11 @@ export async function generateNominationPDF(
         address: p.address ?? undefined,
         serialNo: idx + 1,
       })),
-      paymentDetails: nomination.payments?.[0]
+      paymentDetails: brPayment
         ? {
-            transactionId: nomination.payments[0].transactionId ?? undefined,
-            amount: Number(nomination.payments[0].amount),
-            paymentDate: nomination.payments[0].completedAt!,
+            transactionId: brPayment.brNumber ?? undefined,
+            amount: 500,
+            paymentDate: brPayment.submittedAt!,
           }
         : undefined,
       receivedDate: nomination.receivedAt ?? undefined,
@@ -847,9 +848,9 @@ export async function generateWardPDF(
         applicationNo: nom.applicationNo,
         candidateName: nom.candidateName,
         fatherHusbandName: nom.fatherHusbandName,
-        dateOfBirth: nom.dateOfBirth,
-        age: nom.age,
-        gender: nom.gender,
+        dateOfBirth: nom.dateOfBirth ?? new Date(),
+        age: nom.age ?? 0,
+        gender: nom.gender ?? "MALE",
         address: nom.address,
         epicNo: profile.voterRecord?.epicNo,
         category: nom.category,
