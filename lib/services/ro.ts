@@ -12,7 +12,7 @@ import {
   buildJurisdictionFilter,
 } from "@/lib/services/ro-jurisdiction";
 import { generateOTP, hashOTP, getClientIP } from "@/lib/auth/server-utils";
-import { storeOTP, verifyOTP } from "@/lib/redis";
+import { storeOTP, verifyOTP } from "@/lib/memory-store";
 import { OTPType, OTPStatus } from "@prisma/client";
 
 interface ReceiveNominationInput {
@@ -29,14 +29,15 @@ interface ScrutinyInput {
   remarks?: string;
   rejectionReasons?: string;
   ipAddress: string;
+  otpVerified: boolean;
 }
 
 interface WithdrawalInput {
   nominationId: string;
   roUserId: string;
-  candidateOtpVerified: boolean;
   reason: string;
   ipAddress: string;
+  otpVerified: boolean;
 }
 
 // NOTE: validateROJurisdiction has been replaced by hasAccessToWard()
@@ -208,12 +209,13 @@ export async function receiveNomination(
 }
 
 /**
- * Sends an OTP to the RO user to authorize receiving a nomination
+ * Sends an OTP to the RO user to authorize an action (RECEIPT, SCRUTINY, WITHDRAWAL)
  */
-export async function sendROReceiptOTP(
+export async function sendROOTP(
   nominationId: string,
   roUserId: string,
   ipAddress: string,
+  actionType: OTPType,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     // Verify nomination existence and status
@@ -224,11 +226,6 @@ export async function sendROReceiptOTP(
 
     if (!nomination) {
       return { success: false, error: "Nomination not found" };
-    }
-
-    // Will use this later on when we know if the status needs to be strictly in submitted status
-    if (nomination.status !== NominationStatus.SUBMITTED) {
-      return { success: false, error: "Nomination is not in submitted status" };
     }
 
     // Verify RO jurisdiction
@@ -262,12 +259,7 @@ export async function sendROReceiptOTP(
     const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
 
     // Store in Redis for quick verification
-    await storeOTP(
-      identifier,
-      otpHash,
-      "RECEIPT_CONFIRMATION",
-      expiryMinutes * 60,
-    );
+    await storeOTP(identifier, otpHash, actionType, expiryMinutes * 60);
 
     // Create entry in database (OTPLog) for audit
     await db.oTPLog.create({
@@ -276,7 +268,7 @@ export async function sendROReceiptOTP(
         phone: identifier,
         email: roUser.email,
         otpHash,
-        type: "RECEIPT_CONFIRMATION",
+        type: actionType,
         status: OTPStatus.PENDING,
         maxAttempts: parseInt(process.env.OTP_MAX_ATTEMPTS || "3"),
         expiresAt,
@@ -284,16 +276,24 @@ export async function sendROReceiptOTP(
       },
     });
 
+    // Action name for notification
+    const actionName =
+      actionType === "RECEIPT_CONFIRMATION"
+        ? "Nomination Receipt"
+        : actionType === "SCRUTINY"
+          ? "Nomination Scrutiny"
+          : "Nomination Withdrawal";
+
     // Send notification to RO
     await sendNotification(
       roUser.phone,
       roUser.email,
-      "Nomination Receipt Authorization",
+      `${actionName} Authorization`,
       NotificationTemplates.OTP(otp, expiryMinutes),
     );
 
     console.info(
-      `[RO-Auth] Sent receipt OTP to RO (${roUser.phone}) for nomination ${nominationId}`,
+      `[RO-Auth] Sent ${actionType} OTP to RO (${roUser.phone}) for nomination ${nominationId}`,
     );
     if (process.env.NODE_ENV === "development") {
       console.info(`[DEV] RO OTP: ${otp}`);
@@ -301,9 +301,83 @@ export async function sendROReceiptOTP(
 
     return { success: true };
   } catch (error) {
-    console.error("sendROReceiptOTP error:", error);
+    console.error("sendROOTP error:", error);
     return { success: false, error: "Failed to send authorization OTP" };
   }
+}
+
+/**
+ * Internal helper to verify RO OTP
+ */
+async function verifyROOTP(
+  identifier: string,
+  otp: string,
+  roUserId: string,
+  actionType: OTPType,
+): Promise<{ success: boolean; error?: string }> {
+  const otpHash = hashOTP(otp.trim());
+
+  console.info(
+    `[RO-Auth] Attempting verification for RO ${roUserId} (${identifier}) as ${actionType}`,
+  );
+
+  // Verify OTP via Redis
+  const verification = await verifyOTP(identifier, otpHash, actionType);
+
+  if (!verification.valid) {
+    console.warn(
+      `[RO-Auth] Verification failed for ${identifier}: valid=${verification.valid}, expired=${verification.expired}, maxAttempts=${verification.maxAttemptsReached}`,
+    );
+    if (verification.expired) return { success: false, error: "OTP expired" };
+    if (verification.maxAttemptsReached)
+      return { success: false, error: "Maximum attempts reached" };
+    return { success: false, error: "Invalid OTP" };
+  }
+
+  // Update OTP log in database
+  try {
+    const otpLog = await db.oTPLog.findFirst({
+      where: {
+        OR: [{ userId: roUserId }, { phone: identifier }],
+        type: actionType,
+        status: OTPStatus.PENDING,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (otpLog) {
+      await db.oTPLog.update({
+        where: { id: otpLog.id },
+        data: {
+          status: OTPStatus.VERIFIED,
+          verifiedAt: new Date(),
+        },
+      });
+      console.info(
+        `[RO-Auth] OTP verified for RO ${roUserId} (Log ID: ${otpLog.id})`,
+      );
+    }
+  } catch (dbError) {
+    console.warn("Failed to update OTP log in database:", dbError);
+  }
+
+  return { success: true };
+}
+
+/**
+ * Legacy wrapper for receipt OTP (can be refactored later if desired)
+ */
+export async function sendROReceiptOTP(
+  nominationId: string,
+  roUserId: string,
+  ipAddress: string,
+): Promise<{ success: boolean; error?: string }> {
+  return sendROOTP(
+    nominationId,
+    roUserId,
+    ipAddress,
+    OTPType.RECEIPT_CONFIRMATION,
+  );
 }
 
 /**
@@ -316,69 +390,28 @@ export async function receiveNominationWithROOTP(
   ipAddress: string,
 ): Promise<{ success: boolean; nomination?: any; error?: string }> {
   try {
-    const rawOtp = otp.trim();
     // Get RO details
     const roUser = await db.user.findUnique({
       where: { id: roUserId },
-      select: { phone: true, email: true },
+      select: { phone: true },
     });
 
     if (!roUser || !roUser.phone) {
       return { success: false, error: "RO user not found or phone missing" };
     }
 
-    const identifier = roUser.phone.trim();
-
-    // Hash provided OTP for comparison
-    const otpHash = hashOTP(rawOtp);
-
-    console.info(`[RO-Auth] Attempting verification for RO ${roUserId} (${identifier})`);
-
-    // Verify OTP via Redis first (standard pattern)
-    const verification = await verifyOTP(
-      identifier,
-      otpHash,
-      "RECEIPT_CONFIRMATION",
+    const verification = await verifyROOTP(
+      roUser.phone.trim(),
+      otp,
+      roUserId,
+      OTPType.RECEIPT_CONFIRMATION,
     );
 
-    if (!verification.valid) {
-      console.warn(`[RO-Auth] Verification failed for ${identifier}: valid=${verification.valid}, expired=${verification.expired}, maxAttempts=${verification.maxAttemptsReached}`);
-      if (verification.expired) return { success: false, error: "OTP expired" };
-      if (verification.maxAttemptsReached)
-        return { success: false, error: "Maximum attempts reached" };
-      return { success: false, error: "Invalid OTP" };
+    if (!verification.success) {
+      return { success: false, error: verification.error };
     }
 
-    // Update OTP log in database to VERIFIED (mirroring api/otp/verify pattern)
-    try {
-      // Find the most recent pending OTP log, allowing for 10 min clock skew if any
-      const otpLog = await db.oTPLog.findFirst({
-        where: {
-          OR: [
-            { userId: roUserId },
-            { phone: identifier },
-          ],
-          type: "RECEIPT_CONFIRMATION",
-          status: OTPStatus.PENDING,
-        },
-        orderBy: { createdAt: "desc" },
-      });
-
-      if (otpLog) {
-        await db.oTPLog.update({
-          where: { id: otpLog.id },
-          data: {
-            status: OTPStatus.VERIFIED,
-            verifiedAt: new Date(),
-          },
-        });
-        console.info(`[RO-Auth] OTP verified for RO ${roUserId} (Log ID: ${otpLog.id})`);
-      }
-    } catch (dbError) {
-      console.warn("Failed to update OTP log in database:", dbError);
-    }
-
-    // Call existing receipt logic (which handles status update, logs, and candidate notification)
+    // Call existing receipt logic
     return receiveNomination({
       nominationId,
       roUserId,
@@ -388,6 +421,84 @@ export async function receiveNominationWithROOTP(
   } catch (error) {
     console.error("receiveNominationWithROOTP error:", error);
     return { success: false, error: "Failed to verify and process receipt" };
+  }
+}
+
+/**
+ * Verifies RO OTP and performs scrutiny
+ */
+export async function scrutinizeNominationWithROOTP(
+  input: Omit<ScrutinyInput, "otpVerified"> & { otp: string },
+): Promise<{ success: boolean; nomination?: any; error?: string }> {
+  try {
+    const rawOtp = input.otp.trim();
+    // Get RO details
+    const roUser = await db.user.findUnique({
+      where: { id: input.roUserId },
+      select: { phone: true },
+    });
+
+    if (!roUser || !roUser.phone) {
+      return { success: false, error: "RO user not found or phone missing" };
+    }
+
+    const verification = await verifyROOTP(
+      roUser.phone.trim(),
+      rawOtp,
+      input.roUserId,
+      OTPType.SCRUTINY,
+    );
+
+    if (!verification.success) {
+      return { success: false, error: verification.error };
+    }
+
+    return scrutinizeNomination({
+      ...input,
+      otpVerified: true,
+    });
+  } catch (error) {
+    console.error("scrutinizeNominationWithROOTP error:", error);
+    return { success: false, error: "Failed to verify and process scrutiny" };
+  }
+}
+
+/**
+ * Verifies RO OTP and performs withdrawal
+ */
+export async function processWithdrawalWithROOTP(
+  input: Omit<WithdrawalInput, "otpVerified"> & { otp: string },
+): Promise<{ success: boolean; nomination?: any; error?: string }> {
+  try {
+    const rawOtp = input.otp.trim();
+    // Get RO details
+    const roUser = await db.user.findUnique({
+      where: { id: input.roUserId },
+      select: { phone: true },
+    });
+
+    if (!roUser || !roUser.phone) {
+      return { success: false, error: "RO user not found or phone missing" };
+    }
+
+    const verification = await verifyROOTP(
+      roUser.phone.trim(),
+      rawOtp,
+      input.roUserId,
+      OTPType.WITHDRAWAL,
+    );
+
+    if (!verification.success) {
+      return { success: false, error: verification.error };
+    }
+
+    return processWithdrawal({
+      ...input,
+      otpVerified: true,
+    });
+  } catch (error) {
+    console.error("processWithdrawalWithROOTP error:", error);
+    return { success: false, error: "Failed to verify and process withdrawal" };
   }
 }
 
@@ -418,10 +529,10 @@ export async function scrutinizeNomination(
       return { success: false, error: "Nomination not found" };
     }
 
-    if (nomination.status !== NominationStatus.RECEIVED) {
+    if (nomination.status !== NominationStatus.RECEIVED && nomination.status !== NominationStatus.UNDER_SCRUTINY) {
       return {
         success: false,
-        error: "Nomination must be received before scrutiny",
+        error: "Nomination must be received or under scrutiny before scrutiny",
       };
     }
 
@@ -560,8 +671,8 @@ export async function processWithdrawal(
       };
     }
 
-    if (!input.candidateOtpVerified) {
-      return { success: false, error: "Candidate OTP verification required" };
+    if (!input.otpVerified) {
+      return { success: false, error: "RO OTP verification required" };
     }
 
     // Update nomination

@@ -52,8 +52,7 @@ export async function GET(
             symbol: true,
           },
         },
-        documents: true,
-        payments: true,
+        brPayments: true,
         statusHistory: {
           orderBy: {
             createdAt: "desc",

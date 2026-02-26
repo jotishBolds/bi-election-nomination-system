@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { Role } from "@prisma/client";
 import { requireRoles } from "@/lib/auth/auth-guard";
-import { hasAccessToWard } from "@/lib/services/ro-jurisdiction";
+import { getClientIP } from "@/lib/auth/server-utils";
+import { scrutinizeNominationWithROOTP } from "@/lib/services/ro";
+import { roScrutinySchema } from "@/lib/auth/validations/ro";
 
 // POST /api/ro/applications/[id]/scrutiny - Submit scrutiny decision
 export async function POST(
@@ -11,15 +13,27 @@ export async function POST(
 ) {
   try {
     const session = await requireRoles([Role.RO, Role.SES, Role.SUPER_ADMIN]);
+    const { id: nominationId } = await params;
 
-    const { id } = await params;
-    const body = await request.json();
-    const { decision, checklist, remarks, rejectionReasons, action } = body;
+    const body = await request.json().catch(() => ({}));
+    const validation = roScrutinySchema.safeParse(body);
 
-    // Handle START action - mark as under scrutiny
-    if (action === "START") {
+    if (!validation.success) {
+      const issue = validation.error.issues[0];
+      const field = issue.path.join(".");
+      return NextResponse.json(
+        { success: false, error: `${field}: ${issue.message}` },
+        { status: 400 },
+      );
+    }
+
+    const data = validation.data;
+    const ip = getClientIP(request);
+
+    // Handle START flow (No OTP needed)
+    if (data._flow === "START") {
       const application = await db.nominationApplication.findUnique({
-        where: { id },
+        where: { id: nominationId },
       });
 
       if (!application) {
@@ -34,7 +48,7 @@ export async function POST(
         application.status === "RECEIVED"
       ) {
         await db.nominationApplication.update({
-          where: { id },
+          where: { id: nominationId },
           data: { status: "UNDER_SCRUTINY" },
         });
       }
@@ -45,126 +59,50 @@ export async function POST(
       });
     }
 
-    if (!decision || !["ACCEPTED", "REJECTED"].includes(decision)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid decision. Must be ACCEPTED or REJECTED",
-        },
-        { status: 400 },
-      );
-    }
+    // Now it's the DECISION flow
+    const { decision, remarks, rejectionReasons, otp } = data;
 
-    const application = await db.nominationApplication.findUnique({
-      where: { id },
-      include: {
-        ward: {
-          include: {
-            ulb: true,
-          },
-        },
-      },
-    });
-
-    if (!application) {
-      return NextResponse.json(
-        { success: false, error: "Application not found" },
-        { status: 404 },
-      );
-    }
-
-    // Verify RO has jurisdiction
+    // Call the service with OTP verification if RO
+    let result;
     if (session.user.role === Role.RO) {
-      const hasJurisdiction = await hasAccessToWard(session.user.id, application.wardId);
-
-      if (!hasJurisdiction) {
-        return NextResponse.json(
-          { success: false, error: "Access denied - not in your jurisdiction" },
-          { status: 403 },
-        );
-      }
-    }
-
-    // Check if application is in a state that can be scrutinized
-    if (
-      !["SUBMITTED", "RECEIVED", "UNDER_SCRUTINY"].includes(application.status)
-    ) {
+      result = await scrutinizeNominationWithROOTP({
+        nominationId,
+        roUserId: session.user.id,
+        decision,
+        remarks,
+        rejectionReasons,
+        ipAddress: ip,
+        otp,
+      });
+    } else {
+      // Non-RO (Admin/SES) - Currently we restrict scrutiny to RO via this specific OTP flow
+      // If we want to allow Admins to bypass OTP, we could call scrutinizeNomination directly.
       return NextResponse.json(
-        {
-          success: false,
-          error: "Application cannot be scrutinized in current state",
-        },
-        { status: 400 },
+        { success: false, error: "Currently only RO can perform scrutiny via this flow" },
+        { status: 403 },
       );
     }
 
-    // Determine new status based on decision
-    const newStatus = decision === "ACCEPTED" ? "ACCEPTED" : "REJECTED";
-
-    // Update application with scrutiny result
-    const updatedApplication = await db.nominationApplication.update({
-      where: { id },
-      data: {
-        status: newStatus,
-        scrutinyRemarks: remarks,
-        scrutinyDate: new Date(),
-        scrutinizedBy: session.user.id,
-        rejectionReasons:
-          decision === "REJECTED" ? rejectionReasons : undefined,
-      },
-      include: {
-        applicantProfile: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                phone: true,
-              },
-            },
-          },
-        },
-        ward: {
-          include: {
-            ulb: {
-              include: {
-                district: true,
-              },
-            },
-          },
-        },
-        politicalParty: true,
-        allocatedSymbol: true,
-      },
-    });
-
-    // Log the action
-    await db.auditLog.create({
-      data: {
-        action:
-          decision === "ACCEPTED"
-            ? "NOMINATION_ACCEPTED"
-            : "NOMINATION_REJECTED",
-        entityType: "NominationApplication",
-        entityId: id,
-        userId: session.user.id,
-        newValues: {
-          decision,
-          remarks,
-          rejectionReasons:
-            decision === "REJECTED" ? rejectionReasons : undefined,
-        },
-        ipAddress: "api",
-      },
-    });
+    if (!result.success) {
+      return NextResponse.json(
+        { success: false, error: result.error },
+        { status: 400 },
+      );
+    }
 
     return NextResponse.json({
       success: true,
-      data: updatedApplication,
+      data: result.nomination,
       message: `Application ${decision.toLowerCase()} successfully`,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error processing scrutiny:", error);
+    if (error.message === "UNAUTHORIZED") {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+    if (error.message === "FORBIDDEN") {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
     return NextResponse.json(
       { success: false, error: "Failed to process scrutiny" },
       { status: 500 },
@@ -179,7 +117,6 @@ export async function GET(
 ) {
   try {
     const session = await requireRoles([Role.RO, Role.SES, Role.SUPER_ADMIN]);
-
     const { id } = await params;
 
     const application = await db.nominationApplication.findUnique({

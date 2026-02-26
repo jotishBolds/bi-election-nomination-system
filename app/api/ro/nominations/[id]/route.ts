@@ -174,6 +174,7 @@ export async function POST(
           rejectionReasons: rejectionReason,
           remarks,
           ipAddress: request.headers.get("x-forwarded-for") || "unknown",
+          otpVerified: false,
         });
 
         if (!result.success) {
@@ -205,7 +206,7 @@ export async function POST(
         const result = await processWithdrawal({
           nominationId: id,
           roUserId: session.user.id,
-          candidateOtpVerified: candidateOtpVerified || false,
+          otpVerified: false, // Default to false for legacy direct API
           reason: reason || "",
           ipAddress: request.headers.get("x-forwarded-for") || "unknown",
         });

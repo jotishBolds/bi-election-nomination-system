@@ -108,6 +108,7 @@ enum OTPType {
   LOGIN
   REGISTRATION
   RECEIPT_CONFIRMATION
+  SCRUTINY
   WITHDRAWAL
   DATA_CORRECTION
 }
@@ -294,6 +295,9 @@ model User {
   receivedNominations    NominationApplication[] @relation("ReceivedBy")
   scrutinizedNominations NominationApplication[] @relation("ScrutinizedBy")
   approvedWithdrawals    NominationApplication[] @relation("WithdrawalApprovedBy")
+  createdChecklistItems   ElectionChecklistItem[] @relation("ChecklistItemCreatedBy")
+  createdChecklistResponses ChecklistResponse[]   @relation("ChecklistResponseCreatedBy")
+  documentViewTrackings   DocumentViewTracking[]  @relation("DocumentViewedBy")
 
   @@index([email])
   @@index([phone])
@@ -486,10 +490,10 @@ model NominationApplication {
   age               Int?
   gender            Gender?
   category          Category
-  casteTribeName    String?  @db.VarChar(100)
-  address           String   @db.Text
-  voterSerialNo     String   @db.VarChar(10)
-  voterPartNo       String   @db.VarChar(10)
+  casteTribeName    String?   @db.VarChar(100)
+  address           String    @db.Text
+  voterSerialNo     String    @db.VarChar(10)
+  voterPartNo       String    @db.VarChar(10)
 
   politicalPartyId String? @db.Uuid
   isIndependent    Boolean @default(true)
@@ -532,6 +536,8 @@ model NominationApplication {
   documents         Document[]
   brPayments        BRPayment[]
   statusHistory     NominationStatusHistory[]
+  checklistResponses    ChecklistResponse[]
+  documentViewTrackings DocumentViewTracking[]
 
   @@index([applicantProfileId])
   @@index([ulbId])
@@ -664,6 +670,8 @@ model Document {
 
   nomination NominationApplication @relation(fields: [nominationId], references: [id], onDelete: Cascade)
 
+  viewTrackings DocumentViewTracking[]
+
   @@index([nominationId])
   @@map("documents")
 }
@@ -705,6 +713,7 @@ model ElectionConfig {
   createdBy String   @db.Uuid
 
   symbolAllocations SymbolAllocation[]
+  checklistItems ElectionChecklistItem[]
 
   @@map("election_configs")
 }
@@ -792,13 +801,13 @@ model GeneratedPDF {
 
 // Voter Roll for EPIC number search & auto-populate
 model VoterRollEntry {
-  id            String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  epicNumber    String  @unique @db.VarChar(20)
-  fullName      String  @db.VarChar(200)
-  relationType  String  @db.VarChar(20) // Father, Husband
-  relationName  String  @db.VarChar(200)
-  postalAddress String  @db.Text
-  isActive      Boolean @default(true)
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  epicNumber    String   @unique @db.VarChar(20)
+  fullName      String   @db.VarChar(200)
+  relationType  String   @db.VarChar(20) // Father, Husband
+  relationName  String   @db.VarChar(200)
+  postalAddress String   @db.Text
+  isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -809,21 +818,81 @@ model VoterRollEntry {
 
 // BR Payment proof (replaces online payment)
 model BRPayment {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nominationId   String   @db.Uuid
-  brNumber       String   @db.VarChar(100) 
-  proofImageUrl  String   @db.VarChar(500) // Cloudinary URL
-  proofPublicId  String?  @db.VarChar(255) // Cloudinary public ID
-  status         PaymentStatus @default(PENDING)
-  verifiedBy     String?  @db.Uuid
-  verifiedAt     DateTime?
-  rejectionNote  String?  @db.Text
-  submittedAt    DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nominationId  String        @db.Uuid
+  brNumber      String        @db.VarChar(100)
+  proofImageUrl String        @db.VarChar(500) // Cloudinary URL
+  proofPublicId String?       @db.VarChar(255) // Cloudinary public ID
+  status        PaymentStatus @default(PENDING)
+  verifiedBy    String?       @db.Uuid
+  verifiedAt    DateTime?
+  rejectionNote String?       @db.Text
+  submittedAt   DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   nomination NominationApplication @relation(fields: [nominationId], references: [id], onDelete: Cascade)
 
   @@index([nominationId])
   @@index([brNumber])
   @@map("br_payments")
+}
+
+model ElectionChecklistItem {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  electionId   String   @db.Uuid
+  title        String   @db.VarChar(300)  // e.g., "Age eligibility verified (Min. 21 years)"
+  description   String?  @db.Text         // Detailed description
+  category     String?  @db.VarChar(100) // e.g., "Eligibility", "Documents", "Legal"
+  displayOrder Int      @default(0)     // Order in UI
+  isRequired   Boolean  @default(true)   // Must be checked for approval
+  isActive     Boolean  @default(true)   // Admin can enable/disable
+  
+  createdBy    String   @db.Uuid
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  election     ElectionConfig @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  creator      User           @relation("ChecklistItemCreatedBy", fields: [createdBy], references: [id])
+  responses    ChecklistResponse[]
+  
+  @@unique([electionId, title])
+  @@map("election_checklist_items")
+}
+
+model ChecklistResponse {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nominationId String   @db.Uuid
+  itemId       String   @db.Uuid
+  
+  isFulfilled  Boolean  @default(false)
+  notes        String?  @db.Text    // RO notes for this item
+  fulfilledAt  DateTime?
+  
+  createdBy    String   @db.Uuid
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  nomination   NominationApplication  @relation(fields: [nominationId], references: [id], onDelete: Cascade)
+  item         ElectionChecklistItem @relation(fields: [itemId], references: [id])
+  creator      User                  @relation("ChecklistResponseCreatedBy", fields: [createdBy], references: [id])
+  
+  @@unique([nominationId, itemId])
+  @@map("checklist_responses")
+}
+
+model DocumentViewTracking {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nominationId String   @db.Uuid
+  documentId   String   @db.Uuid
+  viewedAt     DateTime @default(now())
+  ipAddress    String   @db.VarChar(45)
+  
+  viewedBy     String   @db.Uuid
+  
+  nomination   NominationApplication @relation(fields: [nominationId], references: [id], onDelete: Cascade)
+  document     Document             @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  viewer       User                 @relation("DocumentViewedBy", fields: [viewedBy], references: [id])
+  
+  @@unique([nominationId, documentId, viewedBy])
+  @@map("document_view_tracking")
 }

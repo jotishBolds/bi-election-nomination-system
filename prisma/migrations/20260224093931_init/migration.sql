@@ -82,7 +82,7 @@ CREATE TABLE "ulbs" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "code" VARCHAR(20) NOT NULL,
     "name" VARCHAR(100) NOT NULL,
-    "type" VARCHAR(50) NOT NULL,
+    "type" "ULBType",
     "districtId" UUID NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -292,9 +292,9 @@ CREATE TABLE "nomination_applications" (
     "status" "NominationStatus" NOT NULL DEFAULT 'DRAFT',
     "candidateName" VARCHAR(200) NOT NULL,
     "fatherHusbandName" VARCHAR(200) NOT NULL,
-    "dateOfBirth" DATE NOT NULL,
-    "age" INTEGER NOT NULL,
-    "gender" "Gender" NOT NULL,
+    "dateOfBirth" DATE,
+    "age" INTEGER,
+    "gender" "Gender",
     "category" "Category" NOT NULL,
     "casteTribeName" VARCHAR(100),
     "address" TEXT NOT NULL,
@@ -430,34 +430,6 @@ CREATE TABLE "documents" (
 );
 
 -- CreateTable
-CREATE TABLE "payments" (
-    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-    "nominationId" UUID NOT NULL,
-    "amount" DECIMAL(10,2) NOT NULL,
-    "currency" VARCHAR(3) NOT NULL DEFAULT 'INR',
-    "mode" "PaymentMode" NOT NULL,
-    "status" "PaymentStatus" NOT NULL DEFAULT 'PENDING',
-    "transactionId" VARCHAR(100),
-    "orderId" VARCHAR(100),
-    "paymentGateway" VARCHAR(50),
-    "gatewayResponse" JSONB,
-    "challanNo" VARCHAR(50),
-    "bankName" VARCHAR(100),
-    "branchName" VARCHAR(100),
-    "depositDate" TIMESTAMP(3),
-    "verifiedBy" UUID,
-    "verifiedAt" TIMESTAMP(3),
-    "refundedAt" TIMESTAMP(3),
-    "refundAmount" DECIMAL(10,2),
-    "refundReason" TEXT,
-    "initiatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "completedAt" TIMESTAMP(3),
-    "ipAddress" VARCHAR(45) NOT NULL,
-
-    CONSTRAINT "payments_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "election_configs" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "name" VARCHAR(200) NOT NULL,
@@ -558,6 +530,38 @@ CREATE TABLE "generated_pdfs" (
     "metadata" JSONB,
 
     CONSTRAINT "generated_pdfs_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "voter_roll_entries" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "epicNumber" VARCHAR(20) NOT NULL,
+    "fullName" VARCHAR(200) NOT NULL,
+    "relationType" VARCHAR(20) NOT NULL,
+    "relationName" VARCHAR(200) NOT NULL,
+    "postalAddress" TEXT NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "voter_roll_entries_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "br_payments" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "nominationId" UUID NOT NULL,
+    "brNumber" VARCHAR(100) NOT NULL,
+    "proofImageUrl" VARCHAR(500) NOT NULL,
+    "proofPublicId" VARCHAR(255),
+    "status" "PaymentStatus" NOT NULL DEFAULT 'PENDING',
+    "verifiedBy" UUID,
+    "verifiedAt" TIMESTAMP(3),
+    "rejectionNote" TEXT,
+    "submittedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "br_payments_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -699,18 +703,6 @@ CREATE UNIQUE INDEX "symbol_allocations_wardId_symbolId_electionId_key" ON "symb
 CREATE INDEX "documents_nominationId_idx" ON "documents"("nominationId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "payments_transactionId_key" ON "payments"("transactionId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "payments_orderId_key" ON "payments"("orderId");
-
--- CreateIndex
-CREATE INDEX "payments_nominationId_idx" ON "payments"("nominationId");
-
--- CreateIndex
-CREATE INDEX "payments_transactionId_idx" ON "payments"("transactionId");
-
--- CreateIndex
 CREATE UNIQUE INDEX "day_module_configs_electionId_dayNumber_key" ON "day_module_configs"("electionId", "dayNumber");
 
 -- CreateIndex
@@ -739,6 +731,21 @@ CREATE INDEX "generated_pdfs_wardId_idx" ON "generated_pdfs"("wardId");
 
 -- CreateIndex
 CREATE INDEX "generated_pdfs_formType_idx" ON "generated_pdfs"("formType");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "voter_roll_entries_epicNumber_key" ON "voter_roll_entries"("epicNumber");
+
+-- CreateIndex
+CREATE INDEX "voter_roll_entries_epicNumber_idx" ON "voter_roll_entries"("epicNumber");
+
+-- CreateIndex
+CREATE INDEX "voter_roll_entries_fullName_idx" ON "voter_roll_entries"("fullName");
+
+-- CreateIndex
+CREATE INDEX "br_payments_nominationId_idx" ON "br_payments"("nominationId");
+
+-- CreateIndex
+CREATE INDEX "br_payments_brNumber_idx" ON "br_payments"("brNumber");
 
 -- AddForeignKey
 ALTER TABLE "districts" ADD CONSTRAINT "districts_stateId_fkey" FOREIGN KEY ("stateId") REFERENCES "states"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -849,10 +856,10 @@ ALTER TABLE "symbol_allocations" ADD CONSTRAINT "symbol_allocations_electionId_f
 ALTER TABLE "documents" ADD CONSTRAINT "documents_nominationId_fkey" FOREIGN KEY ("nominationId") REFERENCES "nomination_applications"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "payments" ADD CONSTRAINT "payments_nominationId_fkey" FOREIGN KEY ("nominationId") REFERENCES "nomination_applications"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "notification_logs" ADD CONSTRAINT "notification_logs_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "br_payments" ADD CONSTRAINT "br_payments_nominationId_fkey" FOREIGN KEY ("nominationId") REFERENCES "nomination_applications"("id") ON DELETE CASCADE ON UPDATE CASCADE;
