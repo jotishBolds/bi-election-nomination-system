@@ -7,23 +7,34 @@ export const sendROOTPSchema = z.object({
         .default("RECEIPT_CONFIRMATION"),
 });
 
-// Discriminated union for RO Scrutiny action
-// Workflow 1: action="START" -> No OTP needed, just transitions status
-// Workflow 2: decision present -> Requires OTP and decision (ACCEPTED/REJECTED)
-export const roScrutinySchema = z.preprocess((body: any) => {
-    if (body && body.action === "START") {
-        return { ...body, _flow: "START" };
-    }
-    return { ...body, _flow: "DECISION" };
-}, z.discriminatedUnion("_flow", [
+// Enhanced schema for POST /api/ro/applications/[id]/scrutiny with 4 actions
+export const roScrutinySchema = z.discriminatedUnion("action", [
+    // START - Initialize scrutiny
     z.object({
-        _flow: z.literal("START"),
         action: z.literal("START"),
     }),
+    
+    // SAVE_CHECKLIST - Save progress (partial completion allowed)
     z.object({
-        _flow: z.literal("DECISION"),
+        action: z.literal("SAVE_CHECKLIST"),
+        responses: z.array(z.object({
+            itemId: z.string().uuid("Invalid item ID"),
+            isFulfilled: z.boolean(),
+            notes: z.string().max(1000, "Notes too long").optional(),
+        })),
+    }),
+    
+    // VIEW_DOCUMENT - Track viewing
+    z.object({
+        action: z.literal("VIEW_DOCUMENT"),
+        documentId: z.string().uuid("Invalid document ID"),
+    }),
+    
+    // COMPLETE - Final decision
+    z.object({
+        action: z.literal("COMPLETE"),
         decision: z.enum(["ACCEPTED", "REJECTED"], {
-            required_error: "Decision must be ACCEPTED or REJECTED",
+            message: "Decision must be ACCEPTED or REJECTED",
         }),
         remarks: z.string().max(500, "Remarks too long").optional(),
         rejectionReasons: z.string().max(1000, "Rejection reasons too long").optional(),
@@ -32,7 +43,7 @@ export const roScrutinySchema = z.preprocess((body: any) => {
             .length(6, "OTP must be exactly 6 digits")
             .regex(/^[0-9]+$/, "OTP must contain only numbers"),
     }),
-]));
+]);
 
 // Schema for POST /api/ro/applications/[id]/withdraw
 export const roWithdrawalSchema = z.object({
