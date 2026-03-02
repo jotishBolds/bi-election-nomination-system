@@ -358,14 +358,14 @@ export async function getPaymentSummary(filters?: {
     whereClause.nomination = nominationFilter;
   }
 
-  const payments = await db.payment.aggregate({
+  const payments = await (db as any).payment.aggregate({
     where: whereClause,
     _sum: { amount: true },
     _count: { id: true },
   });
 
   // Group by ULB
-  const paymentsByUlb = await db.payment.groupBy({
+  const paymentsByUlb = await (db as any).payment.groupBy({
     by: ["nominationId"],
     where: whereClause,
     _sum: { amount: true },

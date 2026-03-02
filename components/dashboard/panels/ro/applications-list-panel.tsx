@@ -24,10 +24,16 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
 import {
   Search,
   RefreshCw,
@@ -51,6 +57,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Label } from "@/components/ui/label";
 import { downloadForm18PDF } from "@/lib/form18-template";
 
 interface Nomination {
@@ -120,6 +127,17 @@ export function ApplicationsListPanel() {
   const [wards, setWards] = useState<
     Array<{ id: string; wardNo: number; wardName: string }>
   >([]);
+
+  // OTP receive flow state
+  const [isReceiveDialogOpen, setIsReceiveDialogOpen] = useState(false);
+  const [receiveNominationId, setReceiveNominationId] = useState<string | null>(
+    null,
+  );
+  const [receiveOtp, setReceiveOtp] = useState("");
+  const [receiveOtpError, setReceiveOtpError] = useState("");
+  const [isSendingReceiveOtp, setIsSendingReceiveOtp] = useState(false);
+  const [isReceiving, setIsReceiving] = useState(false);
+  const [receiveOtpSent, setReceiveOtpSent] = useState(false);
 
   const fetchWards = async () => {
     try {
@@ -246,19 +264,90 @@ export function ApplicationsListPanel() {
     }
   };
 
-  // Handle nomination status actions (receive, send to scrutiny, etc.)
+  // Handle nomination status actions (receive with OTP, send to scrutiny)
+  const handleReceiveAction = async (nominationId: string) => {
+    setReceiveNominationId(nominationId);
+    setReceiveOtp("");
+    setReceiveOtpError("");
+    setReceiveOtpSent(false);
+    setIsReceiveDialogOpen(true);
+    // Send OTP immediately
+    await sendReceiveOtp(nominationId);
+  };
+
+  const sendReceiveOtp = async (nominationId: string) => {
+    setIsSendingReceiveOtp(true);
+    setReceiveOtpError("");
+    try {
+      const response = await fetch(
+        `/api/ro/applications/${nominationId}/send-otp`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "RECEIPT_CONFIRMATION" }),
+        },
+      );
+      const result = await response.json();
+      if (result.success) {
+        setReceiveOtpSent(true);
+      } else {
+        setReceiveOtpError(result.error || "Failed to send OTP");
+      }
+    } catch {
+      setReceiveOtpError("Failed to send OTP");
+    } finally {
+      setIsSendingReceiveOtp(false);
+    }
+  };
+
+  const handleConfirmReceive = async () => {
+    if (!receiveNominationId || receiveOtp.length !== 6) {
+      setReceiveOtpError("Please enter a valid 6-digit OTP");
+      return;
+    }
+    setIsReceiving(true);
+    setReceiveOtpError("");
+    try {
+      const response = await fetch(
+        `/api/ro/applications/${receiveNominationId}/receive`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ otp: receiveOtp }),
+        },
+      );
+      const result = await response.json();
+      if (result.success) {
+        setIsReceiveDialogOpen(false);
+        fetchNominations();
+      } else {
+        setReceiveOtpError(result.error || "Failed to receive application");
+      }
+    } catch {
+      setReceiveOtpError("Failed to receive application");
+    } finally {
+      setIsReceiving(false);
+    }
+  };
+
   const handleStatusAction = async (
     nominationId: string,
     action: "RECEIVE" | "SCRUTINY",
   ) => {
+    if (action === "RECEIVE") {
+      // Use OTP flow for receive
+      handleReceiveAction(nominationId);
+      return;
+    }
+    // For SCRUTINY, use the start scrutiny flow directly
     setIsActionLoading(nominationId);
     try {
       const response = await fetch(
-        `/api/ro/applications/${nominationId}/action`,
+        `/api/ro/applications/${nominationId}/scrutiny`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action }),
+          body: JSON.stringify({ action: "START" }),
         },
       );
       const result = await response.json();
@@ -789,6 +878,86 @@ export function ApplicationsListPanel() {
               </TabsContent>
             </Tabs>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* OTP Receive Dialog */}
+      <Dialog open={isReceiveDialogOpen} onOpenChange={setIsReceiveDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Phone className="h-5 w-5 text-primary" />
+              Receive Application
+            </DialogTitle>
+            <DialogDescription>
+              Enter the OTP sent to your registered phone to confirm receipt of
+              this application.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex flex-col items-center gap-4">
+              {isSendingReceiveOtp && !receiveOtpSent ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <p className="text-sm text-slate-500">Sending OTP...</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground text-center">
+                    Enter the 6-digit OTP sent to your registered mobile number
+                  </p>
+                  <InputOTP
+                    maxLength={6}
+                    value={receiveOtp}
+                    onChange={setReceiveOtp}
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                  {receiveOtpError && (
+                    <p className="text-sm text-red-600">{receiveOtpError}</p>
+                  )}
+                  <Button
+                    variant="link"
+                    size="sm"
+                    onClick={() =>
+                      receiveNominationId && sendReceiveOtp(receiveNominationId)
+                    }
+                    disabled={isSendingReceiveOtp}
+                  >
+                    {isSendingReceiveOtp ? (
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                    )}
+                    Resend OTP
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsReceiveDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmReceive}
+              disabled={isReceiving || receiveOtp.length !== 6}
+            >
+              {isReceiving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <CheckCheck className="h-4 w-4 mr-2" />
+              Verify & Receive
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -33,6 +33,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
+import {
   Search,
   RefreshCw,
   Eye,
@@ -45,6 +50,8 @@ import {
   ClipboardCheck,
   FileCheck,
   FileX,
+  Phone,
+  Send,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -80,19 +87,25 @@ interface Nomination {
     originalName?: string;
     storagePath?: string;
   }>;
+  checklistResponses?: Array<{
+    id: string;
+    itemId: string;
+    isFulfilled: boolean;
+    notes?: string;
+  }>;
 }
 
-interface ScrutinyChecklist {
-  ageVerified: boolean;
-  residencyVerified: boolean;
-  photoVerified: boolean;
-  idProofVerified: boolean;
-  nominationFormVerified: boolean;
-  affidavitVerified: boolean;
-  reservationCriteriaVerified: boolean;
-  securityDepositVerified: boolean;
-  partyAuthorizationVerified: boolean;
-  criminalDeclarationVerified: boolean;
+interface ChecklistItem {
+  id: string;
+  title: string;
+  description?: string;
+  category?: string;
+  displayOrder: number;
+  isRequired: boolean;
+}
+
+interface ChecklistState {
+  [itemId: string]: { checked: boolean; notes: string };
 }
 
 export function ScrutinyPanel() {
@@ -109,20 +122,18 @@ export function ScrutinyPanel() {
     Array<{ id: string; wardNo: number; wardName: string }>
   >([]);
 
-  const [checklist, setChecklist] = useState<ScrutinyChecklist>({
-    ageVerified: false,
-    residencyVerified: false,
-    photoVerified: false,
-    idProofVerified: false,
-    nominationFormVerified: false,
-    affidavitVerified: false,
-    reservationCriteriaVerified: false,
-    securityDepositVerified: false,
-    partyAuthorizationVerified: false,
-    criminalDeclarationVerified: false,
-  });
+  // Dynamic checklist from election config
+  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
+  const [checklist, setChecklist] = useState<ChecklistState>({});
   const [remarks, setRemarks] = useState("");
   const [decision, setDecision] = useState<"ACCEPTED" | "REJECTED" | "">("");
+
+  // OTP flow state
+  const [otpStep, setOtpStep] = useState<"decision" | "otp">("decision");
+  const [otp, setOtp] = useState("");
+  const [otpError, setOtpError] = useState("");
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
 
   const fetchWards = async () => {
     try {
@@ -169,22 +180,51 @@ export function ScrutinyPanel() {
     fetchNominations();
   }, [fetchNominations]);
 
+  // Fetch dynamic checklist items from election config
+  const fetchChecklistItems = useCallback(async () => {
+    try {
+      // Get active election config and its checklist items
+      const response = await fetch("/api/election-config");
+      const result = await response.json();
+      if (result.success && result.data?.id) {
+        const checklistResponse = await fetch(
+          `/api/admin/elections/${result.data.id}/checklist-items`,
+        );
+        const checklistResult = await checklistResponse.json();
+        if (checklistResult.success && checklistResult.data) {
+          setChecklistItems(checklistResult.data);
+        }
+      }
+    } catch {
+      console.error("Failed to fetch checklist items");
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchChecklistItems();
+  }, [fetchChecklistItems]);
+
   const handleStartScrutiny = async (nomination: Nomination) => {
     setSelectedNomination(nomination);
-    setChecklist({
-      ageVerified: false,
-      residencyVerified: false,
-      photoVerified: false,
-      idProofVerified: false,
-      nominationFormVerified: false,
-      affidavitVerified: false,
-      reservationCriteriaVerified: false,
-      securityDepositVerified: false,
-      partyAuthorizationVerified: false,
-      criminalDeclarationVerified: false,
+    // Initialize checklist state from dynamic items
+    const initialChecklist: ChecklistState = {};
+    checklistItems.forEach((item) => {
+      // Pre-fill from existing responses if any
+      const existingResponse = nomination.checklistResponses?.find(
+        (r) => r.itemId === item.id,
+      );
+      initialChecklist[item.id] = {
+        checked: existingResponse?.isFulfilled || false,
+        notes: existingResponse?.notes || "",
+      };
     });
+    setChecklist(initialChecklist);
     setRemarks("");
     setDecision("");
+    setOtpStep("decision");
+    setOtp("");
+    setOtpError("");
+    setOtpSent(false);
 
     // Mark as under scrutiny
     if (nomination.status === "RECEIVED") {
@@ -202,10 +242,44 @@ export function ScrutinyPanel() {
     setIsScrutinyDialogOpen(true);
   };
 
+  // Send OTP for scrutiny authorization
+  const handleSendOtp = async () => {
+    if (!selectedNomination) return;
+    setIsSendingOtp(true);
+    setOtpError("");
+    try {
+      const response = await fetch(
+        `/api/ro/applications/${selectedNomination.id}/send-otp`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "SCRUTINY" }),
+        },
+      );
+      const result = await response.json();
+      if (result.success) {
+        setOtpSent(true);
+        setOtpStep("otp");
+      } else {
+        setOtpError(result.error || "Failed to send OTP");
+      }
+    } catch {
+      setOtpError("Failed to send OTP");
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  // Submit scrutiny decision with OTP
   const handleSubmitScrutiny = async () => {
     if (!selectedNomination || !decision) return;
+    if (otp.length !== 6) {
+      setOtpError("Please enter a valid 6-digit OTP");
+      return;
+    }
 
     setIsSubmitting(true);
+    setOtpError("");
     try {
       const response = await fetch(
         `/api/ro/applications/${selectedNomination.id}/scrutiny`,
@@ -213,10 +287,10 @@ export function ScrutinyPanel() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            action: "COMPLETE",
             decision,
-            checklist,
             remarks,
+            rejectionReasons: decision === "REJECTED" ? remarks : undefined,
+            otp,
           }),
         },
       );
@@ -226,16 +300,21 @@ export function ScrutinyPanel() {
         setIsScrutinyDialogOpen(false);
         fetchNominations();
       } else {
-        alert(result.error || "Failed to submit scrutiny");
+        setOtpError(result.error || "Failed to submit scrutiny");
       }
     } catch {
-      alert("Failed to submit scrutiny");
+      setOtpError("Failed to submit scrutiny");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const allChecked = Object.values(checklist).every(Boolean);
+  const allChecked =
+    checklistItems.length > 0
+      ? checklistItems
+          .filter((item) => item.isRequired)
+          .every((item) => checklist[item.id]?.checked)
+      : true;
 
   const filteredNominations = nominations.filter(
     (n) =>
@@ -478,7 +557,7 @@ export function ScrutinyPanel() {
             </DialogDescription>
           </DialogHeader>
 
-          {selectedNomination && (
+          {selectedNomination && otpStep === "decision" && (
             <Tabs defaultValue="checklist" className="mt-4">
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="checklist">Checklist</TabsTrigger>
@@ -488,151 +567,63 @@ export function ScrutinyPanel() {
 
               <TabsContent value="checklist" className="space-y-4 mt-4">
                 <div className="grid gap-4">
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <Checkbox
-                      checked={checklist.ageVerified}
-                      onCheckedChange={(checked) =>
-                        setChecklist({ ...checklist, ageVerified: !!checked })
-                      }
-                    />
-                    <Label className="flex-1">
-                      Age eligibility verified (Min. 21 years)
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <Checkbox
-                      checked={checklist.residencyVerified}
-                      onCheckedChange={(checked) =>
-                        setChecklist({
-                          ...checklist,
-                          residencyVerified: !!checked,
-                        })
-                      }
-                    />
-                    <Label className="flex-1">
-                      Residency requirement verified
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <Checkbox
-                      checked={checklist.photoVerified}
-                      onCheckedChange={(checked) =>
-                        setChecklist({ ...checklist, photoVerified: !!checked })
-                      }
-                    />
-                    <Label className="flex-1">
-                      Passport-size photograph verified
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <Checkbox
-                      checked={checklist.idProofVerified}
-                      onCheckedChange={(checked) =>
-                        setChecklist({
-                          ...checklist,
-                          idProofVerified: !!checked,
-                        })
-                      }
-                    />
-                    <Label className="flex-1">
-                      Identity proof (Aadhaar/Voter ID) verified
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <Checkbox
-                      checked={checklist.nominationFormVerified}
-                      onCheckedChange={(checked) =>
-                        setChecklist({
-                          ...checklist,
-                          nominationFormVerified: !!checked,
-                        })
-                      }
-                    />
-                    <Label className="flex-1">
-                      Nomination form properly filled and signed
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <Checkbox
-                      checked={checklist.affidavitVerified}
-                      onCheckedChange={(checked) =>
-                        setChecklist({
-                          ...checklist,
-                          affidavitVerified: !!checked,
-                        })
-                      }
-                    />
-                    <Label className="flex-1">
-                      Affidavit properly notarized and complete
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <Checkbox
-                      checked={checklist.reservationCriteriaVerified}
-                      onCheckedChange={(checked) =>
-                        setChecklist({
-                          ...checklist,
-                          reservationCriteriaVerified: !!checked,
-                        })
-                      }
-                    />
-                    <Label className="flex-1">
-                      Reservation criteria met (if applicable)
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <Checkbox
-                      checked={checklist.securityDepositVerified}
-                      onCheckedChange={(checked) =>
-                        setChecklist({
-                          ...checklist,
-                          securityDepositVerified: !!checked,
-                        })
-                      }
-                    />
-                    <Label className="flex-1">
-                      Security deposit payment verified
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <Checkbox
-                      checked={checklist.partyAuthorizationVerified}
-                      onCheckedChange={(checked) =>
-                        setChecklist({
-                          ...checklist,
-                          partyAuthorizationVerified: !!checked,
-                        })
-                      }
-                    />
-                    <Label className="flex-1">
-                      Party authorization letter (if party candidate)
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <Checkbox
-                      checked={checklist.criminalDeclarationVerified}
-                      onCheckedChange={(checked) =>
-                        setChecklist({
-                          ...checklist,
-                          criminalDeclarationVerified: !!checked,
-                        })
-                      }
-                    />
-                    <Label className="flex-1">
-                      Criminal case declaration reviewed
-                    </Label>
-                  </div>
+                  {checklistItems.length > 0 ? (
+                    checklistItems
+                      .sort((a, b) => a.displayOrder - b.displayOrder)
+                      .map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg"
+                        >
+                          <Checkbox
+                            checked={checklist[item.id]?.checked || false}
+                            onCheckedChange={(checked) =>
+                              setChecklist({
+                                ...checklist,
+                                [item.id]: {
+                                  ...checklist[item.id],
+                                  checked: !!checked,
+                                },
+                              })
+                            }
+                          />
+                          <div className="flex-1">
+                            <Label className="flex items-center gap-2">
+                              {item.title}
+                              {item.isRequired && (
+                                <span className="text-red-500 text-xs">*</span>
+                              )}
+                            </Label>
+                            {item.description && (
+                              <p className="text-xs text-slate-400 mt-0.5">
+                                {item.description}
+                              </p>
+                            )}
+                          </div>
+                          {item.category && (
+                            <Badge variant="outline" className="text-xs">
+                              {item.category}
+                            </Badge>
+                          )}
+                        </div>
+                      ))
+                  ) : (
+                    <div className="text-center py-4 text-slate-400 text-sm">
+                      No checklist items configured. Contact admin to set up
+                      election checklist.
+                    </div>
+                  )}
                 </div>
 
                 <div className="pt-4 border-t flex items-center justify-between">
                   <span className="text-sm text-slate-500">
-                    {Object.values(checklist).filter(Boolean).length}/10 items
-                    verified
+                    {Object.values(checklist).filter((c) => c.checked).length}/
+                    {checklistItems.length} items verified
                   </span>
-                  {allChecked && (
+                  {allChecked && checklistItems.length > 0 && (
                     <Badge className="bg-green-100 text-green-700">
                       <CheckCircle className="h-3 w-3 mr-1" />
-                      All Verified
+                      All Required Verified
                     </Badge>
                   )}
                 </div>
@@ -743,8 +734,8 @@ export function ScrutinyPanel() {
                     <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                       <AlertTriangle className="h-4 w-4 text-amber-600" />
                       <p className="text-sm text-amber-700">
-                        Not all checklist items are verified. Please complete
-                        verification before approving.
+                        Not all required checklist items are verified. Please
+                        complete verification before approving.
                       </p>
                     </div>
                   )}
@@ -753,39 +744,99 @@ export function ScrutinyPanel() {
             </Tabs>
           )}
 
+          {/* OTP Step */}
+          {selectedNomination && otpStep === "otp" && (
+            <div className="space-y-4 py-4">
+              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <Phone className="h-4 w-4 text-blue-600" />
+                <p className="text-sm text-blue-700">
+                  An OTP has been sent to your registered phone number. Enter it
+                  below to confirm your{" "}
+                  {decision === "ACCEPTED" ? "approval" : "rejection"} decision.
+                </p>
+              </div>
+              <div className="flex flex-col items-center gap-4">
+                <InputOTP maxLength={6} value={otp} onChange={setOtp}>
+                  <InputOTPGroup>
+                    <InputOTPSlot index={0} />
+                    <InputOTPSlot index={1} />
+                    <InputOTPSlot index={2} />
+                    <InputOTPSlot index={3} />
+                    <InputOTPSlot index={4} />
+                    <InputOTPSlot index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
+                {otpError && <p className="text-sm text-red-600">{otpError}</p>}
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={handleSendOtp}
+                  disabled={isSendingOtp}
+                >
+                  {isSendingOtp ? (
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                  )}
+                  Resend OTP
+                </Button>
+              </div>
+            </div>
+          )}
+
           <DialogFooter className="mt-6">
             <Button
               variant="outline"
-              onClick={() => setIsScrutinyDialogOpen(false)}
+              onClick={() => {
+                if (otpStep === "otp") {
+                  setOtpStep("decision");
+                  setOtp("");
+                  setOtpError("");
+                } else {
+                  setIsScrutinyDialogOpen(false);
+                }
+              }}
             >
-              Save & Close
+              {otpStep === "otp" ? "Back" : "Save & Close"}
             </Button>
-            <Button
-              onClick={handleSubmitScrutiny}
-              disabled={
-                isSubmitting ||
-                !decision ||
-                (decision === "REJECTED" && !remarks) ||
-                (decision === "ACCEPTED" && !allChecked)
-              }
-            >
-              {isSubmitting && (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              )}
-              {decision === "ACCEPTED" ? (
-                <>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Accept Application
-                </>
-              ) : decision === "REJECTED" ? (
-                <>
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Reject Application
-                </>
-              ) : (
-                "Submit Decision"
-              )}
-            </Button>
+            {otpStep === "decision" ? (
+              <Button
+                onClick={handleSendOtp}
+                disabled={
+                  isSendingOtp ||
+                  !decision ||
+                  (decision === "REJECTED" && !remarks) ||
+                  (decision === "ACCEPTED" && !allChecked)
+                }
+              >
+                {isSendingOtp ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4 mr-2" />
+                )}
+                Send OTP & Proceed
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSubmitScrutiny}
+                disabled={isSubmitting || otp.length !== 6}
+              >
+                {isSubmitting && (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                )}
+                {decision === "ACCEPTED" ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Confirm Approval
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Confirm Rejection
+                  </>
+                )}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

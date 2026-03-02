@@ -305,6 +305,41 @@ export function ROPanel() {
     newStatus: string,
     actionType: string,
   ) => {
+    // First send the OTP
+    try {
+      let otpAction: string;
+      switch (actionType.toUpperCase()) {
+        case "RECEIVE":
+          otpAction = "RECEIPT_CONFIRMATION";
+          break;
+        case "SCRUTINY":
+          otpAction = "SCRUTINY";
+          break;
+        case "WITHDRAW":
+          otpAction = "WITHDRAWAL";
+          break;
+        default:
+          otpAction = "RECEIPT_CONFIRMATION";
+      }
+
+      const sendOtpRes = await fetch(
+        `/api/ro/applications/${nominationId}/send-otp`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: otpAction }),
+        },
+      );
+      const sendOtpResult = await sendOtpRes.json();
+      if (!sendOtpResult.success) {
+        console.error("Failed to send OTP:", sendOtpResult.error);
+        return;
+      }
+    } catch (err) {
+      console.error("Failed to send OTP:", err);
+      return;
+    }
+
     setOtpAction({ type: actionType, nominationId, newStatus });
     setOtpDialogOpen(true);
   };
@@ -314,18 +349,36 @@ export function ROPanel() {
 
     setIsProcessing(true);
     try {
-      // API call to update nomination status
-      const response = await fetch(
-        `/api/nominations/${otpAction.nominationId}/status`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            status: otpAction.newStatus,
+      let endpoint: string;
+      let body: Record<string, unknown>;
+
+      switch (otpAction.type.toUpperCase()) {
+        case "RECEIVE":
+          endpoint = `/api/ro/applications/${otpAction.nominationId}/receive`;
+          body = { otp };
+          break;
+        case "SCRUTINY":
+          endpoint = `/api/ro/applications/${otpAction.nominationId}/scrutiny`;
+          body = {
+            decision:
+              otpAction.newStatus === "ACCEPTED" ? "ACCEPTED" : "REJECTED",
             otp,
-          }),
-        },
-      );
+          };
+          break;
+        case "WITHDRAW":
+          endpoint = `/api/ro/applications/${otpAction.nominationId}/withdraw`;
+          body = { reason: "Withdrawal processed via dashboard", otp };
+          break;
+        default:
+          endpoint = `/api/ro/applications/${otpAction.nominationId}/receive`;
+          body = { otp };
+      }
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
 
       const result = await response.json();
       if (result.success) {

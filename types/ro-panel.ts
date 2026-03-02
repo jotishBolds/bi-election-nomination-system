@@ -76,11 +76,55 @@ export interface RONomination {
     changedBy?: string;
     remarks?: string;
   }>;
+  checklistResponses?: Array<{
+    id: string;
+    itemId: string;
+    isFulfilled: boolean;
+    notes?: string;
+    fulfilledAt?: string;
+    item?: ElectionChecklistItem;
+  }>;
+  documentViewTrackings?: Array<{
+    id: string;
+    documentId: string;
+    viewedAt: string;
+  }>;
   category: string;
   isIndependent: boolean;
   paymentCompleted: boolean;
   rejectionReason?: string;
   remarks?: string;
+}
+
+export interface ElectionChecklistItem {
+  id: string;
+  electionId: string;
+  title: string;
+  description?: string;
+  category?: string;
+  displayOrder: number;
+  isRequired: boolean;
+  isActive: boolean;
+  createdAt: string;
+  responseCount?: number;
+}
+
+export interface ChecklistResponse {
+  id: string;
+  nominationId: string;
+  itemId: string;
+  isFulfilled: boolean;
+  notes?: string;
+  fulfilledAt?: string;
+  createdBy: string;
+}
+
+export interface DocumentViewTracking {
+  id: string;
+  nominationId: string;
+  documentId: string;
+  viewedAt: string;
+  viewedBy: string;
 }
 
 export interface RODashboardStats {

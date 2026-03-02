@@ -768,7 +768,7 @@ export async function getSystemStats() {
     db.user.count(),
     db.user.count({ where: { roles: { some: { role: Role.RO } } } }),
     db.nominationApplication.count(),
-    db.payment.count({ where: { status: PaymentStatus.PAID } }),
+    db.bRPayment.count({ where: { status: PaymentStatus.PAID } }),
     db.state.count(),
     db.district.count(),
     db.uLB.count(),

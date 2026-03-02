@@ -41,6 +41,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
+import {
   Search,
   RefreshCw,
   User,
@@ -50,6 +55,8 @@ import {
   Ban,
   FileText,
   Calendar,
+  Phone,
+  Send,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -94,6 +101,12 @@ export function WithdrawPanel() {
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [withdrawReason, setWithdrawReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // OTP flow state
+  const [otpStep, setOtpStep] = useState<"reason" | "otp">("reason");
+  const [otp, setOtp] = useState("");
+  const [otpError, setOtpError] = useState("");
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
 
   const fetchWards = async () => {
     try {
@@ -143,42 +156,81 @@ export function WithdrawPanel() {
   const handleOpenWithdrawDialog = (nomination: Nomination) => {
     setSelectedNomination(nomination);
     setWithdrawReason("");
+    setOtpStep("reason");
+    setOtp("");
+    setOtpError("");
     setIsWithdrawDialogOpen(true);
+  };
+
+  // Send OTP for withdrawal authorization
+  const handleSendWithdrawOtp = async () => {
+    if (!selectedNomination) return;
+    if (!withdrawReason.trim() || withdrawReason.length < 5) {
+      setOtpError("Please provide a valid reason (min. 5 characters)");
+      return;
+    }
+    setIsSendingOtp(true);
+    setOtpError("");
+    try {
+      const response = await fetch(
+        `/api/ro/applications/${selectedNomination.id}/send-otp`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "WITHDRAWAL" }),
+        },
+      );
+      const result = await response.json();
+      if (result.success) {
+        setOtpStep("otp");
+      } else {
+        setOtpError(result.error || "Failed to send OTP");
+      }
+    } catch {
+      setOtpError("Failed to send OTP");
+    } finally {
+      setIsSendingOtp(false);
+    }
   };
 
   const handleWithdrawRequest = () => {
     if (!withdrawReason.trim()) {
-      alert("Please provide a reason for withdrawal");
+      setOtpError("Please provide a reason for withdrawal");
       return;
     }
-    setIsWithdrawDialogOpen(false);
-    setIsConfirmDialogOpen(true);
+    handleSendWithdrawOtp();
   };
 
   const handleConfirmWithdraw = async () => {
     if (!selectedNomination) return;
+    if (otp.length !== 6) {
+      setOtpError("Please enter a valid 6-digit OTP");
+      return;
+    }
 
     setIsSubmitting(true);
+    setOtpError("");
     try {
       const response = await fetch(
         `/api/ro/applications/${selectedNomination.id}/withdraw`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "APPROVE", remarks: withdrawReason }),
+          body: JSON.stringify({ reason: withdrawReason, otp }),
         },
       );
 
       const result = await response.json();
       if (result.success) {
+        setIsWithdrawDialogOpen(false);
         setIsConfirmDialogOpen(false);
         setSelectedNomination(null);
         fetchNominations();
       } else {
-        alert(result.error || "Failed to process withdrawal");
+        setOtpError(result.error || "Failed to process withdrawal");
       }
     } catch {
-      alert("Failed to process withdrawal");
+      setOtpError("Failed to process withdrawal");
     } finally {
       setIsSubmitting(false);
     }
@@ -432,7 +484,7 @@ export function WithdrawPanel() {
         </CardContent>
       </Card>
 
-      {/* Withdraw Dialog */}
+      {/* Withdraw Dialog with OTP */}
       <Dialog
         open={isWithdrawDialogOpen}
         onOpenChange={setIsWithdrawDialogOpen}
@@ -445,7 +497,7 @@ export function WithdrawPanel() {
             </DialogDescription>
           </DialogHeader>
 
-          {selectedNomination && (
+          {selectedNomination && otpStep === "reason" && (
             <div className="space-y-4 mt-4">
               <div className="p-4 bg-slate-50 rounded-lg">
                 <div className="flex items-center gap-3">
@@ -469,7 +521,7 @@ export function WithdrawPanel() {
                 <Textarea
                   value={withdrawReason}
                   onChange={(e) => setWithdrawReason(e.target.value)}
-                  placeholder="Enter the reason provided by the candidate..."
+                  placeholder="Enter the reason provided by the candidate (min. 5 characters)..."
                   className="mt-2"
                   rows={4}
                 />
@@ -478,9 +530,59 @@ export function WithdrawPanel() {
               <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                 <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5" />
                 <p className="text-sm text-amber-700">
-                  This action is irreversible. Make sure you have received a
-                  signed withdrawal letter from the candidate.
+                  This action is irreversible. An OTP will be sent to your phone
+                  for authorization.
                 </p>
+              </div>
+
+              {otpError && <p className="text-sm text-red-600">{otpError}</p>}
+            </div>
+          )}
+
+          {selectedNomination && otpStep === "otp" && (
+            <div className="space-y-4 mt-4">
+              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <Phone className="h-4 w-4 text-blue-600" />
+                <p className="text-sm text-blue-700">
+                  An OTP has been sent to your registered phone number. Enter it
+                  to confirm withdrawal.
+                </p>
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-lg">
+                <p className="text-sm text-slate-600">
+                  <strong>Candidate:</strong> {selectedNomination.candidateName}
+                </p>
+                <p className="text-sm text-slate-600">
+                  <strong>Reason:</strong> {withdrawReason}
+                </p>
+              </div>
+
+              <div className="flex flex-col items-center gap-4">
+                <InputOTP maxLength={6} value={otp} onChange={setOtp}>
+                  <InputOTPGroup>
+                    <InputOTPSlot index={0} />
+                    <InputOTPSlot index={1} />
+                    <InputOTPSlot index={2} />
+                    <InputOTPSlot index={3} />
+                    <InputOTPSlot index={4} />
+                    <InputOTPSlot index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
+                {otpError && <p className="text-sm text-red-600">{otpError}</p>}
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={handleSendWithdrawOtp}
+                  disabled={isSendingOtp}
+                >
+                  {isSendingOtp ? (
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                  )}
+                  Resend OTP
+                </Button>
               </div>
             </div>
           )}
@@ -488,23 +590,53 @@ export function WithdrawPanel() {
           <DialogFooter className="mt-6">
             <Button
               variant="outline"
-              onClick={() => setIsWithdrawDialogOpen(false)}
+              onClick={() => {
+                if (otpStep === "otp") {
+                  setOtpStep("reason");
+                  setOtp("");
+                  setOtpError("");
+                } else {
+                  setIsWithdrawDialogOpen(false);
+                }
+              }}
             >
-              Cancel
+              {otpStep === "otp" ? "Back" : "Cancel"}
             </Button>
-            <Button
-              variant="destructive"
-              onClick={handleWithdrawRequest}
-              disabled={!withdrawReason.trim()}
-            >
-              <Ban className="h-4 w-4 mr-2" />
-              Process Withdrawal
-            </Button>
+            {otpStep === "reason" ? (
+              <Button
+                variant="destructive"
+                onClick={handleWithdrawRequest}
+                disabled={
+                  !withdrawReason.trim() ||
+                  withdrawReason.length < 5 ||
+                  isSendingOtp
+                }
+              >
+                {isSendingOtp ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4 mr-2" />
+                )}
+                Send OTP & Proceed
+              </Button>
+            ) : (
+              <Button
+                variant="destructive"
+                onClick={handleConfirmWithdraw}
+                disabled={isSubmitting || otp.length !== 6}
+              >
+                {isSubmitting && (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                )}
+                <Ban className="h-4 w-4 mr-2" />
+                Confirm Withdrawal
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Confirm Dialog */}
+      {/* Legacy Confirm Dialog - kept for backward compatibility */}
       <AlertDialog
         open={isConfirmDialogOpen}
         onOpenChange={setIsConfirmDialogOpen}

@@ -342,6 +342,13 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
           iconBgColor: "bg-teal-100",
         },
         {
+          title: "Scrutiny Checklist",
+          icon: ClipboardCheck,
+          href: "/dashboard?tab=scrutiny-checklist",
+          iconColor: "text-pink-600",
+          iconBgColor: "bg-pink-100",
+        },
+        {
           title: "BR Payments",
           icon: Paperclip,
           href: "/dashboard?tab=br-payments",

@@ -94,7 +94,7 @@ export function ROReportsPanel() {
         params.append("wardId", wardFilter);
       }
 
-      const response = await fetch(`/api/ro/reports?${params}`);
+      const response = await fetch(`/api/ro/analytics?${params}`);
       const result = await response.json();
 
       if (result.success) {
