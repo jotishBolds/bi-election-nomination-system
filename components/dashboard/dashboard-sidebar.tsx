@@ -28,7 +28,6 @@ import {
   Users,
   Settings,
   BarChart3,
-  ClipboardCheck,
   ClipboardList,
   FileSearch,
   UserX,
@@ -340,13 +339,6 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
           href: "/dashboard?tab=voter-roll",
           iconColor: "text-teal-600",
           iconBgColor: "bg-teal-100",
-        },
-        {
-          title: "Scrutiny Checklist",
-          icon: ClipboardCheck,
-          href: "/dashboard?tab=scrutiny-checklist",
-          iconColor: "text-pink-600",
-          iconBgColor: "bg-pink-100",
         },
         {
           title: "BR Payments",

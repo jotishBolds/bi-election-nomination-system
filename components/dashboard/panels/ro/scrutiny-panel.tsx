@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -31,7 +30,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   InputOTP,
   InputOTPGroup,
@@ -52,8 +50,19 @@ import {
   FileX,
   Phone,
   Send,
+  Star,
+  ImageIcon,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+
+interface SymbolPreference {
+  preferenceOrder: number;
+  symbol: {
+    id: string;
+    name: string;
+    imagePath?: string;
+  };
+}
 
 interface Nomination {
   id: string;
@@ -74,6 +83,10 @@ interface Nomination {
     wardNo: number;
     wardName: string;
     reservationType?: string;
+    ulb?: {
+      id: string;
+      name: string;
+    };
   };
   politicalParty?: {
     name: string;
@@ -87,25 +100,21 @@ interface Nomination {
     originalName?: string;
     storagePath?: string;
   }>;
-  checklistResponses?: Array<{
+  symbolPreferences?: SymbolPreference[];
+  allocatedSymbol?: {
     id: string;
-    itemId: string;
-    isFulfilled: boolean;
-    notes?: string;
-  }>;
+    name: string;
+    imagePath?: string;
+  };
 }
 
-interface ChecklistItem {
+interface AvailableSymbol {
   id: string;
-  title: string;
-  description?: string;
-  category?: string;
-  displayOrder: number;
-  isRequired: boolean;
-}
-
-interface ChecklistState {
-  [itemId: string]: { checked: boolean; notes: string };
+  name: string;
+  imagePath?: string;
+  isReserved: boolean;
+  isActive?: boolean;
+  isAllocated?: boolean;
 }
 
 export function ScrutinyPanel() {
@@ -122,11 +131,15 @@ export function ScrutinyPanel() {
     Array<{ id: string; wardNo: number; wardName: string }>
   >([]);
 
-  // Dynamic checklist from election config
-  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
-  const [checklist, setChecklist] = useState<ChecklistState>({});
-  const [remarks, setRemarks] = useState("");
+  // Decision state - simple accept or reject
   const [decision, setDecision] = useState<"ACCEPTED" | "REJECTED" | "">("");
+
+  // Symbol allocation state
+  const [availableSymbols, setAvailableSymbols] = useState<AvailableSymbol[]>(
+    [],
+  );
+  const [selectedSymbolId, setSelectedSymbolId] = useState<string>("");
+  const [isLoadingSymbols, setIsLoadingSymbols] = useState(false);
 
   // OTP flow state
   const [otpStep, setOtpStep] = useState<"decision" | "otp">("decision");
@@ -180,53 +193,56 @@ export function ScrutinyPanel() {
     fetchNominations();
   }, [fetchNominations]);
 
-  // Fetch dynamic checklist items from election config
-  const fetchChecklistItems = useCallback(async () => {
+  // Fetch available symbols for a ward
+  const fetchAvailableSymbols = async (wardId: string) => {
+    setIsLoadingSymbols(true);
     try {
-      // Get active election config and its checklist items
-      const response = await fetch("/api/election-config");
+      // Fetch all election symbols
+      const response = await fetch("/api/admin/symbols");
       const result = await response.json();
-      if (result.success && result.data?.id) {
-        const checklistResponse = await fetch(
-          `/api/admin/elections/${result.data.id}/checklist-items`,
+      if (result.success) {
+        // Fetch already allocated symbols for this ward
+        const allocResponse = await fetch(
+          `/api/ro/symbol-allocation?wardId=${wardId}`,
         );
-        const checklistResult = await checklistResponse.json();
-        if (checklistResult.success && checklistResult.data) {
-          setChecklistItems(checklistResult.data);
+        const allocResult = await allocResponse.json();
+        const allocatedSymbolIds = new Set<string>();
+        if (allocResult.success && allocResult.data) {
+          allocResult.data.forEach((a: { symbolId: string }) => {
+            allocatedSymbolIds.add(a.symbolId);
+          });
         }
+
+        const symbols = (result.data || result.symbols || []).map(
+          (s: AvailableSymbol) => ({
+            ...s,
+            isAllocated: allocatedSymbolIds.has(s.id),
+          }),
+        );
+        setAvailableSymbols(symbols);
       }
     } catch {
-      console.error("Failed to fetch checklist items");
+      console.error("Failed to fetch symbols");
+    } finally {
+      setIsLoadingSymbols(false);
     }
-  }, []);
-
-  useEffect(() => {
-    fetchChecklistItems();
-  }, [fetchChecklistItems]);
+  };
 
   const handleStartScrutiny = async (nomination: Nomination) => {
     setSelectedNomination(nomination);
-    // Initialize checklist state from dynamic items
-    const initialChecklist: ChecklistState = {};
-    checklistItems.forEach((item) => {
-      // Pre-fill from existing responses if any
-      const existingResponse = nomination.checklistResponses?.find(
-        (r) => r.itemId === item.id,
-      );
-      initialChecklist[item.id] = {
-        checked: existingResponse?.isFulfilled || false,
-        notes: existingResponse?.notes || "",
-      };
-    });
-    setChecklist(initialChecklist);
-    setRemarks("");
     setDecision("");
+    setSelectedSymbolId(nomination.allocatedSymbol?.id || "");
     setOtpStep("decision");
     setOtp("");
     setOtpError("");
     setOtpSent(false);
 
-    // Mark as under scrutiny
+    // Fetch available symbols for this ward
+    if (nomination.ward?.id) {
+      fetchAvailableSymbols(nomination.ward.id);
+    }
+
+    // Mark as under scrutiny if status is RECEIVED
     if (nomination.status === "RECEIVED") {
       try {
         await fetch(`/api/ro/applications/${nomination.id}/scrutiny`, {
@@ -234,6 +250,12 @@ export function ScrutinyPanel() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "START" }),
         });
+        // Update local state
+        setNominations((prev) =>
+          prev.map((n) =>
+            n.id === nomination.id ? { ...n, status: "UNDER_SCRUTINY" } : n,
+          ),
+        );
       } catch {
         console.error("Failed to start scrutiny");
       }
@@ -270,7 +292,7 @@ export function ScrutinyPanel() {
     }
   };
 
-  // Submit scrutiny decision with OTP
+  // Submit scrutiny decision with OTP using the COMPLETE action
   const handleSubmitScrutiny = async () => {
     if (!selectedNomination || !decision) return;
     if (otp.length !== 6) {
@@ -281,15 +303,15 @@ export function ScrutinyPanel() {
     setIsSubmitting(true);
     setOtpError("");
     try {
+      // Call the scrutiny API with COMPLETE action
       const response = await fetch(
         `/api/ro/applications/${selectedNomination.id}/scrutiny`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            action: "COMPLETE",
             decision,
-            remarks,
-            rejectionReasons: decision === "REJECTED" ? remarks : undefined,
             otp,
           }),
         },
@@ -297,6 +319,22 @@ export function ScrutinyPanel() {
 
       const result = await response.json();
       if (result.success) {
+        // If accepted and symbol selected, allocate the symbol
+        if (decision === "ACCEPTED" && selectedSymbolId) {
+          try {
+            await fetch("/api/ro/symbol-allocation", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                nominationId: selectedNomination.id,
+                symbolId: selectedSymbolId,
+                wardId: selectedNomination.ward.id,
+              }),
+            });
+          } catch {
+            console.error("Symbol allocation failed, but scrutiny succeeded");
+          }
+        }
         setIsScrutinyDialogOpen(false);
         fetchNominations();
       } else {
@@ -308,13 +346,6 @@ export function ScrutinyPanel() {
       setIsSubmitting(false);
     }
   };
-
-  const allChecked =
-    checklistItems.length > 0
-      ? checklistItems
-          .filter((item) => item.isRequired)
-          .every((item) => checklist[item.id]?.checked)
-      : true;
 
   const filteredNominations = nominations.filter(
     (n) =>
@@ -558,77 +589,216 @@ export function ScrutinyPanel() {
           </DialogHeader>
 
           {selectedNomination && otpStep === "decision" && (
-            <Tabs defaultValue="checklist" className="mt-4">
+            <Tabs defaultValue="decision" className="mt-4">
               <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="checklist">Checklist</TabsTrigger>
-                <TabsTrigger value="documents">Documents</TabsTrigger>
                 <TabsTrigger value="decision">Decision</TabsTrigger>
+                <TabsTrigger value="symbols">Symbol Allocation</TabsTrigger>
+                <TabsTrigger value="documents">Documents</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="checklist" className="space-y-4 mt-4">
+              {/* Decision Tab - Accept or Reject */}
+              <TabsContent value="decision" className="space-y-4 mt-4">
                 <div className="grid gap-4">
-                  {checklistItems.length > 0 ? (
-                    checklistItems
-                      .sort((a, b) => a.displayOrder - b.displayOrder)
-                      .map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg"
-                        >
-                          <Checkbox
-                            checked={checklist[item.id]?.checked || false}
-                            onCheckedChange={(checked) =>
-                              setChecklist({
-                                ...checklist,
-                                [item.id]: {
-                                  ...checklist[item.id],
-                                  checked: !!checked,
-                                },
-                              })
-                            }
-                          />
-                          <div className="flex-1">
-                            <Label className="flex items-center gap-2">
-                              {item.title}
-                              {item.isRequired && (
-                                <span className="text-red-500 text-xs">*</span>
-                              )}
-                            </Label>
-                            {item.description && (
-                              <p className="text-xs text-slate-400 mt-0.5">
-                                {item.description}
-                              </p>
-                            )}
-                          </div>
-                          {item.category && (
-                            <Badge variant="outline" className="text-xs">
-                              {item.category}
-                            </Badge>
-                          )}
-                        </div>
-                      ))
-                  ) : (
-                    <div className="text-center py-4 text-slate-400 text-sm">
-                      No checklist items configured. Contact admin to set up
-                      election checklist.
+                  <div>
+                    <Label className="text-base font-medium">
+                      Scrutiny Decision
+                    </Label>
+                    <p className="text-sm text-slate-500 mt-1">
+                      Select Accept or Reject for this nomination application
+                    </p>
+                    <div className="grid grid-cols-2 gap-4 mt-3">
+                      <Button
+                        variant={
+                          decision === "ACCEPTED" ? "default" : "outline"
+                        }
+                        className={`h-20 text-lg ${
+                          decision === "ACCEPTED"
+                            ? "bg-green-600 hover:bg-green-700 text-white"
+                            : "hover:bg-green-50 hover:border-green-300"
+                        }`}
+                        onClick={() => setDecision("ACCEPTED")}
+                      >
+                        <FileCheck className="h-6 w-6 mr-3" />
+                        Accept
+                      </Button>
+                      <Button
+                        variant={
+                          decision === "REJECTED" ? "default" : "outline"
+                        }
+                        className={`h-20 text-lg ${
+                          decision === "REJECTED"
+                            ? "bg-red-600 hover:bg-red-700 text-white"
+                            : "hover:bg-red-50 hover:border-red-300"
+                        }`}
+                        onClick={() => setDecision("REJECTED")}
+                      >
+                        <FileX className="h-6 w-6 mr-3" />
+                        Reject
+                      </Button>
                     </div>
-                  )}
-                </div>
+                  </div>
 
-                <div className="pt-4 border-t flex items-center justify-between">
-                  <span className="text-sm text-slate-500">
-                    {Object.values(checklist).filter((c) => c.checked).length}/
-                    {checklistItems.length} items verified
-                  </span>
-                  {allChecked && checklistItems.length > 0 && (
-                    <Badge className="bg-green-100 text-green-700">
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      All Required Verified
-                    </Badge>
+                  {decision && (
+                    <div className="p-3 rounded-lg border mt-2">
+                      <div className="flex items-center gap-2">
+                        {decision === "ACCEPTED" ? (
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <XCircle className="h-5 w-5 text-red-600" />
+                        )}
+                        <span className="font-medium">
+                          Decision:{" "}
+                          {decision === "ACCEPTED" ? "Accepted" : "Rejected"}
+                        </span>
+                      </div>
+                      <p className="text-sm text-slate-500 mt-1">
+                        {decision === "ACCEPTED"
+                          ? "The nomination will be approved. You can allocate a symbol in the Symbol Allocation tab."
+                          : "The nomination will be rejected."}
+                      </p>
+                    </div>
                   )}
                 </div>
               </TabsContent>
 
+              {/* Symbol Allocation Tab */}
+              <TabsContent value="symbols" className="space-y-4 mt-4">
+                {/* Candidate's preferred symbols */}
+                {selectedNomination.symbolPreferences &&
+                  selectedNomination.symbolPreferences.length > 0 && (
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700">
+                        Candidate&apos;s Preferred Symbols
+                      </Label>
+                      <div className="grid grid-cols-3 gap-3 mt-2">
+                        {selectedNomination.symbolPreferences
+                          .sort((a, b) => a.preferenceOrder - b.preferenceOrder)
+                          .map((pref) => (
+                            <div
+                              key={pref.symbol.id}
+                              className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                                selectedSymbolId === pref.symbol.id
+                                  ? "border-blue-500 bg-blue-50"
+                                  : "border-slate-200 hover:border-slate-300"
+                              }`}
+                              onClick={() =>
+                                setSelectedSymbolId(pref.symbol.id)
+                              }
+                            >
+                              <div className="flex items-center gap-2 mb-2">
+                                <Star className="h-4 w-4 text-amber-500" />
+                                <span className="text-xs text-slate-500">
+                                  Preference {pref.preferenceOrder}
+                                </span>
+                              </div>
+                              {pref.symbol.imagePath ? (
+                                <img
+                                  src={pref.symbol.imagePath}
+                                  alt={pref.symbol.name}
+                                  className="w-12 h-12 object-contain mx-auto"
+                                />
+                              ) : (
+                                <div className="w-12 h-12 bg-slate-100 rounded flex items-center justify-center mx-auto">
+                                  <ImageIcon className="h-6 w-6 text-slate-400" />
+                                </div>
+                              )}
+                              <p className="text-sm font-medium text-center mt-2">
+                                {pref.symbol.name}
+                              </p>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                {/* All available symbols */}
+                <div>
+                  <Label className="text-sm font-medium text-slate-700">
+                    All Available Symbols
+                  </Label>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Select a symbol to allocate to this candidate. Already
+                    allocated symbols in this ward are marked.
+                  </p>
+                  {isLoadingSymbols ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-4 gap-3 mt-3 max-h-[300px] overflow-y-auto">
+                      {availableSymbols
+                        .filter((s) => s.isActive !== false)
+                        .map((symbol) => (
+                          <div
+                            key={symbol.id}
+                            className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                              symbol.isAllocated
+                                ? "border-red-200 bg-red-50 opacity-50 cursor-not-allowed"
+                                : selectedSymbolId === symbol.id
+                                  ? "border-blue-500 bg-blue-50"
+                                  : "border-slate-200 hover:border-slate-300"
+                            }`}
+                            onClick={() => {
+                              if (!symbol.isAllocated) {
+                                setSelectedSymbolId(symbol.id);
+                              }
+                            }}
+                          >
+                            {symbol.imagePath ? (
+                              <img
+                                src={symbol.imagePath}
+                                alt={symbol.name}
+                                className="w-10 h-10 object-contain mx-auto"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 bg-slate-100 rounded flex items-center justify-center mx-auto">
+                                <ImageIcon className="h-5 w-5 text-slate-400" />
+                              </div>
+                            )}
+                            <p className="text-xs font-medium text-center mt-2 truncate">
+                              {symbol.name}
+                            </p>
+                            {symbol.isReserved && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] mt-1 mx-auto block w-fit"
+                              >
+                                Reserved
+                              </Badge>
+                            )}
+                            {symbol.isAllocated && (
+                              <Badge className="text-[10px] mt-1 mx-auto block w-fit bg-red-100 text-red-600">
+                                Taken
+                              </Badge>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+
+                {selectedSymbolId && (
+                  <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 flex items-center gap-3">
+                    <CheckCircle className="h-5 w-5 text-blue-600" />
+                    <div>
+                      <p className="text-sm font-medium text-blue-800">
+                        Selected Symbol:{" "}
+                        {availableSymbols.find((s) => s.id === selectedSymbolId)
+                          ?.name ||
+                          selectedNomination.symbolPreferences?.find(
+                            (p) => p.symbol.id === selectedSymbolId,
+                          )?.symbol.name ||
+                          "Selected"}
+                      </p>
+                      <p className="text-xs text-blue-600">
+                        This symbol will be allocated upon acceptance
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* Documents Tab */}
               <TabsContent value="documents" className="space-y-4 mt-4">
                 {selectedNomination.documents &&
                 selectedNomination.documents.length > 0 ? (
@@ -675,71 +845,6 @@ export function ScrutinyPanel() {
                     No documents attached
                   </div>
                 )}
-              </TabsContent>
-
-              <TabsContent value="decision" className="space-y-4 mt-4">
-                <div className="grid gap-4">
-                  <div>
-                    <Label>Scrutiny Decision *</Label>
-                    <div className="grid grid-cols-2 gap-4 mt-2">
-                      <Button
-                        variant={
-                          decision === "ACCEPTED" ? "default" : "outline"
-                        }
-                        className={
-                          decision === "ACCEPTED"
-                            ? "bg-green-600 hover:bg-green-700"
-                            : ""
-                        }
-                        onClick={() => setDecision("ACCEPTED")}
-                      >
-                        <FileCheck className="h-4 w-4 mr-2" />
-                        Approve
-                      </Button>
-                      <Button
-                        variant={
-                          decision === "REJECTED" ? "default" : "outline"
-                        }
-                        className={
-                          decision === "REJECTED"
-                            ? "bg-red-600 hover:bg-red-700"
-                            : ""
-                        }
-                        onClick={() => setDecision("REJECTED")}
-                      >
-                        <FileX className="h-4 w-4 mr-2" />
-                        Reject
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label>
-                      Remarks / Reason {decision === "REJECTED" && "*"}
-                    </Label>
-                    <Textarea
-                      value={remarks}
-                      onChange={(e) => setRemarks(e.target.value)}
-                      placeholder={
-                        decision === "REJECTED"
-                          ? "Please provide reason for rejection..."
-                          : "Add any additional remarks..."
-                      }
-                      className="mt-2"
-                      rows={4}
-                    />
-                  </div>
-
-                  {!allChecked && decision === "ACCEPTED" && (
-                    <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                      <AlertTriangle className="h-4 w-4 text-amber-600" />
-                      <p className="text-sm text-amber-700">
-                        Not all required checklist items are verified. Please
-                        complete verification before approving.
-                      </p>
-                    </div>
-                  )}
-                </div>
               </TabsContent>
             </Tabs>
           )}
@@ -797,24 +902,19 @@ export function ScrutinyPanel() {
                 }
               }}
             >
-              {otpStep === "otp" ? "Back" : "Save & Close"}
+              {otpStep === "otp" ? "Back" : "Close"}
             </Button>
             {otpStep === "decision" ? (
               <Button
                 onClick={handleSendOtp}
-                disabled={
-                  isSendingOtp ||
-                  !decision ||
-                  (decision === "REJECTED" && !remarks) ||
-                  (decision === "ACCEPTED" && !allChecked)
-                }
+                disabled={isSendingOtp || !decision}
               >
                 {isSendingOtp ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
                   <Send className="h-4 w-4 mr-2" />
                 )}
-                Send OTP & Proceed
+                Send OTP & Submit
               </Button>
             ) : (
               <Button
