@@ -15,20 +15,20 @@ export const roScrutinySchema = z.discriminatedUnion("action", [
     }),
     
     // SAVE_CHECKLIST - Save progress (partial completion allowed)
-    z.object({
-        action: z.literal("SAVE_CHECKLIST"),
-        responses: z.array(z.object({
-            itemId: z.string().uuid("Invalid item ID"),
-            isFulfilled: z.boolean(),
-            notes: z.string().max(1000, "Notes too long").optional(),
-        })),
-    }),
+    // z.object({
+    //     action: z.literal("SAVE_CHECKLIST"),
+    //     responses: z.array(z.object({
+    //         itemId: z.string().uuid("Invalid item ID"),
+    //         isFulfilled: z.boolean(),
+    //         notes: z.string().max(1000, "Notes too long").optional(),
+    //     })),
+    // }),
     
-    // VIEW_DOCUMENT - Track viewing
-    z.object({
-        action: z.literal("VIEW_DOCUMENT"),
-        documentId: z.string().uuid("Invalid document ID"),
-    }),
+    // // VIEW_DOCUMENT - Track viewing
+    // z.object({
+    //     action: z.literal("VIEW_DOCUMENT"),
+    //     documentId: z.string().uuid("Invalid document ID"),
+    // }),
     
     // COMPLETE - Final decision
     z.object({
@@ -36,8 +36,6 @@ export const roScrutinySchema = z.discriminatedUnion("action", [
         decision: z.enum(["ACCEPTED", "REJECTED"], {
             message: "Decision must be ACCEPTED or REJECTED",
         }),
-        remarks: z.string().max(500, "Remarks too long").optional(),
-        rejectionReasons: z.string().max(1000, "Rejection reasons too long").optional(),
         otp: z
             .string()
             .length(6, "OTP must be exactly 6 digits")

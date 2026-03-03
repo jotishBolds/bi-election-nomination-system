@@ -47,34 +47,34 @@ export async function POST(
         application.status === "SUBMITTED" ||
         application.status === "RECEIVED"
       ) {
-        // Update status to UNDER_SCRUTINY
         await db.nominationApplication.update({
           where: { id: nominationId },
           data: { status: "UNDER_SCRUTINY" },
         });
 
+        // COMMENTED: Checklist response creation - DISABLED
         // Create checklist responses for all active items
-        const activeElection = await db.electionConfig.findFirst({
-          where: { isActive: true },
-          include: {
-            checklistItems: {
-              where: { isActive: true },
-              orderBy: { displayOrder: 'asc' }
-            }
-          }
-        });
+        // const activeElection = await db.electionConfig.findFirst({
+        //   where: { isActive: true },
+        //   include: {
+        //     checklistItems: {
+        //       where: { isActive: true },
+        //       orderBy: { displayOrder: 'asc' }
+        //     }
+        //   }
+        // });
 
-        if (activeElection && activeElection.checklistItems && activeElection.checklistItems.length > 0) {
-          await db.checklistResponse.createMany({
-            data: activeElection.checklistItems.map(item => ({
-              nominationId,
-              itemId: item.id,
-              isFulfilled: false,
-              createdBy: session.user.id
-            })),
-            skipDuplicates: true
-          });
-        }
+        // if (activeElection && activeElection.checklistItems && activeElection.checklistItems.length > 0) {
+        //   await db.checklistResponse.createMany({
+        //     data: activeElection.checklistItems.map(item => ({
+        //       nominationId,
+        //       itemId: item.id,
+        //       isFulfilled: false,
+        //       createdBy: session.user.id
+        //     })),
+        //     skipDuplicates: true
+        //   });
+        // }
       }
 
       return NextResponse.json({
@@ -83,186 +83,128 @@ export async function POST(
       });
     }
 
-    // Handle SAVE_CHECKLIST action
-    if (data.action === "SAVE_CHECKLIST") {
-      const { responses } = data;
+    // COMMENTED: SAVE_CHECKLIST action - DISABLED
+    // if (data.action === "SAVE_CHECKLIST") {
+    //   const { responses } = data;
 
-      // Update each response (partial completion allowed)
-      for (const response of responses) {
-        try {
-          await db.checklistResponse.upsert({
-            where: {
-              nominationId_itemId: {
-                nominationId,
-                itemId: response.itemId
-              }
-            },
-            update: {
-              isFulfilled: response.isFulfilled,
-              notes: response.notes,
-              fulfilledAt: response.isFulfilled ? new Date() : null,
-            },
-            create: {
-              nominationId,
-              itemId: response.itemId,
-              isFulfilled: response.isFulfilled,
-              notes: response.notes,
-              fulfilledAt: response.isFulfilled ? new Date() : null,
-              createdBy: session.user.id
-            }
-          });
-        } catch (upsertError: unknown) {
-          console.error(`Failed to save response for item ${response.itemId}:`, upsertError);
+    //   // Update each response (partial completion allowed)
+    //   for (const response of responses) {
+    //     try {
+    //       await db.checklistResponse.upsert({
+    //         where: {
+    //           nominationId_itemId: {
+    //             nominationId,
+    //             itemId: response.itemId
+    //           }
+    //         },
+    //         update: {
+    //           isFulfilled: response.isFulfilled,
+    //           notes: response.notes,
+    //           fulfilledAt: response.isFulfilled ? new Date() : null,
+    //         },
+    //         create: {
+    //           nominationId,
+    //           itemId: response.itemId,
+    //           isFulfilled: response.isFulfilled,
+    //           notes: response.notes,
+    //           fulfilledAt: response.isFulfilled ? new Date() : null,
+    //           createdBy: session.user.id
+    //         }
+    //       });
+    //     } catch (upsertError: unknown) {
+    //       console.error(`Failed to save response for item ${response.itemId}:`, upsertError);
           
-          // Check if it's a foreign key error
-          if (upsertError instanceof Error && 'code' in upsertError && (upsertError as { code: string }).code === 'P2003') {
-            return NextResponse.json({
-              success: false,
-              error: `Invalid checklist item ID: ${response.itemId}. Please ensure scrutiny has been started and the item exists.`
-            }, { status: 400 });
-          }
+    //       // Check if it's a foreign key error
+    //       if (upsertError instanceof Error && 'code' in upsertError && (upsertError as { code: string }).code === 'P2003') {
+    //         return NextResponse.json({
+    //           success: false,
+    //           error: `Invalid checklist item ID: ${response.itemId}. Please ensure scrutiny has been started and item exists.`
+    //         }, { status: 400 });
+    //       }
           
-          throw upsertError; // Re-throw other errors
-        }
-      }
+    //       throw upsertError; // Re-throw other errors
+    //     }
+    //   }
 
-      return NextResponse.json({
-        success: true,
-        message: "Checklist saved successfully",
-      });
-    }
+    //   return NextResponse.json({
+    //     success: true,
+    //     message: "Checklist saved successfully",
+    //   });
+    // }
 
-    // Handle VIEW_DOCUMENT action
-    if (data.action === "VIEW_DOCUMENT") {
-      const { documentId } = data;
+    // COMMENTED: VIEW_DOCUMENT action - DISABLED
+    // if (data.action === "VIEW_DOCUMENT") {
+    //   const { documentId } = data;
 
-      try {
-        // Check if document exists for this nomination
-        const document = await db.document.findFirst({
-          where: {
-            id: documentId,
-            nominationId: nominationId
-          }
-        });
+    //   try {
+    //     // Check if document exists for this nomination
+    //     const document = await db.document.findFirst({
+    //       where: {
+    //         id: documentId,
+    //         nominationId: nominationId
+    //       }
+    //     });
 
-        if (!document) {
-          return NextResponse.json({
-            success: false,
-            error: `Document ID: ${documentId} not found for this nomination.`
-          }, { status: 404 });
-        }
+    //     if (!document) {
+    //       return NextResponse.json({
+    //         success: false,
+    //         error: `Document ID: ${documentId} not found for this nomination.`
+    //       }, { status: 404 });
+    //     }
 
-        // Check if already viewed
-        const existingView = await db.documentViewTracking.findFirst({
-          where: {
-            documentId,
-            nominationId,
-            viewedBy: session.user.id
-          }
-        });
+    //     // Check if already viewed
+    //     const existingView = await db.documentViewTracking.findFirst({
+    //       where: {
+    //         documentId,
+    //         nominationId,
+    //         viewedBy: session.user.id
+    //       }
+    //     });
 
-        if (existingView) {
-          return NextResponse.json({
-            success: true,
-            message: "Document already viewed",
-            data: {
-              viewedAt: existingView.viewedAt,
-              ipAddress: existingView.ipAddress
-            }
-          });
-        }
+    //     if (existingView) {
+    //       return NextResponse.json({
+    //         success: true,
+    //         message: "Document already viewed",
+    //         data: {
+    //           viewedAt: existingView.viewedAt,
+    //           ipAddress: existingView.ipAddress
+    //         }
+    //       });
+    //     }
 
-        // Record document viewing
-        await db.documentViewTracking.create({
-          data: {
-            documentId,
-            nominationId,
-            viewedBy: session.user.id,
-            viewedAt: new Date(),
-            ipAddress: ip
-          }
-        });
+    //     // Record document viewing
+    //     await db.documentViewTracking.create({
+    //       data: {
+    //         documentId,
+    //         nominationId,
+    //         viewedBy: session.user.id,
+    //         viewedAt: new Date(),
+    //         ipAddress: ip
+    //       }
+    //     });
 
-        return NextResponse.json({
-          success: true,
-          message: "Document viewing recorded",
-        });
-      } catch (docError: unknown) {
-        console.error(`Failed to record document viewing for ${documentId}:`, docError);
+    //     return NextResponse.json({
+    //       success: true,
+    //       message: "Document viewing recorded",
+    //     });
+    //   } catch (docError: unknown) {
+    //     console.error(`Failed to record document viewing for ${documentId}:`, docError);
         
-        // Check if it's a foreign key error
-        if (docError instanceof Error && 'code' in docError && (docError as { code: string }).code === 'P2003') {
-          return NextResponse.json({
-            success: false,
-            error: `Invalid document ID: ${documentId}. Please ensure the document exists for this nomination.`
-          }, { status: 400 });
-        }
+    //     // Check if it's a foreign key error
+    //     if (docError instanceof Error && 'code' in docError && (docError as { code: string }).code === 'P2003') {
+    //       return NextResponse.json({
+    //         success: false,
+    //         error: `Invalid document ID: ${documentId}. Please ensure the document exists for this nomination.`
+    //       }, { status: 400 });
+    //     }
         
-        throw docError; // Re-throw other errors
-      }
-    }
+    //     throw docError; // Re-throw other errors
+    //   }
+    // }
 
     // Handle COMPLETE action
     if (data.action === "COMPLETE") {
-      const { decision, remarks, rejectionReasons, otp } = data;
-
-      // For ACCEPTED: Require all documents viewed and all required checklist items fulfilled
-      if (decision === "ACCEPTED") {
-        // Check if all documents have been viewed
-        const totalDocuments = await db.document.count({
-          where: { nominationId }
-        });
-
-        const viewedDocuments = await db.documentViewTracking.findMany({
-          where: { 
-            nominationId, 
-            viewedBy: session.user.id 
-          },
-          select: { documentId: true }
-        });
-
-        const uniqueViewedDocuments = new Set(viewedDocuments.map(v => v.documentId));
-
-        if (uniqueViewedDocuments.size < totalDocuments) {
-          return NextResponse.json({
-            success: false,
-            error: `Please view all ${totalDocuments} documents before accepting the application. Currently viewed: ${uniqueViewedDocuments.size}/${totalDocuments}`
-          }, { status: 400 });
-        }
-
-        // Check if all required checklist items are fulfilled
-        const requiredChecklistItems = await db.checklistResponse.findMany({
-          where: { 
-            nominationId,
-            item: { isRequired: true }
-          },
-          include: {
-            item: {
-              select: { id: true, title: true, isRequired: true }
-            }
-          }
-        });
-
-        const unfulfilledRequiredItems = requiredChecklistItems.filter(response => !response.isFulfilled);
-
-        if (unfulfilledRequiredItems.length > 0) {
-          const itemTitles = unfulfilledRequiredItems.map(r => r.item.title).join(", ");
-          return NextResponse.json({
-            success: false,
-            error: `Please complete all required checklist items before accepting. Missing: ${itemTitles}`
-          }, { status: 400 });
-        }
-      }
-
-      // For REJECTED: Rejection reason is required
-      if (decision === "REJECTED") {
-        if (!rejectionReasons || rejectionReasons.trim().length === 0) {
-          return NextResponse.json({
-            success: false,
-            error: "Rejection reason is required when rejecting an application"
-          }, { status: 400 });
-        }
-      }
+      const { decision, otp } = data;
 
       // Call the service with OTP verification if RO
       let result;
@@ -271,8 +213,6 @@ export async function POST(
           nominationId,
           roUserId: session.user.id,
           decision,
-          remarks: remarks || undefined, // Optional remarks
-          rejectionReasons: decision === "REJECTED" ? rejectionReasons : undefined,
           ipAddress: ip,
           otp,
         });
@@ -291,22 +231,22 @@ export async function POST(
       }
 
       // Store remarks appropriately
-      if (decision === "REJECTED") {
-        await db.nominationApplication.update({
-          where: { id: nominationId },
-          data: {
-            rejectionReasons: remarks, // Specific rejection reasons
-            scrutinyRemarks: remarks    // General remarks
-          }
-        });
-      } else {
-        await db.nominationApplication.update({
-          where: { id: nominationId },
-          data: {
-            scrutinyRemarks: remarks    // General remarks only
-          }
-        });
-      }
+      // if (decision === "REJECTED") {
+      //   await db.nominationApplication.update({
+      //     where: { id: nominationId },
+      //     data: {
+      //       rejectionReasons: remarks, // Specific rejection reasons
+      //       scrutinyRemarks: remarks    // General remarks
+      //     }
+      //   });
+      // } else {
+      //   await db.nominationApplication.update({
+      //     where: { id: nominationId },
+      //     data: {
+      //       scrutinyRemarks: remarks    // General remarks only
+      //     }
+      //   });
+      // }
 
       return NextResponse.json({
         success: true,
@@ -343,7 +283,7 @@ export async function GET(
     await requireRoles([Role.RO, Role.SES, Role.SUPER_ADMIN]);
     const { id } = await params;
 
-    // Get application with enhanced data
+    // Get application with basic data
     const application = await db.nominationApplication.findUnique({
       where: { id },
       include: {
@@ -360,28 +300,7 @@ export async function GET(
         politicalParty: {
           select: { name: true, abbreviation: true },
         },
-        documents: {
-          include: {
-            viewTrackings: {
-              where: { viewedBy: "current-user-placeholder" },
-              select: { viewedAt: true, ipAddress: true },
-            },
-          },
-        },
-        checklistResponses: {
-          include: {
-            item: {
-              select: {
-                id: true,
-                title: true,
-                description: true,
-                category: true,
-                displayOrder: true,
-                isRequired: true,
-              },
-            },
-          },
-        },
+        documents: true,
         scrutinizer: {
           select: {
             id: true,
@@ -398,45 +317,45 @@ export async function GET(
       );
     }
 
-    // Get active election checklist items
-    const activeElection = await db.electionConfig.findFirst({
-      where: { isActive: true },
-      include: {
-        checklistItems: {
-          where: { isActive: true },
-          orderBy: { displayOrder: 'asc' },
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            category: true,
-            displayOrder: true,
-            isRequired: true,
-          }
-        }
-      }
-    });
+    // COMMENTED: Get active election checklist items - DISABLED
+    // const activeElection = await db.electionConfig.findFirst({
+    //   where: { isActive: true },
+    //   include: {
+    //     checklistItems: {
+    //       where: { isActive: true },
+    //       orderBy: { displayOrder: 'asc' },
+    //       select: {
+    //         id: true,
+    //         title: true,
+    //         description: true,
+    //         category: true,
+    //         displayOrder: true,
+    //         isRequired: true,
+    //       }
+    //     }
+    //   }
+    // });
 
-    const checklistItems = activeElection?.checklistItems || [];
+    // const checklistItems = activeElection?.checklistItems || [];
 
     return NextResponse.json({
       success: true,
       data: {
         application: {
           id: application.id,
+          applicationNo: application.applicationNo,
           status: application.status,
-          scrutinyRemarks: application.scrutinyRemarks,
+          candidateName: application.candidateName,
           scrutinyDate: application.scrutinyDate,
           scrutinizedBy: application.scrutinizedBy,
-          rejectionReasons: application.rejectionReasons,
           applicantProfile: application.applicantProfile,
           ward: application.ward,
           politicalParty: application.politicalParty,
           documents: application.documents,
           scrutinizer: application.scrutinizer,
         },
-        checklistItems,
-        checklistResponses: application.checklistResponses,
+        // checklistItems,
+        // checklistResponses: application.checklistResponses,
       },
     });
   } catch (error: unknown) {
