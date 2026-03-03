@@ -1,4 +1,3 @@
-// components/dashboard/dashboard-sidebar.tsx
 "use client";
 
 import Link from "next/link";
@@ -57,7 +56,6 @@ interface NavGroup {
   items: NavItem[];
 }
 
-// Navigation with colorful icons - Dynamic config for all roles
 const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
   RO: [
     {
@@ -395,7 +393,6 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
   ],
 };
 
-// Function to get dynamic CANDIDATE navigation based on submission status
 const getCandidateNavigation = (
   submissionCount: number,
   maxSubmissions: number,
@@ -471,7 +468,6 @@ function DashboardSidebarContent() {
     maxAllowed: number;
   } | null>(null);
 
-  // Fetch candidate submission data for dynamic navigation
   useEffect(() => {
     if (user?.role === "CANDIDATE") {
       const fetchSubmissionData = async () => {
@@ -481,7 +477,7 @@ function DashboardSidebarContent() {
             const result = await response.json();
             if (result.success && result.data?.submissions) {
               setCandidateSubmissionData({
-                count: result.data.submissions.count, // Use total count for consistency
+                count: result.data.submissions.count,
                 maxAllowed: result.data.submissions.maxAllowed,
               });
             }
@@ -496,7 +492,6 @@ function DashboardSidebarContent() {
 
   if (!user) return null;
 
-  // Use dynamic navigation for CANDIDATE, static for others
   const navGroups =
     user.role === "CANDIDATE" && candidateSubmissionData
       ? getCandidateNavigation(
@@ -506,27 +501,49 @@ function DashboardSidebarContent() {
       : ROLE_NAV_CONFIG[user.role];
 
   return (
-    <Sidebar className="border-r border-blue-100 bg-gradient-to-b from-blue-50 to-slate-50">
-      <SidebarHeader className="border-b border-blue-100 px-4 py-4">
-        <div className="flex items-center gap-3">
-          <img src="/main-logo.png" alt="ENS Portal" className="h-10 w-auto" />
-          <div>
-            <h2 className="font-semibold text-primary">ENS Portal</h2>
-            <p className="text-xs text-muted-foreground">Nomination System</p>
+    <Sidebar
+      className="border-r border-blue-200 !bg-blue-50"
+      style={
+        {
+          "--sidebar-background": "214 100% 97%",
+          "--sidebar-foreground": "215 20% 30%",
+          "--sidebar-border": "214 32% 91%",
+          "--sidebar-accent": "214 80% 94%",
+          "--sidebar-accent-foreground": "215 20% 20%",
+          "--sidebar-primary": "217 91% 60%",
+          "--sidebar-primary-foreground": "0 0% 100%",
+        } as React.CSSProperties
+      }
+    >
+      {/* Header */}
+      <SidebarHeader className="border-b border-blue-200 bg-blue-100/80 px-3 sm:px-4 py-3 sm:py-4">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <img
+            src="/main-logo.png"
+            alt="ENS Portal"
+            className="h-8 sm:h-10 w-auto"
+          />
+          <div className="min-w-0">
+            <h2 className="font-semibold text-sm sm:text-base text-blue-800 truncate">
+              ENS Portal
+            </h2>
+            <p className="text-[10px] sm:text-xs text-blue-600/70">
+              Nomination System
+            </p>
           </div>
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="px-2 py-4">
+      {/* Nav Content */}
+      <SidebarContent className="px-1.5 sm:px-2 py-2 sm:py-4 bg-blue-50">
         {navGroups.map((group) => (
           <SidebarGroup key={group.label}>
-            <SidebarGroupLabel className="text-xs font-semibold text-blue-600/70 uppercase tracking-wider px-2">
+            <SidebarGroupLabel className="text-[10px] sm:text-xs font-semibold text-blue-600/70 uppercase tracking-wider px-2 sm:px-2 mb-0.5 sm:mb-1">
               {group.label}
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => {
-                  // Extract tab from href if present
                   const itemTab = item.href.includes("tab=")
                     ? new URL(item.href, "http://dummy").searchParams.get("tab")
                     : null;
@@ -544,28 +561,32 @@ function DashboardSidebarContent() {
                       <SidebarMenuButton
                         asChild
                         isActive={isActive}
-                        className={
-                          isActive
-                            ? "bg-primary text-white hover:bg-primary/90 shadow-sm"
-                            : "hover:bg-blue-100/60 text-gray-700"
-                        }
+                        className={`
+                          ${
+                            isActive
+                              ? "!bg-blue-600 !text-white hover:!bg-blue-700 shadow-sm shadow-blue-200"
+                              : "hover:!bg-blue-100 !text-slate-700"
+                          }
+                        `}
                       >
                         <Link
                           href={item.href}
-                          className="flex items-center gap-3 py-2"
+                          className="flex items-center gap-2 sm:gap-3 py-1.5 sm:py-2"
                         >
                           <div
-                            className={`p-1.5 rounded-lg ${
+                            className={`p-1 sm:p-1.5 rounded-lg shrink-0 ${
                               isActive ? "bg-white/25" : item.iconBgColor
                             }`}
                           >
                             <item.icon
-                              className={`h-4 w-4 ${
+                              className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${
                                 isActive ? "text-white" : item.iconColor
                               }`}
                             />
                           </div>
-                          <span className="font-medium">{item.title}</span>
+                          <span className="font-medium text-xs sm:text-sm truncate">
+                            {item.title}
+                          </span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -577,8 +598,9 @@ function DashboardSidebarContent() {
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-blue-100 px-4 py-3">
-        <p className="text-xs text-muted-foreground text-center">
+      {/* Footer */}
+      <SidebarFooter className="border-t border-blue-200 bg-blue-100/50 px-3 sm:px-4 py-2 sm:py-3">
+        <p className="text-[10px] sm:text-xs text-blue-600/60 text-center">
           © 2026 Election Commission
         </p>
       </SidebarFooter>
@@ -588,7 +610,11 @@ function DashboardSidebarContent() {
 
 export function DashboardSidebar() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense
+      fallback={
+        <div className="w-[250px] h-full bg-blue-50 border-r border-blue-200 animate-pulse" />
+      }
+    >
       <DashboardSidebarContent />
     </Suspense>
   );

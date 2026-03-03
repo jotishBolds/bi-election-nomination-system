@@ -40,6 +40,15 @@
 
   --color-destructive: var(--destructive);
 
+  --color-sidebar-background: var(--sidebar-background);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -77,6 +86,16 @@
   --border: #e5e7eb;
   --input: #e5e7eb;
   --ring: #1434a4;
+
+  /* SIDEBAR — solid light blue */
+  --sidebar-background: #eff6ff;
+  --sidebar-foreground: #1e3a5f;
+  --sidebar-primary: #1d4ed8;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #dbeafe;
+  --sidebar-accent-foreground: #1e3a5f;
+  --sidebar-border: #bfdbfe;
+  --sidebar-ring: #3b82f6;
 }
 
 .dark {
@@ -107,6 +126,16 @@
   --border: rgba(255, 255, 255, 0.1);
   --input: rgba(255, 255, 255, 0.15);
   --ring: #4f6ef5;
+
+  /* SIDEBAR dark */
+  --sidebar-background: #0f172a;
+  --sidebar-foreground: #e2e8f0;
+  --sidebar-primary: #60a5fa;
+  --sidebar-primary-foreground: #0f172a;
+  --sidebar-accent: #1e293b;
+  --sidebar-accent-foreground: #e2e8f0;
+  --sidebar-border: #334155;
+  --sidebar-ring: #60a5fa;
 }
 
 @layer base {
@@ -117,4 +146,79 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* ═══════════════════════════════════════════════════════
+   SIDEBAR MOBILE FIX — Force solid light-blue background
+   Remove glass/transparent/backdrop-blur on mobile sheet
+   ═══════════════════════════════════════════════════════ */
+
+/* Sidebar panel itself */
+[data-sidebar="sidebar"] {
+  background-color: var(--sidebar-background) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Mobile sidebar rendered inside a Sheet/Dialog */
+[data-sidebar="sidebar"][data-mobile="true"] {
+  background-color: var(--sidebar-background) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* The Sheet overlay content wrapper */
+[role="dialog"] [data-sidebar="sidebar"] {
+  background-color: var(--sidebar-background) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* SheetContent that wraps the sidebar on mobile */
+[data-sidebar="sidebar"] > div,
+div[data-state] > [data-sidebar="sidebar"] {
+  background-color: var(--sidebar-background) !important;
+}
+
+/* Force the Sheet content panel to be solid, not transparent */
+.fixed[role="dialog"] > div[class*="bg-"] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Radix Sheet content — target the inner content panel */
+[data-state="open"][data-side="left"],
+[data-state="open"][role="dialog"] [data-side="left"] {
+  background-color: var(--sidebar-background) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Additional specificity for Vaul / shadcn Sheet */
+.group\/sidebar-wrapper [data-sidebar="sidebar"],
+.peer [data-sidebar="sidebar"] {
+  background-color: var(--sidebar-background) !important;
+}
+
+/* Make sure sidebar header, content, footer are also solid */
+[data-sidebar="sidebar"] [data-sidebar="header"],
+[data-sidebar="sidebar"] [data-sidebar="content"],
+[data-sidebar="sidebar"] [data-sidebar="footer"] {
+  background-color: transparent;
+}
+
+/* The overlay behind the mobile sidebar */
+[data-sidebar="sidebar"] ~ [data-state="open"],
+.fixed.inset-0[data-state="open"] {
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: none !important;
+}
+
+/* Hide scrollbar on breadcrumb nav */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }

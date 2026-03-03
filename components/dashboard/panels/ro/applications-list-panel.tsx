@@ -65,8 +65,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { downloadForm18PDF } from "@/lib/form18-template";
 
-// ─── Interfaces ──────────────────────────────────────────────────────────────
-
 interface WardData {
   id: string;
   wardNo: number;
@@ -162,8 +160,6 @@ interface FolderHistoryState {
   wardId?: string;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
 const formatUlbType = (type: string) =>
   type
     .replace(/_/g, " ")
@@ -177,21 +173,16 @@ const LEVEL_NUM: Record<NavLevel, number> = {
   applications: 3,
 };
 
-// ─── Component ───────────────────────────────────────────────────────────────
-
 export function ApplicationsListPanel() {
-  // Data state
   const [nominations, setNominations] = useState<Nomination[]>([]);
   const [wards, setWards] = useState<WardData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Navigation state
   const [navLevel, setNavLevel] = useState<NavLevel>("root");
   const [selectedUlb, setSelectedUlb] = useState<ULBGroup | null>(null);
   const [selectedWardNav, setSelectedWardNav] = useState<WardData | null>(null);
 
-  // Double-click/tap tracking
   const lastTapRef = useRef<{ id: string; time: number }>({
     id: "",
     time: 0,
@@ -199,17 +190,14 @@ export function ApplicationsListPanel() {
   const [tappedFolderId, setTappedFolderId] = useState<string | null>(null);
   const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Filters (applications level)
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  // Action state
   const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
   const [selectedNomination, setSelectedNomination] =
     useState<Nomination | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
 
-  // OTP receive flow state
   const [isReceiveDialogOpen, setIsReceiveDialogOpen] = useState(false);
   const [receiveNominationId, setReceiveNominationId] = useState<string | null>(
     null,
@@ -219,8 +207,6 @@ export function ApplicationsListPanel() {
   const [isSendingReceiveOtp, setIsSendingReceiveOtp] = useState(false);
   const [isReceiving, setIsReceiving] = useState(false);
   const [receiveOtpSent, setReceiveOtpSent] = useState(false);
-
-  // ─── Computed Data (need early for history handler) ──────────────────────
 
   const ulbGroups = useMemo(() => {
     const groups: Record<string, ULBGroup> = {};
@@ -245,15 +231,11 @@ export function ApplicationsListPanel() {
     return Object.values(groups).sort((a, b) => a.name.localeCompare(b.name));
   }, [wards]);
 
-  // Keep a ref so the popstate handler always has fresh data
   const ulbGroupsRef = useRef(ulbGroups);
   useEffect(() => {
     ulbGroupsRef.current = ulbGroups;
   }, [ulbGroups]);
 
-  // ─── Browser History Management ──────────────────────────────────────────
-
-  // On mount: mark the current history entry as our root
   const historyInitialized = useRef(false);
   useEffect(() => {
     if (!historyInitialized.current) {
@@ -265,14 +247,10 @@ export function ApplicationsListPanel() {
     }
   }, []);
 
-  // Listen for browser back/forward
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
       const state = event.state as FolderHistoryState | null;
-
-      // If the state has no appFolder key, it's not ours – let browser handle it
       if (!state || !state.appFolder) return;
-
       const groups = ulbGroupsRef.current;
 
       switch (state.appFolder) {
@@ -330,7 +308,7 @@ export function ApplicationsListPanel() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  // ─── Double Click/Tap Handler ────────────────────────────────────────────
+  //Double Click/Tap
 
   const handleFolderDoubleClick = useCallback(
     (folderId: string, callback: () => void) => {
@@ -351,10 +329,7 @@ export function ApplicationsListPanel() {
       } else {
         lastTapRef.current = { id: folderId, time: now };
         setTappedFolderId(folderId);
-
-        if (tapTimeoutRef.current) {
-          clearTimeout(tapTimeoutRef.current);
-        }
+        if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
         tapTimeoutRef.current = setTimeout(() => {
           setTappedFolderId((prev) => (prev === folderId ? null : prev));
           tapTimeoutRef.current = null;
@@ -370,15 +345,13 @@ export function ApplicationsListPanel() {
     };
   }, []);
 
-  // ─── Data Fetching ───────────────────────────────────────────────────────
+  //Data Fetching
 
   const fetchWards = async () => {
     try {
       const response = await fetch("/api/ro/wards");
       const result = await response.json();
-      if (result.success) {
-        setWards(result.data);
-      }
+      if (result.success) setWards(result.data);
     } catch {
       console.error("Failed to fetch wards");
     }
@@ -410,7 +383,7 @@ export function ApplicationsListPanel() {
     fetchNominations();
   }, [fetchNominations]);
 
-  // ─── More Computed Data ──────────────────────────────────────────────────
+  //More Computed Data
 
   const ulbNominationCounts = useMemo(() => {
     const wardToUlb: Record<string, string> = {};
@@ -488,7 +461,7 @@ export function ApplicationsListPanel() {
     return items;
   }, [navLevel, selectedUlb, selectedWardNav]);
 
-  // ─── Navigation (with browser history) ───────────────────────────────────
+  //Navigation
 
   const navigateToUlb = (ulb: ULBGroup) => {
     setSelectedUlb(ulb);
@@ -529,24 +502,20 @@ export function ApplicationsListPanel() {
     );
   };
 
-  /** Go back one level using browser history */
   const goBack = () => {
     setTappedFolderId(null);
-    if (navLevel !== "root") {
-      window.history.back(); // popstate handler updates React state
-    }
+    if (navLevel !== "root") window.history.back();
   };
 
-  /** Jump to a specific level via breadcrumb */
   const navigateToLevel = (level: NavLevel) => {
     const diff = LEVEL_NUM[navLevel] - LEVEL_NUM[level];
     if (diff > 0) {
       setTappedFolderId(null);
-      window.history.go(-diff); // popstate handler updates React state
+      window.history.go(-diff);
     }
   };
 
-  // ─── Status Badge ────────────────────────────────────────────────────────
+  //tatus Badge
 
   const getStatusBadge = (status: string) => {
     const config: Record<
@@ -556,64 +525,71 @@ export function ApplicationsListPanel() {
       DRAFT: {
         bg: "bg-slate-100",
         text: "text-slate-700",
-        icon: <Clock className="h-3 w-3" />,
+        icon: <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3" />,
       },
       SUBMITTED: {
         bg: "bg-blue-100",
         text: "text-blue-700",
-        icon: <FileText className="h-3 w-3" />,
+        icon: <FileText className="h-2.5 w-2.5 sm:h-3 sm:w-3" />,
       },
       RECEIVED: {
         bg: "bg-cyan-100",
         text: "text-cyan-700",
-        icon: <CheckCircle className="h-3 w-3" />,
+        icon: <CheckCircle className="h-2.5 w-2.5 sm:h-3 sm:w-3" />,
       },
       UNDER_SCRUTINY: {
         bg: "bg-amber-100",
         text: "text-amber-700",
-        icon: <Eye className="h-3 w-3" />,
+        icon: <Eye className="h-2.5 w-2.5 sm:h-3 sm:w-3" />,
       },
       APPROVED: {
         bg: "bg-green-100",
         text: "text-green-700",
-        icon: <CheckCircle className="h-3 w-3" />,
+        icon: <CheckCircle className="h-2.5 w-2.5 sm:h-3 sm:w-3" />,
       },
       ACCEPTED: {
         bg: "bg-green-100",
         text: "text-green-700",
-        icon: <CheckCircle className="h-3 w-3" />,
+        icon: <CheckCircle className="h-2.5 w-2.5 sm:h-3 sm:w-3" />,
       },
       CONTESTING: {
         bg: "bg-purple-100",
         text: "text-purple-700",
-        icon: <FileCheck className="h-3 w-3" />,
+        icon: <FileCheck className="h-2.5 w-2.5 sm:h-3 sm:w-3" />,
       },
       REJECTED: {
         bg: "bg-red-100",
         text: "text-red-700",
-        icon: <XCircle className="h-3 w-3" />,
+        icon: <XCircle className="h-2.5 w-2.5 sm:h-3 sm:w-3" />,
       },
       WITHDRAWN: {
         bg: "bg-gray-100",
         text: "text-gray-700",
-        icon: <Ban className="h-3 w-3" />,
+        icon: <Ban className="h-2.5 w-2.5 sm:h-3 sm:w-3" />,
       },
       VALID: {
         bg: "bg-emerald-100",
         text: "text-emerald-700",
-        icon: <FileCheck className="h-3 w-3" />,
+        icon: <FileCheck className="h-2.5 w-2.5 sm:h-3 sm:w-3" />,
       },
     };
     const c = config[status] || config.DRAFT;
     return (
-      <Badge className={`${c.bg} ${c.text} gap-1`}>
+      <Badge
+        className={`${c.bg} ${c.text} gap-0.5 sm:gap-1 text-[9px] sm:text-[10px] md:text-xs px-1.5 sm:px-2 py-0 sm:py-0.5`}
+      >
         {c.icon}
-        {status.replace("_", " ")}
+        <span className="hidden xs:inline sm:inline">
+          {status.replace("_", " ")}
+        </span>
+        <span className="xs:hidden sm:hidden">
+          {status.replace("_", " ").slice(0, 4)}
+        </span>
       </Badge>
     );
   };
 
-  // ─── Action Handlers ─────────────────────────────────────────────────────
+  //Actions
 
   const handleViewNomination = (nomination: Nomination) => {
     setSelectedNomination(nomination);
@@ -724,61 +700,62 @@ export function ApplicationsListPanel() {
     }
   };
 
-  // ─── Loading Skeleton ────────────────────────────────────────────────────
+  // Loading
 
   if (isLoading && nominations.length === 0 && wards.length === 0) {
     return (
-      <div className="space-y-6 p-4 md:p-6">
-        <Skeleton className="h-8 w-56" />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+      <div className="space-y-3 sm:space-y-4 md:space-y-6 p-2 sm:p-3 md:p-6">
+        <Skeleton className="h-6 sm:h-7 md:h-8 w-40 sm:w-48 md:w-56" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-40 md:h-44 rounded-xl" />
+            <Skeleton key={i} className="h-24 sm:h-32 md:h-44 rounded-xl" />
+          ))}
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Skeleton key={i} className="h-28 sm:h-36 md:h-48 rounded-xl" />
           ))}
         </div>
       </div>
     );
   }
 
-  // ─── Render ──────────────────────────────────────────────────────────────
-
   return (
-    <div className="space-y-4 md:space-y-5 p-3 md:p-6">
-      {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 md:gap-3">
+    <div className="space-y-2.5 sm:space-y-3 md:space-y-5 p-2 sm:p-3 md:p-6 w-full max-w-full overflow-x-hidden">
+      <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3">
         {navLevel !== "root" && (
           <Button
             variant="ghost"
             size="icon"
             onClick={goBack}
-            className="shrink-0 h-8 w-8 md:h-9 md:w-9"
+            className="shrink-0 h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-9"
           >
-            <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
+            <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5" />
           </Button>
         )}
         <div className="min-w-0 flex-1">
-          <h1 className="text-base md:text-xl font-semibold text-slate-800 truncate">
+          <h1 className="text-xs sm:text-sm md:text-xl font-semibold text-slate-800 truncate">
             {navLevel === "root" && "Municipal Bodies"}
             {navLevel === "ulb" && selectedUlb?.name}
             {navLevel === "ward" &&
               `Ward ${selectedWardNav?.wardNo} – ${selectedWardNav?.wardName}`}
             {navLevel === "applications" && "Application List"}
           </h1>
-          <p className="text-[11px] md:text-sm text-slate-500 mt-0.5 truncate">
+          <p className="text-[9px] sm:text-[10px] md:text-sm text-slate-500 mt-0.5 truncate">
             {navLevel === "root" &&
               "Double-tap a folder to view wards and applications"}
             {navLevel === "ulb" &&
-              `${selectedUlb?.districtName} District · ${formatUlbType(selectedUlb?.type || "")}`}
+              `${selectedUlb?.districtName} · ${formatUlbType(selectedUlb?.type || "")}`}
             {navLevel === "ward" &&
-              `${selectedUlb?.name} · Reservation: ${(selectedWardNav?.reservationType || "N/A").replace(/_/g, " ")}`}
+              `${selectedUlb?.name} · ${(selectedWardNav?.reservationType || "N/A").replace(/_/g, " ")}`}
             {navLevel === "applications" &&
               `Ward ${selectedWardNav?.wardNo} – ${selectedWardNav?.wardName}`}
           </p>
         </div>
-
         <Button
           variant="outline"
           size="icon"
-          className="ml-auto shrink-0 h-8 w-8 md:h-9 md:w-9"
+          className="ml-auto shrink-0 h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-9"
           onClick={() => {
             fetchWards();
             fetchNominations();
@@ -786,44 +763,42 @@ export function ApplicationsListPanel() {
           disabled={isLoading}
         >
           <RefreshCw
-            className={`h-3.5 w-3.5 md:h-4 md:w-4 ${isLoading ? "animate-spin" : ""}`}
+            className={`h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 ${isLoading ? "animate-spin" : ""}`}
           />
         </Button>
       </div>
 
-      {/* ── Breadcrumb ────────────────────────────────────────────────────── */}
       {navLevel !== "root" && (
-        <nav className="flex items-center gap-0.5 md:gap-1 text-xs md:text-sm overflow-x-auto pb-1 scrollbar-none -mx-1 px-1">
+        <nav className="flex items-center gap-0.5 text-[9px] sm:text-[10px] md:text-sm overflow-x-auto pb-1 scrollbar-none -mx-1 px-1">
           {breadcrumbs.map((item, idx) => {
             const isLast = idx === breadcrumbs.length - 1;
             return (
-              <div
-                key={idx}
-                className="flex items-center gap-0.5 md:gap-1 shrink-0"
-              >
+              <div key={idx} className="flex items-center gap-0.5 shrink-0">
                 {idx > 0 && (
-                  <ChevronRight className="h-3 w-3 md:h-3.5 md:w-3.5 text-slate-400" />
+                  <ChevronRight className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-slate-400 shrink-0" />
                 )}
                 <button
                   onClick={() => !isLast && navigateToLevel(item.level)}
                   disabled={isLast}
-                  className={`flex items-center gap-1 md:gap-1.5 px-1.5 md:px-2 py-0.5 md:py-1 rounded-md transition-colors ${
+                  className={`flex items-center gap-0.5 sm:gap-1 px-1 sm:px-1.5 md:px-2 py-0.5 rounded-md transition-colors whitespace-nowrap ${
                     isLast
                       ? "text-slate-800 font-medium cursor-default"
                       : "text-slate-500 hover:text-slate-700 hover:bg-slate-100 active:bg-slate-200"
                   }`}
                 >
-                  {idx === 0 && <Home className="h-3 w-3 md:h-3.5 md:w-3.5" />}
+                  {idx === 0 && (
+                    <Home className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
+                  )}
                   {idx === 1 && (
-                    <Building2 className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                    <Building2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
                   )}
                   {idx === 2 && (
-                    <MapPin className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                    <MapPin className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
                   )}
                   {idx === 3 && (
-                    <FileText className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                    <FileText className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
                   )}
-                  <span className="whitespace-nowrap max-w-[100px] md:max-w-none truncate">
+                  <span className="max-w-[60px] sm:max-w-[100px] md:max-w-none truncate">
                     {item.label}
                   </span>
                 </button>
@@ -833,76 +808,73 @@ export function ApplicationsListPanel() {
         </nav>
       )}
 
-      {/* ════════════════════════════════════════════════════════════════════ */}
-      {/*  ROOT LEVEL                                                         */}
-      {/* ════════════════════════════════════════════════════════════════════ */}
       {navLevel === "root" && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
-            <Card className="bg-blue-50 border-0 shadow-sm">
-              <CardContent className="p-3 md:p-4">
-                <Building2 className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
-                <p className="text-xl md:text-2xl font-bold text-slate-800 mt-1.5 md:mt-2">
-                  {ulbGroups.length}
-                </p>
-                <p className="text-[10px] md:text-xs text-slate-500 mt-0.5">
-                  Municipal Bodies
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="bg-indigo-50 border-0 shadow-sm">
-              <CardContent className="p-3 md:p-4">
-                <MapPin className="h-4 w-4 md:h-5 md:w-5 text-indigo-600" />
-                <p className="text-xl md:text-2xl font-bold text-slate-800 mt-1.5 md:mt-2">
-                  {wards.length}
-                </p>
-                <p className="text-[10px] md:text-xs text-slate-500 mt-0.5">
-                  Total Wards
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="bg-emerald-50 border-0 shadow-sm">
-              <CardContent className="p-3 md:p-4">
-                <FileText className="h-4 w-4 md:h-5 md:w-5 text-emerald-600" />
-                <p className="text-xl md:text-2xl font-bold text-slate-800 mt-1.5 md:mt-2">
-                  {nominations.length}
-                </p>
-                <p className="text-[10px] md:text-xs text-slate-500 mt-0.5">
-                  Total Applications
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="bg-amber-50 border-0 shadow-sm">
-              <CardContent className="p-3 md:p-4">
-                <Clock className="h-4 w-4 md:h-5 md:w-5 text-amber-600" />
-                <p className="text-xl md:text-2xl font-bold text-slate-800 mt-1.5 md:mt-2">
-                  {
-                    nominations.filter(
-                      (n) =>
-                        n.status === "SUBMITTED" || n.status === "RECEIVED",
-                    ).length
-                  }
-                </p>
-                <p className="text-[10px] md:text-xs text-slate-500 mt-0.5">
-                  Pending Review
-                </p>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-2 md:gap-3">
+            {[
+              {
+                bg: "bg-blue-50",
+                icon: Building2,
+                iconColor: "text-blue-600",
+                value: ulbGroups.length,
+                label: "Municipal Bodies",
+              },
+              {
+                bg: "bg-indigo-50",
+                icon: MapPin,
+                iconColor: "text-indigo-600",
+                value: wards.length,
+                label: "Total Wards",
+              },
+              {
+                bg: "bg-emerald-50",
+                icon: FileText,
+                iconColor: "text-emerald-600",
+                value: nominations.length,
+                label: "Total Applications",
+              },
+              {
+                bg: "bg-amber-50",
+                icon: Clock,
+                iconColor: "text-amber-600",
+                value: nominations.filter(
+                  (n) => n.status === "SUBMITTED" || n.status === "RECEIVED",
+                ).length,
+                label: "Pending Review",
+              },
+            ].map((stat, i) => (
+              <Card
+                key={i}
+                className={`${stat.bg} border-0 shadow-sm rounded-xl`}
+              >
+                <CardContent className="p-2 sm:p-2.5 md:p-4">
+                  <stat.icon
+                    className={`h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5 ${stat.iconColor}`}
+                  />
+                  <p className="text-base sm:text-lg md:text-2xl font-bold text-slate-800 mt-1 md:mt-2">
+                    {stat.value}
+                  </p>
+                  <p className="text-[8px] sm:text-[9px] md:text-xs text-slate-500 mt-0.5">
+                    {stat.label}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
           </div>
 
-          <div className="flex items-center gap-1.5 text-[11px] md:text-xs text-slate-400 px-1">
-            <MousePointerClick className="h-3 w-3 md:h-3.5 md:w-3.5" />
+          <div className="flex items-center gap-1 text-[9px] sm:text-[10px] md:text-xs text-slate-400 px-1">
+            <MousePointerClick className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
             <span>Double-click / Double-tap to open folders</span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3 md:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1.5 sm:gap-2 md:gap-4">
             {ulbGroups.map((ulb) => {
               const count = ulbNominationCounts[ulb.id] || 0;
               const isTapped = tappedFolderId === `ulb-${ulb.id}`;
               return (
                 <Card
                   key={ulb.id}
-                  className={`cursor-pointer select-none touch-manipulation transition-all duration-200 group
+                  className={`cursor-pointer select-none touch-manipulation transition-all duration-200 group rounded-xl
                     ${
                       isTapped
                         ? "border-2 border-amber-400 shadow-lg shadow-amber-100 scale-[1.03]"
@@ -914,32 +886,32 @@ export function ApplicationsListPanel() {
                     )
                   }
                 >
-                  <CardContent className="p-3 md:p-5 flex flex-col items-center text-center gap-2 md:gap-2.5">
+                  <CardContent className="p-2 sm:p-3 md:p-5 flex flex-col items-center text-center gap-1 sm:gap-1.5 md:gap-2.5">
                     <div
-                      className={`relative w-12 h-12 md:w-16 md:h-16 rounded-xl flex items-center justify-center transition-colors
+                      className={`relative w-9 h-9 sm:w-11 sm:h-11 md:w-16 md:h-16 rounded-xl flex items-center justify-center transition-colors
                       ${isTapped ? "bg-amber-200" : "bg-amber-100 group-hover:bg-amber-200"}`}
                     >
                       <Folder
-                        className="h-7 w-7 md:h-9 md:w-9 text-amber-600"
+                        className="h-5 w-5 sm:h-6 sm:w-6 md:h-9 md:w-9 text-amber-600"
                         fill="currentColor"
                         fillOpacity={0.15}
                       />
                       {count > 0 && (
-                        <span className="absolute -top-1 -right-1 md:-top-1.5 md:-right-1.5 bg-blue-600 text-white text-[9px] md:text-[10px] font-bold rounded-full min-w-[18px] md:min-w-[20px] h-[18px] md:h-5 flex items-center justify-center px-1">
+                        <span className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 bg-blue-600 text-white text-[7px] sm:text-[8px] md:text-[10px] font-bold rounded-full min-w-[14px] sm:min-w-[16px] md:min-w-[20px] h-3.5 sm:h-4 md:h-5 flex items-center justify-center px-0.5">
                           {count}
                         </span>
                       )}
                     </div>
-                    <div className="space-y-0.5 min-w-0 w-full">
-                      <p className="font-semibold text-[11px] md:text-sm text-slate-800 leading-tight line-clamp-2">
+                    <div className="space-y-0 sm:space-y-0.5 min-w-0 w-full">
+                      <p className="font-semibold text-[9px] sm:text-[10px] md:text-sm text-slate-800 leading-tight line-clamp-2">
                         {ulb.name}
                       </p>
-                      <p className="text-[9px] md:text-xs text-slate-400">
+                      <p className="text-[7px] sm:text-[8px] md:text-xs text-slate-400">
                         {ulb.wards.length} Wards
                       </p>
                     </div>
                     {isTapped && (
-                      <p className="text-[9px] md:text-[10px] text-amber-600 font-medium animate-pulse">
+                      <p className="text-[7px] sm:text-[8px] md:text-[10px] text-amber-600 font-medium animate-pulse">
                         Tap again to open
                       </p>
                     )}
@@ -950,10 +922,10 @@ export function ApplicationsListPanel() {
           </div>
 
           {ulbGroups.length === 0 && !isLoading && (
-            <Card className="border-0 shadow-sm">
-              <CardContent className="py-12 md:py-16 flex flex-col items-center gap-3">
-                <Folder className="h-10 w-10 md:h-14 md:w-14 text-slate-300" />
-                <p className="text-sm text-slate-500">
+            <Card className="border-0 shadow-sm rounded-xl">
+              <CardContent className="py-8 sm:py-12 md:py-16 flex flex-col items-center gap-2 sm:gap-3">
+                <Folder className="h-8 w-8 sm:h-10 sm:w-10 md:h-14 md:w-14 text-slate-300" />
+                <p className="text-xs sm:text-sm text-slate-500">
                   No municipal bodies found
                 </p>
               </CardContent>
@@ -962,72 +934,59 @@ export function ApplicationsListPanel() {
         </>
       )}
 
-      {/* ════════════════════════════════════════════════════════════════════ */}
-      {/*  ULB LEVEL                                                          */}
-      {/* ════════════════════════════════════════════════════════════════════ */}
+      {/*ULB LEVEL*/}
       {navLevel === "ulb" && selectedUlb && (
         <>
-          <Card className="border-0 shadow-sm bg-gradient-to-r from-blue-50 to-indigo-50">
-            <CardContent className="p-3 md:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3 md:gap-4">
-                <div className="w-10 h-10 md:w-12 md:h-12 bg-white/60 rounded-xl flex items-center justify-center shrink-0 shadow-sm">
-                  <Building2 className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
+          <Card className="border-0 shadow-sm bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl">
+            <CardContent className="p-2 sm:p-3 md:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 md:gap-4">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-white/60 rounded-xl flex items-center justify-center shrink-0 shadow-sm">
+                  <Building2 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-blue-600" />
                 </div>
-                <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
-                  <div>
-                    <p className="text-[10px] md:text-[11px] text-slate-500 uppercase tracking-wider">
-                      Code
-                    </p>
-                    <p className="font-semibold text-xs md:text-sm text-slate-800">
-                      {selectedUlb.code}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] md:text-[11px] text-slate-500 uppercase tracking-wider">
-                      Type
-                    </p>
-                    <p className="font-semibold text-xs md:text-sm text-slate-800">
-                      {formatUlbType(selectedUlb.type)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] md:text-[11px] text-slate-500 uppercase tracking-wider">
-                      District
-                    </p>
-                    <p className="font-semibold text-xs md:text-sm text-slate-800">
-                      {selectedUlb.districtName}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] md:text-[11px] text-slate-500 uppercase tracking-wider">
-                      Applications
-                    </p>
-                    <p className="font-semibold text-xs md:text-sm text-slate-800">
-                      {ulbNominationCounts[selectedUlb.id] || 0}
-                    </p>
-                  </div>
+                <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
+                  {[
+                    { label: "Code", value: selectedUlb.code },
+                    {
+                      label: "Type",
+                      value: formatUlbType(selectedUlb.type),
+                    },
+                    { label: "District", value: selectedUlb.districtName },
+                    {
+                      label: "Applications",
+                      value: ulbNominationCounts[selectedUlb.id] || 0,
+                    },
+                  ].map((item, i) => (
+                    <div key={i}>
+                      <p className="text-[8px] sm:text-[9px] md:text-[11px] text-slate-500 uppercase tracking-wider">
+                        {item.label}
+                      </p>
+                      <p className="font-semibold text-[10px] sm:text-xs md:text-sm text-slate-800 truncate">
+                        {item.value}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <div className="flex items-center gap-1.5 text-[11px] md:text-xs text-slate-400 px-1">
-            <MousePointerClick className="h-3 w-3 md:h-3.5 md:w-3.5" />
+          <div className="flex items-center gap-1 text-[9px] sm:text-[10px] md:text-xs text-slate-400 px-1">
+            <MousePointerClick className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
             <span>Double-click / Double-tap to open folders</span>
           </div>
 
           <div>
-            <h2 className="text-xs md:text-sm font-medium text-slate-600 mb-2 md:mb-3">
+            <h2 className="text-[10px] sm:text-xs md:text-sm font-medium text-slate-600 mb-1.5 sm:mb-2 md:mb-3">
               Wards ({selectedUlb.wards.length})
             </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3 md:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1.5 sm:gap-2 md:gap-4">
               {selectedUlb.wards.map((ward) => {
                 const count = wardNominationCounts[ward.id] || 0;
                 const isTapped = tappedFolderId === `ward-${ward.id}`;
                 return (
                   <Card
                     key={ward.id}
-                    className={`cursor-pointer select-none touch-manipulation transition-all duration-200 group
+                    className={`cursor-pointer select-none touch-manipulation transition-all duration-200 group rounded-xl
                       ${
                         isTapped
                           ? "border-2 border-indigo-400 shadow-lg shadow-indigo-100 scale-[1.03]"
@@ -1039,40 +998,40 @@ export function ApplicationsListPanel() {
                       )
                     }
                   >
-                    <CardContent className="p-3 md:p-5 flex flex-col items-center text-center gap-2 md:gap-2.5">
+                    <CardContent className="p-2 sm:p-3 md:p-5 flex flex-col items-center text-center gap-1 sm:gap-1.5 md:gap-2.5">
                       <div
-                        className={`relative w-12 h-12 md:w-16 md:h-16 rounded-xl flex items-center justify-center transition-colors
+                        className={`relative w-9 h-9 sm:w-11 sm:h-11 md:w-16 md:h-16 rounded-xl flex items-center justify-center transition-colors
                         ${isTapped ? "bg-indigo-200" : "bg-indigo-100 group-hover:bg-indigo-200"}`}
                       >
                         <Folder
-                          className="h-7 w-7 md:h-9 md:w-9 text-indigo-600"
+                          className="h-5 w-5 sm:h-6 sm:w-6 md:h-9 md:w-9 text-indigo-600"
                           fill="currentColor"
                           fillOpacity={0.15}
                         />
                         {count > 0 && (
-                          <span className="absolute -top-1 -right-1 md:-top-1.5 md:-right-1.5 bg-indigo-600 text-white text-[9px] md:text-[10px] font-bold rounded-full min-w-[18px] md:min-w-[20px] h-[18px] md:h-5 flex items-center justify-center px-1">
+                          <span className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 bg-indigo-600 text-white text-[7px] sm:text-[8px] md:text-[10px] font-bold rounded-full min-w-[14px] sm:min-w-[16px] md:min-w-[20px] h-3.5 sm:h-4 md:h-5 flex items-center justify-center px-0.5">
                             {count}
                           </span>
                         )}
                       </div>
-                      <div className="space-y-0.5 min-w-0 w-full">
-                        <p className="font-bold text-[11px] md:text-sm text-slate-800">
+                      <div className="space-y-0 sm:space-y-0.5 min-w-0 w-full">
+                        <p className="font-bold text-[9px] sm:text-[10px] md:text-sm text-slate-800">
                           Ward {ward.wardNo}
                         </p>
-                        <p className="text-[9px] md:text-xs text-slate-500 line-clamp-1">
+                        <p className="text-[7px] sm:text-[8px] md:text-xs text-slate-500 line-clamp-1">
                           {ward.wardName}
                         </p>
                         {ward.reservationType && (
                           <Badge
                             variant="outline"
-                            className="mt-0.5 md:mt-1 text-[8px] md:text-[10px] px-1 md:px-1.5 py-0"
+                            className="mt-0 sm:mt-0.5 text-[6px] sm:text-[7px] md:text-[10px] px-0.5 sm:px-1 py-0 h-3.5 sm:h-4"
                           >
                             {ward.reservationType.replace(/_/g, " ")}
                           </Badge>
                         )}
                       </div>
                       {isTapped && (
-                        <p className="text-[9px] md:text-[10px] text-indigo-600 font-medium animate-pulse">
+                        <p className="text-[7px] sm:text-[8px] md:text-[10px] text-indigo-600 font-medium animate-pulse">
                           Tap again to open
                         </p>
                       )}
@@ -1085,41 +1044,39 @@ export function ApplicationsListPanel() {
         </>
       )}
 
-      {/* ════════════════════════════════════════════════════════════════════ */}
-      {/*  WARD LEVEL                                                         */}
-      {/* ════════════════════════════════════════════════════════════════════ */}
+      {/*WARD LEVEL*/}
       {navLevel === "ward" && selectedWardNav && selectedUlb && (
         <>
-          <Card className="border-0 shadow-sm bg-gradient-to-r from-indigo-50 to-purple-50">
-            <CardContent className="p-3 md:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3 md:gap-4">
-                <div className="w-10 h-10 md:w-12 md:h-12 bg-white/60 rounded-xl flex items-center justify-center shrink-0 shadow-sm">
-                  <MapPin className="h-5 w-5 md:h-6 md:w-6 text-indigo-600" />
+          <Card className="border-0 shadow-sm bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl">
+            <CardContent className="p-2 sm:p-3 md:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 md:gap-4">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-white/60 rounded-xl flex items-center justify-center shrink-0 shadow-sm">
+                  <MapPin className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-indigo-600" />
                 </div>
-                <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
+                <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
                   <div>
-                    <p className="text-[10px] md:text-[11px] text-slate-500 uppercase tracking-wider">
+                    <p className="text-[8px] sm:text-[9px] md:text-[11px] text-slate-500 uppercase tracking-wider">
                       Ward No
                     </p>
-                    <p className="font-semibold text-xs md:text-sm text-slate-800">
+                    <p className="font-semibold text-[10px] sm:text-xs md:text-sm text-slate-800">
                       {selectedWardNav.wardNo}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] md:text-[11px] text-slate-500 uppercase tracking-wider">
+                    <p className="text-[8px] sm:text-[9px] md:text-[11px] text-slate-500 uppercase tracking-wider">
                       Name
                     </p>
-                    <p className="font-semibold text-xs md:text-sm text-slate-800 truncate">
+                    <p className="font-semibold text-[10px] sm:text-xs md:text-sm text-slate-800 truncate">
                       {selectedWardNav.wardName}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] md:text-[11px] text-slate-500 uppercase tracking-wider">
+                    <p className="text-[8px] sm:text-[9px] md:text-[11px] text-slate-500 uppercase tracking-wider">
                       Reservation
                     </p>
                     <Badge
                       variant="outline"
-                      className="mt-0.5 text-[10px] md:text-xs"
+                      className="mt-0.5 text-[8px] sm:text-[9px] md:text-xs"
                     >
                       {(selectedWardNav.reservationType || "N/A").replace(
                         /_/g,
@@ -1128,10 +1085,10 @@ export function ApplicationsListPanel() {
                     </Badge>
                   </div>
                   <div>
-                    <p className="text-[10px] md:text-[11px] text-slate-500 uppercase tracking-wider">
+                    <p className="text-[8px] sm:text-[9px] md:text-[11px] text-slate-500 uppercase tracking-wider">
                       Applications
                     </p>
-                    <p className="font-semibold text-xs md:text-sm text-slate-800">
+                    <p className="font-semibold text-[10px] sm:text-xs md:text-sm text-slate-800">
                       {wardNominationCounts[selectedWardNav.id] || 0}
                     </p>
                   </div>
@@ -1140,21 +1097,21 @@ export function ApplicationsListPanel() {
             </CardContent>
           </Card>
 
-          <div className="flex items-center gap-1.5 text-[11px] md:text-xs text-slate-400 px-1">
-            <MousePointerClick className="h-3 w-3 md:h-3.5 md:w-3.5" />
+          <div className="flex items-center gap-1 text-[9px] sm:text-[10px] md:text-xs text-slate-400 px-1">
+            <MousePointerClick className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
             <span>Double-click / Double-tap to open</span>
           </div>
 
           <div>
-            <h2 className="text-xs md:text-sm font-medium text-slate-600 mb-2 md:mb-3">
+            <h2 className="text-[10px] sm:text-xs md:text-sm font-medium text-slate-600 mb-1.5 sm:mb-2 md:mb-3">
               Contents
             </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
               {(() => {
                 const isTapped = tappedFolderId === "applications";
                 return (
                   <Card
-                    className={`cursor-pointer select-none touch-manipulation transition-all duration-200 group
+                    className={`cursor-pointer select-none touch-manipulation transition-all duration-200 group rounded-xl
                       ${
                         isTapped
                           ? "border-2 border-emerald-400 shadow-lg shadow-emerald-100 scale-[1.03]"
@@ -1167,30 +1124,29 @@ export function ApplicationsListPanel() {
                       )
                     }
                   >
-                    <CardContent className="p-3 md:p-5 flex flex-col items-center text-center gap-2 md:gap-2.5">
+                    <CardContent className="p-2 sm:p-3 md:p-5 flex flex-col items-center text-center gap-1 sm:gap-1.5 md:gap-2.5">
                       <div
-                        className={`relative w-12 h-12 md:w-16 md:h-16 rounded-xl flex items-center justify-center transition-colors
+                        className={`relative w-9 h-9 sm:w-11 sm:h-11 md:w-16 md:h-16 rounded-xl flex items-center justify-center transition-colors
                         ${isTapped ? "bg-emerald-200" : "bg-emerald-100 group-hover:bg-emerald-200"}`}
                       >
-                        <FileText className="h-7 w-7 md:h-9 md:w-9 text-emerald-600" />
+                        <FileText className="h-5 w-5 sm:h-6 sm:w-6 md:h-9 md:w-9 text-emerald-600" />
                         {(wardNominationCounts[selectedWardNav.id] || 0) >
                           0 && (
-                          <span className="absolute -top-1 -right-1 md:-top-1.5 md:-right-1.5 bg-emerald-600 text-white text-[9px] md:text-[10px] font-bold rounded-full min-w-[18px] md:min-w-[20px] h-[18px] md:h-5 flex items-center justify-center px-1">
+                          <span className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 bg-emerald-600 text-white text-[7px] sm:text-[8px] md:text-[10px] font-bold rounded-full min-w-[14px] sm:min-w-[16px] md:min-w-[20px] h-3.5 sm:h-4 md:h-5 flex items-center justify-center px-0.5">
                             {wardNominationCounts[selectedWardNav.id] || 0}
                           </span>
                         )}
                       </div>
-                      <div className="space-y-0.5">
-                        <p className="font-semibold text-[11px] md:text-sm text-slate-800">
+                      <div className="space-y-0 sm:space-y-0.5">
+                        <p className="font-semibold text-[9px] sm:text-[10px] md:text-sm text-slate-800">
                           Application List
                         </p>
-                        <p className="text-[9px] md:text-xs text-slate-400">
-                          {wardNominationCounts[selectedWardNav.id] || 0}{" "}
-                          Applications
+                        <p className="text-[7px] sm:text-[8px] md:text-xs text-slate-400">
+                          {wardNominationCounts[selectedWardNav.id] || 0} Apps
                         </p>
                       </div>
                       {isTapped && (
-                        <p className="text-[9px] md:text-[10px] text-emerald-600 font-medium animate-pulse">
+                        <p className="text-[7px] sm:text-[8px] md:text-[10px] text-emerald-600 font-medium animate-pulse">
                           Tap again to open
                         </p>
                       )}
@@ -1203,25 +1159,22 @@ export function ApplicationsListPanel() {
         </>
       )}
 
-      {/* ════════════════════════════════════════════════════════════════════ */}
-      {/*  APPLICATIONS LEVEL                                                 */}
-      {/* ════════════════════════════════════════════════════════════════════ */}
       {navLevel === "applications" && selectedWardNav && (
         <>
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-3 md:p-4">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 md:gap-3">
+          <Card className="border-0 shadow-sm rounded-xl">
+            <CardContent className="p-2 sm:p-2.5 md:p-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2 md:gap-3">
                 <div className="relative flex-1 min-w-0">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Search className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-slate-400" />
                   <Input
-                    placeholder="Search by app no., name, phone…"
+                    placeholder="Search app no., name, phone…"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 h-9 md:h-10 text-sm"
+                    className="pl-7 sm:pl-8 md:pl-9 h-7 sm:h-8 md:h-10 text-[10px] sm:text-xs md:text-sm"
                   />
                 </div>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full sm:w-44 h-9 md:h-10 text-sm">
+                  <SelectTrigger className="w-full sm:w-36 md:w-44 h-7 sm:h-8 md:h-10 text-[10px] sm:text-xs md:text-sm">
                     <SelectValue placeholder="All Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1241,39 +1194,53 @@ export function ApplicationsListPanel() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-3 md:grid-cols-5 gap-2 md:gap-4">
-            <Card className="bg-blue-50 border-0 shadow-sm">
-              <CardContent className="p-2.5 md:p-4">
-                <FileText className="h-3.5 w-3.5 md:h-5 md:w-5 text-blue-600" />
-                <p className="text-lg md:text-2xl font-bold text-slate-800 mt-1">
-                  {
-                    nominations.filter((n) => n.ward.id === selectedWardNav.id)
-                      .length
-                  }
-                </p>
-                <p className="text-[9px] md:text-xs text-slate-500">Total</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-amber-50 border-0 shadow-sm">
-              <CardContent className="p-2.5 md:p-4">
-                <Clock className="h-3.5 w-3.5 md:h-5 md:w-5 text-amber-600" />
-                <p className="text-lg md:text-2xl font-bold text-slate-800 mt-1">
-                  {(statusStats["SUBMITTED"] || 0) +
-                    (statusStats["RECEIVED"] || 0)}
-                </p>
-                <p className="text-[9px] md:text-xs text-slate-500">Pending</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-purple-50 border-0 shadow-sm">
-              <CardContent className="p-2.5 md:p-4">
-                <Eye className="h-3.5 w-3.5 md:h-5 md:w-5 text-purple-600" />
-                <p className="text-lg md:text-2xl font-bold text-slate-800 mt-1">
-                  {statusStats["UNDER_SCRUTINY"] || 0}
-                </p>
-                <p className="text-[9px] md:text-xs text-slate-500">Scrutiny</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-emerald-50 border-0 shadow-sm hidden md:block">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-3 md:grid-cols-5 gap-1 sm:gap-1.5 md:gap-4">
+            {[
+              {
+                bg: "bg-blue-50",
+                icon: FileText,
+                iconColor: "text-blue-600",
+                value: nominations.filter(
+                  (n) => n.ward.id === selectedWardNav.id,
+                ).length,
+                label: "Total",
+              },
+              {
+                bg: "bg-amber-50",
+                icon: Clock,
+                iconColor: "text-amber-600",
+                value:
+                  (statusStats["SUBMITTED"] || 0) +
+                  (statusStats["RECEIVED"] || 0),
+                label: "Pending",
+              },
+              {
+                bg: "bg-purple-50",
+                icon: Eye,
+                iconColor: "text-purple-600",
+                value: statusStats["UNDER_SCRUTINY"] || 0,
+                label: "Scrutiny",
+              },
+            ].map((stat, i) => (
+              <Card
+                key={i}
+                className={`${stat.bg} border-0 shadow-sm rounded-xl`}
+              >
+                <CardContent className="p-1.5 sm:p-2 md:p-4">
+                  <stat.icon
+                    className={`h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-5 md:w-5 ${stat.iconColor}`}
+                  />
+                  <p className="text-sm sm:text-base md:text-2xl font-bold text-slate-800 mt-0.5 sm:mt-1">
+                    {stat.value}
+                  </p>
+                  <p className="text-[7px] sm:text-[8px] md:text-xs text-slate-500">
+                    {stat.label}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+            <Card className="bg-emerald-50 border-0 shadow-sm rounded-xl hidden md:block">
               <CardContent className="p-4">
                 <CheckCircle className="h-5 w-5 text-emerald-600" />
                 <p className="text-2xl font-bold text-slate-800 mt-1">
@@ -1282,7 +1249,7 @@ export function ApplicationsListPanel() {
                 <p className="text-xs text-slate-500">Approved</p>
               </CardContent>
             </Card>
-            <Card className="bg-red-50 border-0 shadow-sm hidden md:block">
+            <Card className="bg-red-50 border-0 shadow-sm rounded-xl hidden md:block">
               <CardContent className="p-4">
                 <XCircle className="h-5 w-5 text-red-600" />
                 <p className="text-2xl font-bold text-slate-800 mt-1">
@@ -1293,8 +1260,7 @@ export function ApplicationsListPanel() {
             </Card>
           </div>
 
-          {/* Desktop Table */}
-          <Card className="border-0 shadow-sm hidden md:block">
+          <Card className="border-0 shadow-sm rounded-xl hidden md:block">
             <CardContent className="p-0">
               {error ? (
                 <div className="flex flex-col items-center justify-center py-12 gap-4">
@@ -1310,13 +1276,13 @@ export function ApplicationsListPanel() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="whitespace-nowrap">
+                        <TableHead className="whitespace-nowrap text-xs">
                           Application No.
                         </TableHead>
-                        <TableHead>Candidate</TableHead>
-                        <TableHead>Party</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Submitted</TableHead>
+                        <TableHead className="text-xs">Candidate</TableHead>
+                        <TableHead className="text-xs">Party</TableHead>
+                        <TableHead className="text-xs">Status</TableHead>
+                        <TableHead className="text-xs">Submitted</TableHead>
                         <TableHead className="w-[130px]"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1325,7 +1291,7 @@ export function ApplicationsListPanel() {
                         <TableRow>
                           <TableCell
                             colSpan={6}
-                            className="text-center py-8 text-slate-500"
+                            className="text-center py-8 text-slate-500 text-sm"
                           >
                             No applications found
                           </TableCell>
@@ -1334,20 +1300,20 @@ export function ApplicationsListPanel() {
                         currentNominations.map((n) => (
                           <TableRow key={n.id}>
                             <TableCell>
-                              <span className="font-mono text-sm font-medium text-slate-800">
+                              <span className="font-mono text-xs font-medium text-slate-800">
                                 {n.applicationNo}
                               </span>
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                                  <User className="h-4 w-4 text-blue-600" />
+                                <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                                  <User className="h-3.5 w-3.5 text-blue-600" />
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="font-medium text-slate-800 truncate">
+                                  <p className="font-medium text-sm text-slate-800 truncate">
                                     {n.candidateName}
                                   </p>
-                                  <p className="text-xs text-slate-400">
+                                  <p className="text-[11px] text-slate-400">
                                     {n.applicantProfile?.user?.phone || ""}
                                   </p>
                                 </div>
@@ -1355,17 +1321,17 @@ export function ApplicationsListPanel() {
                             </TableCell>
                             <TableCell>
                               {n.politicalParty ? (
-                                <Badge variant="outline">
+                                <Badge variant="outline" className="text-xs">
                                   {n.politicalParty.abbreviation}
                                 </Badge>
                               ) : (
-                                <span className="text-sm text-slate-400">
+                                <span className="text-xs text-slate-400">
                                   Independent
                                 </span>
                               )}
                             </TableCell>
                             <TableCell>{getStatusBadge(n.status)}</TableCell>
-                            <TableCell className="text-sm text-slate-500 whitespace-nowrap">
+                            <TableCell className="text-xs text-slate-500 whitespace-nowrap">
                               {new Date(n.submittedAt).toLocaleDateString()}
                             </TableCell>
                             <TableCell>
@@ -1373,34 +1339,33 @@ export function ApplicationsListPanel() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
+                                  className="h-7 w-7"
                                   onClick={() => handleViewNomination(n)}
-                                  title="View Details"
                                 >
-                                  <Eye className="h-4 w-4" />
+                                  <Eye className="h-3.5 w-3.5" />
                                 </Button>
                                 <Button
                                   variant="ghost"
                                   size="icon"
+                                  className="h-7 w-7"
                                   onClick={() => handleDownloadForm(n.id)}
-                                  title="Download FORM-18"
                                 >
-                                  <Download className="h-4 w-4" />
+                                  <Download className="h-3.5 w-3.5" />
                                 </Button>
                                 {n.status === "SUBMITTED" && (
                                   <Button
                                     variant="ghost"
                                     size="icon"
+                                    className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
                                     onClick={() =>
                                       handleStatusAction(n.id, "RECEIVE")
                                     }
                                     disabled={isActionLoading === n.id}
-                                    title="Receive Application"
-                                    className="text-green-600 hover:text-green-700 hover:bg-green-50"
                                   >
                                     {isActionLoading === n.id ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                     ) : (
-                                      <CheckCheck className="h-4 w-4" />
+                                      <CheckCheck className="h-3.5 w-3.5" />
                                     )}
                                   </Button>
                                 )}
@@ -1408,17 +1373,16 @@ export function ApplicationsListPanel() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
+                                    className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                                     onClick={() =>
                                       handleStatusAction(n.id, "SCRUTINY")
                                     }
                                     disabled={isActionLoading === n.id}
-                                    title="Send to Scrutiny"
-                                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                                   >
                                     {isActionLoading === n.id ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                     ) : (
-                                      <Send className="h-4 w-4" />
+                                      <Send className="h-3.5 w-3.5" />
                                     )}
                                   </Button>
                                 )}
@@ -1434,53 +1398,55 @@ export function ApplicationsListPanel() {
             </CardContent>
           </Card>
 
-          {/* Mobile Card List */}
-          <div className="md:hidden space-y-2.5">
+          <div className="md:hidden space-y-1.5 sm:space-y-2">
             {error ? (
-              <Card className="border-0 shadow-sm">
-                <CardContent className="py-10 flex flex-col items-center gap-3">
-                  <AlertTriangle className="h-8 w-8 text-amber-500" />
-                  <p className="text-slate-600 text-sm">{error}</p>
+              <Card className="border-0 shadow-sm rounded-xl">
+                <CardContent className="py-6 sm:py-8 flex flex-col items-center gap-2">
+                  <AlertTriangle className="h-6 w-6 sm:h-8 sm:w-8 text-amber-500" />
+                  <p className="text-slate-600 text-[10px] sm:text-xs">
+                    {error}
+                  </p>
                   <Button
                     onClick={fetchNominations}
                     variant="outline"
                     size="sm"
+                    className="h-6 sm:h-7 text-[10px] sm:text-xs"
                   >
-                    <RefreshCw className="h-4 w-4 mr-2" />
+                    <RefreshCw className="h-3 w-3 mr-1" />
                     Retry
                   </Button>
                 </CardContent>
               </Card>
             ) : currentNominations.length === 0 ? (
-              <Card className="border-0 shadow-sm">
-                <CardContent className="py-10 text-center text-slate-500 text-sm">
+              <Card className="border-0 shadow-sm rounded-xl">
+                <CardContent className="py-6 sm:py-8 text-center text-slate-500 text-[10px] sm:text-xs">
                   No applications found
                 </CardContent>
               </Card>
             ) : (
               currentNominations.map((n) => (
-                <Card key={n.id} className="border shadow-sm">
-                  <CardContent className="p-3 space-y-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-[11px] font-medium text-slate-700 truncate">
+                <Card key={n.id} className="border shadow-sm rounded-xl">
+                  <CardContent className="p-2 sm:p-2.5 space-y-1.5 sm:space-y-2">
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className="font-mono text-[9px] sm:text-[10px] font-medium text-slate-700 truncate">
                         {n.applicationNo}
                       </span>
                       {getStatusBadge(n.status)}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                        <User className="h-3.5 w-3.5 text-blue-600" />
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                        <User className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-blue-600" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-sm text-slate-800 truncate">
+                        <p className="font-medium text-[10px] sm:text-xs text-slate-800 truncate">
                           {n.candidateName}
                         </p>
-                        <p className="text-[11px] text-slate-400">
+                        <p className="text-[8px] sm:text-[9px] text-slate-400">
                           {n.applicantProfile?.user?.phone || "N/A"}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between text-[11px] text-slate-500">
+                    <div className="flex items-center justify-between text-[8px] sm:text-[9px] text-slate-500">
                       <span>
                         {n.politicalParty
                           ? n.politicalParty.abbreviation
@@ -1490,36 +1456,36 @@ export function ApplicationsListPanel() {
                         {new Date(n.submittedAt).toLocaleDateString()}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5 pt-2 border-t">
+                    <div className="flex items-center gap-1 sm:gap-1.5 pt-1.5 sm:pt-2 border-t">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex-1 h-8 text-xs"
+                        className="flex-1 h-6 sm:h-7 text-[9px] sm:text-[10px]"
                         onClick={() => handleViewNomination(n)}
                       >
-                        <Eye className="h-3 w-3 mr-1" />
+                        <Eye className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
                         View
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-8 w-8 p-0"
+                        className="h-6 w-6 sm:h-7 sm:w-7 p-0"
                         onClick={() => handleDownloadForm(n.id)}
                       >
-                        <Download className="h-3 w-3" />
+                        <Download className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                       </Button>
                       {n.status === "SUBMITTED" && (
                         <Button
                           size="sm"
-                          className="flex-1 h-8 text-xs bg-green-600 hover:bg-green-700 text-white"
+                          className="flex-1 h-6 sm:h-7 text-[9px] sm:text-[10px] bg-green-600 hover:bg-green-700 text-white"
                           onClick={() => handleStatusAction(n.id, "RECEIVE")}
                           disabled={isActionLoading === n.id}
                         >
                           {isActionLoading === n.id ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
+                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
                           ) : (
                             <>
-                              <CheckCheck className="h-3 w-3 mr-1" />
+                              <CheckCheck className="h-2.5 w-2.5 mr-0.5" />
                               Receive
                             </>
                           )}
@@ -1528,15 +1494,15 @@ export function ApplicationsListPanel() {
                       {n.status === "RECEIVED" && (
                         <Button
                           size="sm"
-                          className="flex-1 h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+                          className="flex-1 h-6 sm:h-7 text-[9px] sm:text-[10px] bg-blue-600 hover:bg-blue-700 text-white"
                           onClick={() => handleStatusAction(n.id, "SCRUTINY")}
                           disabled={isActionLoading === n.id}
                         >
                           {isActionLoading === n.id ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
+                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
                           ) : (
                             <>
-                              <Send className="h-3 w-3 mr-1" />
+                              <Send className="h-2.5 w-2.5 mr-0.5" />
                               Scrutiny
                             </>
                           )}
@@ -1551,59 +1517,56 @@ export function ApplicationsListPanel() {
         </>
       )}
 
-      {/* ════════════════════════════════════════════════════════════════════ */}
-      {/*  VIEW DIALOG                                                        */}
-      {/* ════════════════════════════════════════════════════════════════════ */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto w-[95vw] rounded-xl">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto w-[94vw] rounded-xl p-2.5 sm:p-4 md:p-6">
           <DialogHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-2">
               <div>
-                <DialogTitle className="text-base md:text-lg">
+                <DialogTitle className="text-xs sm:text-sm md:text-lg">
                   Application Details
                 </DialogTitle>
-                <DialogDescription className="text-xs md:text-sm">
-                  Application No: {selectedNomination?.applicationNo}
+                <DialogDescription className="text-[9px] sm:text-[10px] md:text-sm">
+                  App No: {selectedNomination?.applicationNo}
                 </DialogDescription>
               </div>
               <Button
                 variant="outline"
                 size="sm"
-                className="w-fit text-xs md:text-sm"
+                className="w-fit text-[9px] sm:text-[10px] md:text-sm h-6 sm:h-7 md:h-8"
                 onClick={() =>
                   selectedNomination &&
                   handleDownloadForm(selectedNomination.id)
                 }
               >
-                <Download className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
-                Download PDF
+                <Download className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4 mr-1" />
+                PDF
               </Button>
             </div>
           </DialogHeader>
           {selectedNomination && (
-            <Tabs defaultValue="candidate" className="mt-3 md:mt-4">
-              <TabsList className="grid w-full grid-cols-4 h-9 md:h-10">
+            <Tabs defaultValue="candidate" className="mt-2 sm:mt-3 md:mt-4">
+              <TabsList className="grid w-full grid-cols-4 h-7 sm:h-8 md:h-10">
                 <TabsTrigger
                   value="candidate"
-                  className="text-[11px] md:text-sm px-1"
+                  className="text-[8px] sm:text-[10px] md:text-sm px-0.5"
                 >
                   Candidate
                 </TabsTrigger>
                 <TabsTrigger
                   value="ward"
-                  className="text-[11px] md:text-sm px-1"
+                  className="text-[8px] sm:text-[10px] md:text-sm px-0.5"
                 >
                   Ward
                 </TabsTrigger>
                 <TabsTrigger
                   value="documents"
-                  className="text-[11px] md:text-sm px-1"
+                  className="text-[8px] sm:text-[10px] md:text-sm px-0.5"
                 >
                   Docs
                 </TabsTrigger>
                 <TabsTrigger
                   value="status"
-                  className="text-[11px] md:text-sm px-1"
+                  className="text-[8px] sm:text-[10px] md:text-sm px-0.5"
                 >
                   Status
                 </TabsTrigger>
@@ -1611,18 +1574,18 @@ export function ApplicationsListPanel() {
 
               <TabsContent
                 value="candidate"
-                className="space-y-3 md:space-y-4 mt-3 md:mt-4"
+                className="space-y-2 sm:space-y-3 md:space-y-4 mt-2 sm:mt-3"
               >
-                <div className="flex items-center gap-3 md:gap-4">
-                  <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                    <User className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
+                <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
+                  <div className="w-9 h-9 sm:w-12 sm:h-12 md:w-16 md:h-16 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                    <User className="h-4 w-4 sm:h-6 sm:w-6 md:h-8 md:w-8 text-blue-600" />
                   </div>
                   <div className="min-w-0">
-                    <h3 className="text-base md:text-lg font-semibold truncate">
+                    <h3 className="text-xs sm:text-sm md:text-lg font-semibold truncate">
                       {selectedNomination.candidateName}
                     </h3>
                     {selectedNomination.dateOfBirth && (
-                      <p className="text-xs md:text-sm text-slate-500">
+                      <p className="text-[9px] sm:text-[10px] md:text-sm text-slate-500">
                         DOB:{" "}
                         {new Date(
                           selectedNomination.dateOfBirth,
@@ -1631,27 +1594,27 @@ export function ApplicationsListPanel() {
                     )}
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 pt-3 md:pt-4 border-t">
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-slate-400 shrink-0" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 md:gap-4 pt-2 sm:pt-3 border-t">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <Phone className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-slate-400 shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-[11px] md:text-xs text-slate-500">
+                      <p className="text-[8px] sm:text-[10px] md:text-xs text-slate-500">
                         Phone
                       </p>
-                      <p className="font-medium text-sm md:text-base">
+                      <p className="font-medium text-[10px] sm:text-xs md:text-base">
                         {selectedNomination.applicantProfile?.user?.phone ||
                           "N/A"}
                       </p>
                     </div>
                   </div>
                   {selectedNomination.applicantProfile?.user?.email && (
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-slate-400 shrink-0" />
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      <Mail className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-slate-400 shrink-0" />
                       <div className="min-w-0">
-                        <p className="text-[11px] md:text-xs text-slate-500">
+                        <p className="text-[8px] sm:text-[10px] md:text-xs text-slate-500">
                           Email
                         </p>
-                        <p className="font-medium text-sm md:text-base truncate">
+                        <p className="font-medium text-[10px] sm:text-xs md:text-base truncate">
                           {selectedNomination.applicantProfile.user.email}
                         </p>
                       </div>
@@ -1659,21 +1622,23 @@ export function ApplicationsListPanel() {
                   )}
                 </div>
                 {selectedNomination.address && (
-                  <div className="flex items-start gap-2 pt-3 md:pt-4 border-t">
-                    <Building className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" />
+                  <div className="flex items-start gap-1.5 sm:gap-2 pt-2 sm:pt-3 border-t">
+                    <Building className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-slate-400 mt-0.5 shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-[11px] md:text-xs text-slate-500">
+                      <p className="text-[8px] sm:text-[10px] md:text-xs text-slate-500">
                         Address
                       </p>
-                      <p className="text-sm">{selectedNomination.address}</p>
+                      <p className="text-[10px] sm:text-xs md:text-sm">
+                        {selectedNomination.address}
+                      </p>
                     </div>
                   </div>
                 )}
-                <div className="pt-3 md:pt-4 border-t">
-                  <p className="text-xs md:text-sm text-slate-500">
+                <div className="pt-2 sm:pt-3 border-t">
+                  <p className="text-[9px] sm:text-[10px] md:text-sm text-slate-500">
                     Political Affiliation
                   </p>
-                  <p className="font-medium text-sm md:text-base">
+                  <p className="font-medium text-[10px] sm:text-xs md:text-base">
                     {selectedNomination.politicalParty?.name ||
                       "Independent Candidate"}
                   </p>
@@ -1682,26 +1647,26 @@ export function ApplicationsListPanel() {
 
               <TabsContent
                 value="ward"
-                className="space-y-3 md:space-y-4 mt-3 md:mt-4"
+                className="space-y-2 sm:space-y-3 md:space-y-4 mt-2 sm:mt-3"
               >
-                <div className="flex items-center gap-3 md:gap-4">
-                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
-                    <MapPin className="h-5 w-5 md:h-6 md:w-6 text-indigo-600" />
+                <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
+                    <MapPin className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-indigo-600" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-sm md:text-base">
+                    <h3 className="font-semibold text-xs sm:text-sm md:text-base">
                       Ward {selectedNomination.ward.wardNo}
                     </h3>
-                    <p className="text-xs md:text-sm text-slate-500">
+                    <p className="text-[9px] sm:text-xs md:text-sm text-slate-500">
                       {selectedNomination.ward.wardName}
                     </p>
                   </div>
                 </div>
-                <div className="pt-3 md:pt-4 border-t">
-                  <p className="text-xs md:text-sm text-slate-500">
+                <div className="pt-2 sm:pt-3 border-t">
+                  <p className="text-[9px] sm:text-xs md:text-sm text-slate-500">
                     Reservation Status
                   </p>
-                  <Badge className="mt-1 text-xs">
+                  <Badge className="mt-1 text-[9px] sm:text-[10px] md:text-xs">
                     {(selectedNomination.ward.reservationType || "N/A").replace(
                       /-/g,
                       " ",
@@ -1712,23 +1677,23 @@ export function ApplicationsListPanel() {
 
               <TabsContent
                 value="documents"
-                className="space-y-3 md:space-y-4 mt-3 md:mt-4"
+                className="space-y-2 sm:space-y-3 mt-2 sm:mt-3"
               >
                 {selectedNomination.documents &&
                 selectedNomination.documents.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-1 sm:space-y-1.5 md:space-y-2">
                     {selectedNomination.documents.map((doc) => (
                       <div
                         key={doc.id}
-                        className="flex items-center justify-between p-2.5 md:p-3 bg-slate-50 rounded-lg gap-2"
+                        className="flex items-center justify-between p-1.5 sm:p-2 md:p-3 bg-slate-50 rounded-lg gap-1.5 sm:gap-2"
                       >
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <FileText className="h-4 w-4 text-slate-400 shrink-0" />
+                        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
+                          <FileText className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-slate-400 shrink-0" />
                           <div className="min-w-0">
-                            <p className="text-xs md:text-sm font-medium truncate">
+                            <p className="text-[9px] sm:text-[10px] md:text-sm font-medium truncate">
                               {doc.type.replace(/_/g, " ")}
                             </p>
-                            <p className="text-[10px] md:text-xs text-slate-400 truncate">
+                            <p className="text-[8px] sm:text-[9px] md:text-xs text-slate-400 truncate">
                               {doc.originalName || doc.fileName}
                             </p>
                           </div>
@@ -1742,9 +1707,9 @@ export function ApplicationsListPanel() {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-7 md:h-8 text-xs shrink-0"
+                              className="h-5 sm:h-6 md:h-8 text-[8px] sm:text-[10px] md:text-xs shrink-0 px-1.5 sm:px-2"
                             >
-                              <Eye className="h-3 w-3 md:h-4 md:w-4 mr-1" />
+                              <Eye className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5" />
                               View
                             </Button>
                           </a>
@@ -1753,7 +1718,7 @@ export function ApplicationsListPanel() {
                             variant="outline"
                             size="sm"
                             disabled
-                            className="h-7 md:h-8 text-xs shrink-0"
+                            className="h-5 sm:h-6 md:h-8 text-[8px] sm:text-[10px] md:text-xs shrink-0 px-1.5"
                           >
                             No File
                           </Button>
@@ -1762,7 +1727,7 @@ export function ApplicationsListPanel() {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-slate-400 text-sm">
+                  <div className="text-center py-5 sm:py-6 md:py-8 text-slate-400 text-[10px] sm:text-xs md:text-sm">
                     No documents uploaded
                   </div>
                 )}
@@ -1770,47 +1735,50 @@ export function ApplicationsListPanel() {
 
               <TabsContent
                 value="status"
-                className="space-y-3 md:space-y-4 mt-3 md:mt-4"
+                className="space-y-2 sm:space-y-3 md:space-y-4 mt-2 sm:mt-3"
               >
-                <div className="flex items-center gap-3 md:gap-4">
-                  <Calendar className="h-4 w-4 md:h-5 md:w-5 text-slate-400 shrink-0" />
+                <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
+                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 text-slate-400 shrink-0" />
                   <div>
-                    <p className="text-xs md:text-sm text-slate-500">
+                    <p className="text-[9px] sm:text-[10px] md:text-sm text-slate-500">
                       Submitted On
                     </p>
-                    <p className="font-medium text-sm md:text-base">
+                    <p className="font-medium text-[10px] sm:text-xs md:text-base">
                       {new Date(
                         selectedNomination.submittedAt,
                       ).toLocaleString()}
                     </p>
                   </div>
                 </div>
-                <div className="pt-3 md:pt-4 border-t">
-                  <p className="text-xs md:text-sm text-slate-500 mb-2">
+                <div className="pt-2 sm:pt-3 border-t">
+                  <p className="text-[9px] sm:text-[10px] md:text-sm text-slate-500 mb-1.5">
                     Current Status
                   </p>
                   {getStatusBadge(selectedNomination.status)}
                 </div>
                 {selectedNomination.paymentStatus && (
-                  <div className="pt-3 md:pt-4 border-t">
-                    <p className="text-xs md:text-sm text-slate-500">
-                      Payment Status
+                  <div className="pt-2 sm:pt-3 border-t">
+                    <p className="text-[9px] sm:text-[10px] md:text-sm text-slate-500">
+                      Payment
                     </p>
-                    <Badge variant="outline" className="mt-1 text-xs">
+                    <Badge
+                      variant="outline"
+                      className="mt-1 text-[9px] sm:text-[10px] md:text-xs"
+                    >
                       {selectedNomination.paymentStatus}
                     </Badge>
                   </div>
                 )}
                 {selectedNomination.scrutinyAt && (
-                  <div className="pt-3 md:pt-4 border-t">
-                    <p className="text-xs md:text-sm text-slate-500">
+                  <div className="pt-2 sm:pt-3 border-t">
+                    <p className="text-[9px] sm:text-[10px] md:text-sm text-slate-500">
                       Scrutiny Date
                     </p>
-                    <p className="font-medium text-sm">
+                    <p className="font-medium text-[10px] sm:text-xs md:text-sm">
                       {new Date(selectedNomination.scrutinyAt).toLocaleString()}
                     </p>
                     {selectedNomination.scrutinyRemarks && (
-                      <p className="text-xs md:text-sm text-slate-500 mt-2">
+                      <p className="text-[9px] sm:text-[10px] md:text-sm text-slate-500 mt-1">
                         Remarks: {selectedNomination.scrutinyRemarks}
                       </p>
                     )}
@@ -1822,32 +1790,30 @@ export function ApplicationsListPanel() {
         </DialogContent>
       </Dialog>
 
-      {/* ════════════════════════════════════════════════════════════════════ */}
-      {/*  OTP RECEIVE DIALOG                                                 */}
-      {/* ════════════════════════════════════════════════════════════════════ */}
       <Dialog open={isReceiveDialogOpen} onOpenChange={setIsReceiveDialogOpen}>
-        <DialogContent className="sm:max-w-md w-[95vw] rounded-xl">
+        <DialogContent className="sm:max-w-md w-[94vw] rounded-xl p-2.5 sm:p-4 md:p-6">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
-              <Phone className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+            <DialogTitle className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm md:text-lg">
+              <Phone className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5 text-primary" />
               Receive Application
             </DialogTitle>
-            <DialogDescription className="text-xs md:text-sm">
-              Enter the OTP sent to your registered phone to confirm receipt of
-              this application.
+            <DialogDescription className="text-[9px] sm:text-[10px] md:text-sm">
+              Enter the OTP sent to your phone to confirm receipt.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-3 md:py-4">
-            <div className="flex flex-col items-center gap-3 md:gap-4">
+          <div className="space-y-2.5 sm:space-y-3 md:space-y-4 py-2 sm:py-3 md:py-4">
+            <div className="flex flex-col items-center gap-2 sm:gap-3 md:gap-4">
               {isSendingReceiveOtp && !receiveOtpSent ? (
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <p className="text-sm text-slate-500">Sending OTP...</p>
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
+                  <p className="text-[10px] sm:text-xs md:text-sm text-slate-500">
+                    Sending OTP...
+                  </p>
                 </div>
               ) : (
                 <>
-                  <p className="text-xs md:text-sm text-muted-foreground text-center">
-                    Enter the 6-digit OTP sent to your registered mobile number
+                  <p className="text-[9px] sm:text-[10px] md:text-sm text-muted-foreground text-center">
+                    Enter the 6-digit OTP sent to your registered mobile
                   </p>
                   <InputOTP
                     maxLength={6}
@@ -1864,14 +1830,14 @@ export function ApplicationsListPanel() {
                     </InputOTPGroup>
                   </InputOTP>
                   {receiveOtpError && (
-                    <p className="text-xs md:text-sm text-red-600">
+                    <p className="text-[9px] sm:text-[10px] md:text-sm text-red-600">
                       {receiveOtpError}
                     </p>
                   )}
                   <Button
                     variant="link"
                     size="sm"
-                    className="text-xs md:text-sm"
+                    className="text-[9px] sm:text-[10px] md:text-sm"
                     onClick={() =>
                       receiveNominationId && sendReceiveOtp(receiveNominationId)
                     }
@@ -1888,21 +1854,23 @@ export function ApplicationsListPanel() {
               )}
             </div>
           </div>
-          <DialogFooter className="flex-col sm:flex-row gap-2">
+          <DialogFooter className="flex-col sm:flex-row gap-1.5 sm:gap-2">
             <Button
               variant="outline"
               onClick={() => setIsReceiveDialogOpen(false)}
-              className="w-full sm:w-auto"
+              className="w-full sm:w-auto h-7 sm:h-8 md:h-9 text-[10px] sm:text-xs md:text-sm"
             >
               Cancel
             </Button>
             <Button
               onClick={handleConfirmReceive}
               disabled={isReceiving || receiveOtp.length !== 6}
-              className="w-full sm:w-auto"
+              className="w-full sm:w-auto h-7 sm:h-8 md:h-9 text-[10px] sm:text-xs md:text-sm"
             >
-              {isReceiving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              <CheckCheck className="h-4 w-4 mr-2" />
+              {isReceiving && (
+                <Loader2 className="mr-1 sm:mr-1.5 h-3 w-3 sm:h-3.5 sm:w-3.5 animate-spin" />
+              )}
+              <CheckCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1 sm:mr-1.5" />
               Verify & Receive
             </Button>
           </DialogFooter>
