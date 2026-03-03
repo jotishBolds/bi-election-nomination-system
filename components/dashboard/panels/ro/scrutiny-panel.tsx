@@ -672,9 +672,7 @@ export function ScrutinyPanel() {
                       </Label>
                       <div className="grid grid-cols-3 gap-3 mt-2">
                         {selectedNomination.symbolPreferences
-                          .sort(
-                            (a, b) => a.preferenceOrder - b.preferenceOrder,
-                          )
+                          .sort((a, b) => a.preferenceOrder - b.preferenceOrder)
                           .map((pref) => (
                             <div
                               key={pref.symbol.id}
@@ -785,9 +783,8 @@ export function ScrutinyPanel() {
                     <div>
                       <p className="text-sm font-medium text-blue-800">
                         Selected Symbol:{" "}
-                        {availableSymbols.find(
-                          (s) => s.id === selectedSymbolId,
-                        )?.name ||
+                        {availableSymbols.find((s) => s.id === selectedSymbolId)
+                          ?.name ||
                           selectedNomination.symbolPreferences?.find(
                             (p) => p.symbol.id === selectedSymbolId,
                           )?.symbol.name ||

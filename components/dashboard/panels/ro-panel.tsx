@@ -1,12 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -1026,7 +1021,10 @@ export function ROPanel() {
                               dataKey="value"
                             >
                               {nominationStatusData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={entry.color}
+                                />
                               ))}
                             </Pie>
                             <Tooltip />
@@ -1224,10 +1222,7 @@ export function ROPanel() {
                           <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-emerald-500 transition-colors mt-1" />
                         </div>
                         {ward.reservationType && (
-                          <Badge
-                            variant="outline"
-                            className="mt-3 text-xs"
-                          >
+                          <Badge variant="outline" className="mt-3 text-xs">
                             {ward.reservationType}
                           </Badge>
                         )}
