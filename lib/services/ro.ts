@@ -528,8 +528,10 @@ export async function scrutinizeNomination(
     if (!nomination) {
       return { success: false, error: "Nomination not found" };
     }
-
-    if (nomination.status !== NominationStatus.RECEIVED && nomination.status !== NominationStatus.UNDER_SCRUTINY) {
+    if (
+      nomination.status !== NominationStatus.RECEIVED &&
+      nomination.status !== NominationStatus.UNDER_SCRUTINY
+    ) {
       return {
         success: false,
         error: "Nomination must be received or under scrutiny before scrutiny",
@@ -560,8 +562,6 @@ export async function scrutinizeNomination(
         status: newStatus,
         scrutinyDate: new Date(),
         scrutinizedBy: input.roUserId,
-        scrutinyRemarks: input.remarks,
-        rejectionReasons: input.rejectionReasons,
       },
     });
 

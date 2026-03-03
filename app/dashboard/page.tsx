@@ -16,7 +16,6 @@ import {
   SymbolsPanel,
   VoterRollPanel,
   BRPaymentsPanel,
-  ChecklistPanel,
 } from "@/components/dashboard/panels/admin";
 
 // SEC Panels
@@ -119,8 +118,6 @@ function DashboardContent() {
           return <CMSPanel />;
         case "audit-logs":
           return <AuditLogsPanel />;
-        case "scrutiny-checklist":
-          return <ChecklistPanel />;
         case "reports":
           return <SECReportsPanel />; // Admin can see SEC reports
         default:

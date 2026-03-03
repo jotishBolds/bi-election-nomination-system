@@ -5,4 +5,3 @@ export { CMSPanel } from "./cms-panel";
 export { SymbolsPanel } from "./symbols-panel";
 export { VoterRollPanel } from "./voter-roll-panel";
 export { BRPaymentsPanel } from "./br-payments-panel";
-export { ChecklistPanel } from "./checklist-panel";

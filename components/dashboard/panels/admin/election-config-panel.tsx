@@ -97,7 +97,29 @@ export function ElectionConfigPanel() {
       const response = await fetch("/api/admin/election-config", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ configId: editedConfig.id, ...editedConfig }),
+        body: JSON.stringify({
+          configId: editedConfig.id,
+          name: editedConfig.name,
+          year: editedConfig.year,
+          type: editedConfig.type,
+          notificationDate: editedConfig.notificationDate,
+          nominationStartDate: editedConfig.nominationStartDate,
+          nominationEndDate: editedConfig.nominationEndDate,
+          scrutinyDate: editedConfig.scrutinyDate,
+          withdrawalStartDate: editedConfig.withdrawalStartDate,
+          withdrawalEndDate: editedConfig.withdrawalEndDate,
+          symbolAllotmentDate: editedConfig.symbolAllotmentDate,
+          pollDate: editedConfig.pollDate,
+          countingDate: editedConfig.countingDate,
+          resultDate: editedConfig.resultDate,
+          dailyStartTime: editedConfig.dailyStartTime,
+          dailyEndTime: editedConfig.dailyEndTime,
+          nominationFee: editedConfig.nominationFee,
+          scStFeeDiscount: editedConfig.scStFeeDiscount,
+          maxNominationsPerCandidate: editedConfig.maxNominationsPerCandidate,
+          maxProposersRequired: editedConfig.maxProposersRequired,
+          isActive: editedConfig.isActive,
+        }),
       });
       const result = await response.json();
 
