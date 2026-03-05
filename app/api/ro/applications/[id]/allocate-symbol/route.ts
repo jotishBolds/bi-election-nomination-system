@@ -47,6 +47,7 @@ export async function POST(
         wardId: true,
         ulbId: true,
         allocatedSymbolId: true,
+        electionId: true, // NEW: Include electionId
       },
     });
 
@@ -87,10 +88,19 @@ export async function POST(
     }
 
     // 6️⃣ Get Active Election
-    const electionConfig = await db.electionConfig.findFirst({
-      where: { isActive: true },
-      select: { id: true },
-    });
+    // Use the nomination's electionId if available, otherwise fall back to active election
+    let electionConfig;
+    if (nomination.electionId) {
+      electionConfig = await db.electionConfig.findUnique({
+        where: { id: nomination.electionId },
+        select: { id: true },
+      });
+    } else {
+      electionConfig = await db.electionConfig.findFirst({
+        where: { isActive: true },
+        select: { id: true },
+      });
+    }
 
     if (!electionConfig) {
       return NextResponse.json(

@@ -512,6 +512,7 @@ model NominationApplication {
   withdrawalOtpVerified Boolean   @default(false)
 
   allocatedSymbolId String? @db.Uuid
+  electionId       String?  @db.Uuid // NEW: Nullable to preserve existing data
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -520,6 +521,7 @@ model NominationApplication {
   ulb                ULB              @relation(fields: [ulbId], references: [id])
   ward               Ward             @relation(fields: [wardId], references: [id])
   politicalParty     PoliticalParty?  @relation(fields: [politicalPartyId], references: [id])
+  election           ElectionConfig?  @relation(fields: [electionId], references: [id]) // NEW: Election relation
   creator            User             @relation("CreatedBy", fields: [createdBy], references: [id])
   receiver           User?            @relation("ReceivedBy", fields: [receivedBy], references: [id])
   scrutinizer        User?            @relation("ScrutinizedBy", fields: [scrutinizedBy], references: [id])
@@ -536,6 +538,7 @@ model NominationApplication {
   @@index([ulbId])
   @@index([wardId])
   @@index([status])
+  @@index([electionId]) // NEW: Index for performance
   @@index([applicationNo])
   @@map("nomination_applications")
 }
@@ -704,6 +707,7 @@ model ElectionConfig {
   createdBy String   @db.Uuid
 
   symbolAllocations SymbolAllocation[]
+  nominations        NominationApplication[] // NEW: Reverse relation for nominations
 
   @@map("election_configs")
 }

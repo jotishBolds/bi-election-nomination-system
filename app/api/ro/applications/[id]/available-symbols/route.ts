@@ -30,6 +30,9 @@ export async function GET(
           include: { symbol: true },
           orderBy: { preferenceOrder: 'asc' },
         },
+        election: { // NEW: Include election info
+          select: { id: true, isActive: true },
+        },
       },
     });
 
@@ -41,9 +44,15 @@ export async function GET(
     }
 
     // Get active election config
-    const electionConfig = await db.electionConfig.findFirst({
-      where: { isActive: true },
-    });
+    // Use the nomination's election if available, otherwise fall back to active election
+    let electionConfig;
+    if (nomination.election) {
+      electionConfig = nomination.election.isActive ? nomination.election : null;
+    } else {
+      electionConfig = await db.electionConfig.findFirst({
+        where: { isActive: true },
+      });
+    }
 
     if (!electionConfig) {
       return NextResponse.json(
