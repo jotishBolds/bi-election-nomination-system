@@ -256,36 +256,50 @@ export function ROPanel() {
       const res = await fetch("/api/ro/wards");
       const result = await res.json();
       if (!result.success) return;
-      const filtered = (result.data as Array<{
-        id: string; wardNo: number; wardName: string;
-        reservationType?: string; ulb?: { id: string };
-        _count?: { nominations: number };
-      }>).filter((w) => w.ulb?.id === ulbId);
+      const filtered = (
+        result.data as Array<{
+          id: string;
+          wardNo: number;
+          wardName: string;
+          reservationType?: string;
+          ulb?: { id: string };
+          _count?: { nominations: number };
+        }>
+      ).filter((w) => w.ulb?.id === ulbId);
 
       const wardsWithStats: WardData[] = await Promise.all(
         filtered.map(async (w) => {
           try {
             const nr = await fetch(`/api/ro/applications?wardId=${w.id}`);
             const nResult = await nr.json();
-            const noms: Array<{ status: string }> = nResult.success ? nResult.data : [];
+            const noms: Array<{ status: string }> = nResult.success
+              ? nResult.data
+              : [];
             return {
               id: w.id,
               wardNo: w.wardNo,
               wardName: w.wardName,
               reservationType: w.reservationType,
               nominationCount: noms.length,
-              acceptedCount: noms.filter((n) => n.status === "ACCEPTED" || n.status === "CONTESTING").length,
-              pendingCount: noms.filter((n) => ["SUBMITTED", "RECEIVED", "UNDER_SCRUTINY"].includes(n.status)).length,
+              acceptedCount: noms.filter(
+                (n) => n.status === "ACCEPTED" || n.status === "CONTESTING",
+              ).length,
+              pendingCount: noms.filter((n) =>
+                ["SUBMITTED", "RECEIVED", "UNDER_SCRUTINY"].includes(n.status),
+              ).length,
             };
           } catch {
             return {
-              id: w.id, wardNo: w.wardNo, wardName: w.wardName,
+              id: w.id,
+              wardNo: w.wardNo,
+              wardName: w.wardName,
               reservationType: w.reservationType,
               nominationCount: w._count?.nominations || 0,
-              acceptedCount: 0, pendingCount: 0,
+              acceptedCount: 0,
+              pendingCount: 0,
             };
           }
-        })
+        }),
       );
       setWardList(wardsWithStats);
     } finally {
@@ -322,8 +336,13 @@ export function ROPanel() {
   };
 
   const navTo = (layer: NavLayer) => {
-    if (layer === "ulbs") { setSelectedULB(null); setSelectedWard(null); }
-    if (layer === "wards") { setSelectedWard(null); }
+    if (layer === "ulbs") {
+      setSelectedULB(null);
+      setSelectedWard(null);
+    }
+    if (layer === "wards") {
+      setSelectedWard(null);
+    }
     setNavLayer(layer);
   };
 
@@ -336,7 +355,9 @@ export function ROPanel() {
       });
       const rr = await r.json();
       if (!rr.success) return;
-    } catch { return; }
+    } catch {
+      return;
+    }
     setOtpAction({ type: "RECEIVE", nominationId, newStatus: "RECEIVED" });
     setOtpDialogOpen(true);
   };
@@ -350,7 +371,9 @@ export function ROPanel() {
       });
       const rr = await r.json();
       if (rr.success && selectedWard) fetchNominations(selectedWard.id);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   };
 
   if (isLoading) {
@@ -516,6 +539,7 @@ export function ROPanel() {
         case "SCRUTINY":
           endpoint = `/api/ro/applications/${otpAction.nominationId}/scrutiny`;
           body = {
+            action: "COMPLETE",
             decision:
               otpAction.newStatus === "ACCEPTED" ? "ACCEPTED" : "REJECTED",
             otp,
@@ -831,7 +855,9 @@ export function ROPanel() {
               <button
                 onClick={() => navTo("ulbs")}
                 className={`flex items-center gap-0.5 px-1 py-0.5 rounded hover:bg-slate-100 transition-colors ${
-                  navLayer === "ulbs" ? "text-indigo-600 font-semibold" : "text-slate-500"
+                  navLayer === "ulbs"
+                    ? "text-indigo-600 font-semibold"
+                    : "text-slate-500"
                 }`}
               >
                 <Home className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
@@ -843,11 +869,15 @@ export function ROPanel() {
                   <button
                     onClick={() => navTo("wards")}
                     className={`flex items-center gap-0.5 px-1 py-0.5 rounded hover:bg-slate-100 transition-colors ${
-                      navLayer === "wards" ? "text-indigo-600 font-semibold" : "text-slate-500"
+                      navLayer === "wards"
+                        ? "text-indigo-600 font-semibold"
+                        : "text-slate-500"
                     }`}
                   >
                     <Building2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
-                    <span className="truncate max-w-[80px] sm:max-w-none">{selectedULB.name}</span>
+                    <span className="truncate max-w-[80px] sm:max-w-none">
+                      {selectedULB.name}
+                    </span>
                   </button>
                 </>
               )}
@@ -856,7 +886,9 @@ export function ROPanel() {
                   <ChevronRight className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-slate-300 shrink-0" />
                   <span className="text-indigo-600 font-semibold px-1 flex items-center gap-0.5">
                     <MapPin className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
-                    <span className="truncate max-w-[80px] sm:max-w-none">Ward {selectedWard.wardNo} – {selectedWard.wardName}</span>
+                    <span className="truncate max-w-[80px] sm:max-w-none">
+                      Ward {selectedWard.wardNo} – {selectedWard.wardName}
+                    </span>
                   </span>
                 </>
               )}
@@ -882,13 +914,15 @@ export function ROPanel() {
         <CardContent className="px-2 sm:px-3 md:px-4 pb-2 sm:pb-3 md:pb-4">
           {layerLoading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 sm:h-24 rounded-xl" />)}
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-20 sm:h-24 rounded-xl" />
+              ))}
             </div>
           ) : (
             <>
               {/* ── ULB cards ── */}
-              {navLayer === "ulbs" && (
-                ulbList.length === 0 ? (
+              {navLayer === "ulbs" &&
+                (ulbList.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-6 text-slate-400 text-[10px] sm:text-xs">
                     <Building2 className="h-8 w-8 mb-1 opacity-40" />
                     No municipalities in your jurisdiction
@@ -907,9 +941,12 @@ export function ROPanel() {
                               <Building2 className="h-3 w-3 sm:h-4 sm:w-4 text-indigo-600" />
                             </div>
                             <div className="min-w-0">
-                              <p className="font-semibold text-[10px] sm:text-xs md:text-sm text-slate-800 truncate">{ulb.name}</p>
+                              <p className="font-semibold text-[10px] sm:text-xs md:text-sm text-slate-800 truncate">
+                                {ulb.name}
+                              </p>
                               <p className="text-[8px] sm:text-[9px] text-slate-500 truncate">
-                                {ulb.district?.name}{ulb.type ? ` • ${ulb.type}` : ""}
+                                {ulb.district?.name}
+                                {ulb.type ? ` • ${ulb.type}` : ""}
                               </p>
                             </div>
                           </div>
@@ -917,23 +954,30 @@ export function ROPanel() {
                         </div>
                         <div className="grid grid-cols-2 gap-1.5 mt-2 sm:mt-3">
                           <div className="bg-white rounded-lg p-1.5 text-center shadow-sm">
-                            <p className="text-sm sm:text-base font-bold text-slate-800">{ulb.wardCount}</p>
-                            <p className="text-[8px] sm:text-[9px] text-slate-500">Wards</p>
+                            <p className="text-sm sm:text-base font-bold text-slate-800">
+                              {ulb.wardCount}
+                            </p>
+                            <p className="text-[8px] sm:text-[9px] text-slate-500">
+                              Wards
+                            </p>
                           </div>
                           <div className="bg-blue-50 rounded-lg p-1.5 text-center">
-                            <p className="text-sm sm:text-base font-bold text-blue-700">{ulb.nominationCount}</p>
-                            <p className="text-[8px] sm:text-[9px] text-slate-500">Nominations</p>
+                            <p className="text-sm sm:text-base font-bold text-blue-700">
+                              {ulb.nominationCount}
+                            </p>
+                            <p className="text-[8px] sm:text-[9px] text-slate-500">
+                              Nominations
+                            </p>
                           </div>
                         </div>
                       </button>
                     ))}
                   </div>
-                )
-              )}
+                ))}
 
               {/* ── Ward cards ── */}
-              {navLayer === "wards" && (
-                wardList.length === 0 ? (
+              {navLayer === "wards" &&
+                (wardList.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-6 text-slate-400 text-[10px] sm:text-xs">
                     <MapPin className="h-8 w-8 mb-1 opacity-40" />
                     No wards found
@@ -955,39 +999,55 @@ export function ROPanel() {
                               <p className="font-semibold text-[10px] sm:text-xs md:text-sm text-slate-800">
                                 Ward {ward.wardNo}
                               </p>
-                              <p className="text-[8px] sm:text-[9px] text-slate-500 truncate">{ward.wardName}</p>
+                              <p className="text-[8px] sm:text-[9px] text-slate-500 truncate">
+                                {ward.wardName}
+                              </p>
                             </div>
                           </div>
                           <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 text-slate-300 group-hover:text-emerald-500 transition-colors shrink-0 mt-0.5" />
                         </div>
                         {ward.reservationType && (
-                          <Badge variant="outline" className="mt-1.5 text-[8px] sm:text-[9px] h-4">
+                          <Badge
+                            variant="outline"
+                            className="mt-1.5 text-[8px] sm:text-[9px] h-4"
+                          >
                             {ward.reservationType}
                           </Badge>
                         )}
                         <div className="grid grid-cols-3 gap-1 mt-2">
                           <div className="bg-blue-50 rounded-lg p-1 text-center">
-                            <p className="text-xs sm:text-sm font-bold text-blue-700">{ward.nominationCount}</p>
-                            <p className="text-[7px] sm:text-[8px] text-slate-500">Total</p>
+                            <p className="text-xs sm:text-sm font-bold text-blue-700">
+                              {ward.nominationCount}
+                            </p>
+                            <p className="text-[7px] sm:text-[8px] text-slate-500">
+                              Total
+                            </p>
                           </div>
                           <div className="bg-green-50 rounded-lg p-1 text-center">
-                            <p className="text-xs sm:text-sm font-bold text-green-700">{ward.acceptedCount}</p>
-                            <p className="text-[7px] sm:text-[8px] text-slate-500">Accepted</p>
+                            <p className="text-xs sm:text-sm font-bold text-green-700">
+                              {ward.acceptedCount}
+                            </p>
+                            <p className="text-[7px] sm:text-[8px] text-slate-500">
+                              Accepted
+                            </p>
                           </div>
                           <div className="bg-amber-50 rounded-lg p-1 text-center">
-                            <p className="text-xs sm:text-sm font-bold text-amber-700">{ward.pendingCount}</p>
-                            <p className="text-[7px] sm:text-[8px] text-slate-500">Pending</p>
+                            <p className="text-xs sm:text-sm font-bold text-amber-700">
+                              {ward.pendingCount}
+                            </p>
+                            <p className="text-[7px] sm:text-[8px] text-slate-500">
+                              Pending
+                            </p>
                           </div>
                         </div>
                       </button>
                     ))}
                   </div>
-                )
-              )}
+                ))}
 
               {/* ── Applicants table ── */}
-              {navLayer === "applicants" && (
-                getFilteredNominations().length === 0 ? (
+              {navLayer === "applicants" &&
+                (getFilteredNominations().length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-6 text-slate-400 text-[10px] sm:text-xs">
                     <FolderOpen className="h-8 w-8 mb-1 opacity-40" />
                     No applications found
@@ -997,42 +1057,70 @@ export function ROPanel() {
                     <Table className="text-[9px] sm:text-[10px] md:text-xs">
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="text-[8px] sm:text-[9px] md:text-xs">App No.</TableHead>
-                          <TableHead className="text-[8px] sm:text-[9px] md:text-xs">Candidate</TableHead>
-                          <TableHead className="text-[8px] sm:text-[9px] md:text-xs hidden sm:table-cell">Party</TableHead>
-                          <TableHead className="text-[8px] sm:text-[9px] md:text-xs">Status</TableHead>
-                          <TableHead className="text-[8px] sm:text-[9px] md:text-xs hidden md:table-cell">Submitted</TableHead>
-                          <TableHead className="text-[8px] sm:text-[9px] md:text-xs w-[70px] sm:w-[90px]">Actions</TableHead>
+                          <TableHead className="text-[8px] sm:text-[9px] md:text-xs">
+                            App No.
+                          </TableHead>
+                          <TableHead className="text-[8px] sm:text-[9px] md:text-xs">
+                            Candidate
+                          </TableHead>
+                          <TableHead className="text-[8px] sm:text-[9px] md:text-xs hidden sm:table-cell">
+                            Party
+                          </TableHead>
+                          <TableHead className="text-[8px] sm:text-[9px] md:text-xs">
+                            Status
+                          </TableHead>
+                          <TableHead className="text-[8px] sm:text-[9px] md:text-xs hidden md:table-cell">
+                            Submitted
+                          </TableHead>
+                          <TableHead className="text-[8px] sm:text-[9px] md:text-xs w-[70px] sm:w-[90px]">
+                            Actions
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {getFilteredNominations().map((n) => (
                           <TableRow key={n.id}>
-                            <TableCell className="font-mono font-medium">{n.applicationNo}</TableCell>
+                            <TableCell className="font-mono font-medium">
+                              {n.applicationNo}
+                            </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1 sm:gap-1.5">
                                 <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
                                   <User className="h-2 w-2 sm:h-2.5 sm:w-2.5 text-indigo-600" />
                                 </div>
                                 <div>
-                                  <p className="font-medium truncate max-w-[80px] sm:max-w-[120px]">{n.candidateName}</p>
-                                  <p className="text-slate-400 text-[7px] sm:text-[8px] truncate">{n.applicantProfile?.user?.phone || ""}</p>
+                                  <p className="font-medium truncate max-w-[80px] sm:max-w-[120px]">
+                                    {n.candidateName}
+                                  </p>
+                                  <p className="text-slate-400 text-[7px] sm:text-[8px] truncate">
+                                    {n.applicantProfile?.user?.phone || ""}
+                                  </p>
                                 </div>
                               </div>
                             </TableCell>
                             <TableCell className="hidden sm:table-cell">
-                              {n.politicalParty
-                                ? <Badge variant="outline" className="text-[7px] sm:text-[8px] h-4">{n.politicalParty.abbreviation}</Badge>
-                                : <span className="text-slate-400">Ind.</span>}
+                              {n.politicalParty ? (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[7px] sm:text-[8px] h-4"
+                                >
+                                  {n.politicalParty.abbreviation}
+                                </Badge>
+                              ) : (
+                                <span className="text-slate-400">Ind.</span>
+                              )}
                             </TableCell>
                             <TableCell>{getStatusBadge(n.status)}</TableCell>
                             <TableCell className="hidden md:table-cell text-slate-500">
-                              {n.submittedAt ? new Date(n.submittedAt).toLocaleDateString() : ""}
+                              {n.submittedAt
+                                ? new Date(n.submittedAt).toLocaleDateString()
+                                : ""}
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-0.5">
                                 <Button
-                                  variant="ghost" size="icon"
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-5 w-5 sm:h-6 sm:w-6"
                                   onClick={() => downloadForm18PDF(n.id)}
                                   title="Download Form"
@@ -1041,7 +1129,8 @@ export function ROPanel() {
                                 </Button>
                                 {n.status === "SUBMITTED" && (
                                   <Button
-                                    variant="ghost" size="icon"
+                                    variant="ghost"
+                                    size="icon"
                                     className="h-5 w-5 sm:h-6 sm:w-6 text-green-600 hover:bg-green-50"
                                     onClick={() => handleQuickReceive(n.id)}
                                     title="Receive Application"
@@ -1051,7 +1140,8 @@ export function ROPanel() {
                                 )}
                                 {n.status === "RECEIVED" && (
                                   <Button
-                                    variant="ghost" size="icon"
+                                    variant="ghost"
+                                    size="icon"
                                     className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 hover:bg-blue-50"
                                     onClick={() => handleQuickScrutiny(n.id)}
                                     title="Start Scrutiny"
@@ -1066,8 +1156,7 @@ export function ROPanel() {
                       </TableBody>
                     </Table>
                   </div>
-                )
-              )}
+                ))}
             </>
           )}
         </CardContent>

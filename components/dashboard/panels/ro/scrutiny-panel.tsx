@@ -115,6 +115,8 @@ interface AvailableSymbol {
   isReserved: boolean;
   isActive?: boolean;
   isAllocated?: boolean;
+  isPreferred?: boolean;
+  preferenceOrder?: number;
 }
 
 export function ScrutinyPanel() {
@@ -193,33 +195,45 @@ export function ScrutinyPanel() {
     fetchNominations();
   }, [fetchNominations]);
 
-  // Fetch available symbols for a ward
-  const fetchAvailableSymbols = async (wardId: string) => {
+  // Fetch available symbols for a nomination using the dedicated API
+  const fetchAvailableSymbols = async (nominationId: string) => {
     setIsLoadingSymbols(true);
     try {
-      // Fetch all election symbols
-      const response = await fetch("/api/admin/symbols");
+      const response = await fetch(
+        `/api/ro/applications/${nominationId}/available-symbols`,
+      );
       const result = await response.json();
-      if (result.success) {
-        // Fetch already allocated symbols for this ward
-        const allocResponse = await fetch(
-          `/api/ro/symbol-allocation?wardId=${wardId}`,
-        );
-        const allocResult = await allocResponse.json();
-        const allocatedSymbolIds = new Set<string>();
-        if (allocResult.success && allocResult.data) {
-          allocResult.data.forEach((a: { symbolId: string }) => {
-            allocatedSymbolIds.add(a.symbolId);
-          });
-        }
-
-        const symbols = (result.data || result.symbols || []).map(
-          (s: AvailableSymbol) => ({
-            ...s,
-            isAllocated: allocatedSymbolIds.has(s.id),
+      if (result.success && result.data) {
+        const symbols = (result.data.availableSymbols || []).map(
+          (s: {
+            id: string;
+            name: string;
+            imagePath?: string;
+            isAllocated: boolean;
+            isPreferred: boolean;
+            preferenceOrder?: number;
+          }) => ({
+            id: s.id,
+            name: s.name,
+            imagePath: s.imagePath,
+            isReserved: false,
+            isActive: true,
+            isAllocated: s.isAllocated,
+            isPreferred: s.isPreferred,
+            preferenceOrder: s.preferenceOrder,
           }),
         );
         setAvailableSymbols(symbols);
+        // Clear pre-selected symbol if it turned out to be already allocated
+        setSelectedSymbolId((prev) => {
+          if (prev) {
+            const sym = symbols.find(
+              (s: { id: string; isAllocated: boolean }) => s.id === prev,
+            );
+            if (sym?.isAllocated) return "";
+          }
+          return prev;
+        });
       }
     } catch {
       console.error("Failed to fetch symbols");
@@ -237,10 +251,8 @@ export function ScrutinyPanel() {
     setOtpError("");
     setOtpSent(false);
 
-    // Fetch available symbols for this ward
-    if (nomination.ward?.id) {
-      fetchAvailableSymbols(nomination.ward.id);
-    }
+    // Fetch available symbols for this nomination
+    fetchAvailableSymbols(nomination.id);
 
     // Mark as under scrutiny if status is RECEIVED
     if (nomination.status === "RECEIVED") {
@@ -303,38 +315,27 @@ export function ScrutinyPanel() {
     setIsSubmitting(true);
     setOtpError("");
     try {
-      // Call the scrutiny API with COMPLETE action
+      // Call the scrutiny API with COMPLETE action, including symbolId for acceptance
+      const requestBody: Record<string, string> = {
+        action: "COMPLETE",
+        decision,
+        otp,
+      };
+      if (decision === "ACCEPTED" && selectedSymbolId) {
+        requestBody.symbolId = selectedSymbolId;
+      }
+
       const response = await fetch(
         `/api/ro/applications/${selectedNomination.id}/scrutiny`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "COMPLETE",
-            decision,
-            otp,
-          }),
+          body: JSON.stringify(requestBody),
         },
       );
 
       const result = await response.json();
       if (result.success) {
-        // If accepted and symbol selected, allocate the symbol
-        if (decision === "ACCEPTED" && selectedSymbolId) {
-          try {
-            await fetch("/api/ro/symbol-allocation", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                nominationId: selectedNomination.id,
-                symbolId: selectedSymbolId,
-                wardId: selectedNomination.ward.id,
-              }),
-            });
-          } catch {
-            console.error("Symbol allocation failed, but scrutiny succeeded");
-          }
-        }
         setIsScrutinyDialogOpen(false);
         fetchNominations();
       } else {
@@ -673,40 +674,56 @@ export function ScrutinyPanel() {
                       <div className="grid grid-cols-3 gap-3 mt-2">
                         {selectedNomination.symbolPreferences
                           .sort((a, b) => a.preferenceOrder - b.preferenceOrder)
-                          .map((pref) => (
-                            <div
-                              key={pref.symbol.id}
-                              className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                                selectedSymbolId === pref.symbol.id
-                                  ? "border-blue-500 bg-blue-50"
-                                  : "border-slate-200 hover:border-slate-300"
-                              }`}
-                              onClick={() =>
-                                setSelectedSymbolId(pref.symbol.id)
-                              }
-                            >
-                              <div className="flex items-center gap-2 mb-2">
-                                <Star className="h-4 w-4 text-amber-500" />
-                                <span className="text-xs text-slate-500">
-                                  Preference {pref.preferenceOrder}
-                                </span>
-                              </div>
-                              {pref.symbol.imagePath ? (
-                                <img
-                                  src={pref.symbol.imagePath}
-                                  alt={pref.symbol.name}
-                                  className="w-12 h-12 object-contain mx-auto"
-                                />
-                              ) : (
-                                <div className="w-12 h-12 bg-slate-100 rounded flex items-center justify-center mx-auto">
-                                  <ImageIcon className="h-6 w-6 text-slate-400" />
+                          .map((pref) => {
+                            const allocStatus = availableSymbols.find(
+                              (s) => s.id === pref.symbol.id,
+                            );
+                            const isAllocated =
+                              allocStatus?.isAllocated ?? false;
+                            return (
+                              <div
+                                key={pref.symbol.id}
+                                className={`p-3 rounded-lg border-2 transition-all ${
+                                  isAllocated
+                                    ? "border-red-200 bg-red-50 opacity-50 cursor-not-allowed"
+                                    : selectedSymbolId === pref.symbol.id
+                                      ? "border-blue-500 bg-blue-50 cursor-pointer"
+                                      : "border-slate-200 hover:border-slate-300 cursor-pointer"
+                                }`}
+                                onClick={() => {
+                                  if (!isAllocated) {
+                                    setSelectedSymbolId(pref.symbol.id);
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Star className="h-4 w-4 text-amber-500" />
+                                  <span className="text-xs text-slate-500">
+                                    Preference {pref.preferenceOrder}
+                                  </span>
                                 </div>
-                              )}
-                              <p className="text-sm font-medium text-center mt-2">
-                                {pref.symbol.name}
-                              </p>
-                            </div>
-                          ))}
+                                {pref.symbol.imagePath ? (
+                                  <img
+                                    src={pref.symbol.imagePath}
+                                    alt={pref.symbol.name}
+                                    className="w-12 h-12 object-contain mx-auto"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 bg-slate-100 rounded flex items-center justify-center mx-auto">
+                                    <ImageIcon className="h-6 w-6 text-slate-400" />
+                                  </div>
+                                )}
+                                <p className="text-sm font-medium text-center mt-2">
+                                  {pref.symbol.name}
+                                </p>
+                                {isAllocated && (
+                                  <Badge className="text-[10px] mt-1 mx-auto block w-fit bg-red-100 text-red-600">
+                                    Taken
+                                  </Badge>
+                                )}
+                              </div>
+                            );
+                          })}
                       </div>
                     </div>
                   )}
@@ -736,7 +753,9 @@ export function ScrutinyPanel() {
                                 ? "border-red-200 bg-red-50 opacity-50 cursor-not-allowed"
                                 : selectedSymbolId === symbol.id
                                   ? "border-blue-500 bg-blue-50"
-                                  : "border-slate-200 hover:border-slate-300"
+                                  : symbol.isPreferred
+                                    ? "border-amber-400 bg-amber-50 hover:border-amber-500"
+                                    : "border-slate-200 hover:border-slate-300"
                             }`}
                             onClick={() => {
                               if (!symbol.isAllocated) {
@@ -744,6 +763,14 @@ export function ScrutinyPanel() {
                               }
                             }}
                           >
+                            {symbol.isPreferred && (
+                              <div className="flex items-center gap-1 mb-1">
+                                <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
+                                <span className="text-[10px] text-amber-600 font-medium">
+                                  Pref {symbol.preferenceOrder}
+                                </span>
+                              </div>
+                            )}
                             {symbol.imagePath ? (
                               <img
                                 src={symbol.imagePath}

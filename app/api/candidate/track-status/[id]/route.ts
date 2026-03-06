@@ -144,8 +144,7 @@ export async function GET(
         label: "Rejected",
         status: "error",
         timestamp: nomination.scrutinyDate,
-        description:
-          nomination.rejectionReasons?.toString() || "Application was rejected",
+        description: "Application was rejected",
       });
     } else {
       progressSteps.push({
@@ -202,8 +201,6 @@ export async function GET(
           ward: nomination.ward,
           politicalParty: nomination.politicalParty,
           allocatedSymbol: nomination.allocatedSymbol,
-          scrutinyRemarks: nomination.scrutinyRemarks,
-          rejectionReasons: nomination.rejectionReasons,
         },
         progress: {
           currentStatus: nomination.status,

@@ -113,7 +113,7 @@ export async function POST(
     //       });
     //     } catch (upsertError: unknown) {
     //       console.error(`Failed to save response for item ${response.itemId}:`, upsertError);
-          
+
     //       // Check if it's a foreign key error
     //       if (upsertError instanceof Error && 'code' in upsertError && (upsertError as { code: string }).code === 'P2003') {
     //         return NextResponse.json({
@@ -121,7 +121,7 @@ export async function POST(
     //           error: `Invalid checklist item ID: ${response.itemId}. Please ensure scrutiny has been started and item exists.`
     //         }, { status: 400 });
     //       }
-          
+
     //       throw upsertError; // Re-throw other errors
     //     }
     //   }
@@ -189,7 +189,7 @@ export async function POST(
     //     });
     //   } catch (docError: unknown) {
     //     console.error(`Failed to record document viewing for ${documentId}:`, docError);
-        
+
     //     // Check if it's a foreign key error
     //     if (docError instanceof Error && 'code' in docError && (docError as { code: string }).code === 'P2003') {
     //       return NextResponse.json({
@@ -197,7 +197,7 @@ export async function POST(
     //         error: `Invalid document ID: ${documentId}. Please ensure the document exists for this nomination.`
     //       }, { status: 400 });
     //     }
-        
+
     //     throw docError; // Re-throw other errors
     //   }
     // }
@@ -227,7 +227,7 @@ export async function POST(
                 ward: true,
                 symbolPreferences: {
                   include: { symbol: true },
-                  orderBy: { preferenceOrder: 'asc' },
+                  orderBy: { preferenceOrder: "asc" },
                 },
               },
             });
@@ -276,7 +276,8 @@ export async function POST(
               return NextResponse.json(
                 {
                   success: false,
-                  error: "This symbol is already allocated to another candidate in this ward",
+                  error:
+                    "This symbol is already allocated to another candidate in this ward",
                 },
                 { status: 409 },
               );
@@ -284,7 +285,7 @@ export async function POST(
 
             // Get applicant's symbol preferences
             const preferences = nomination.symbolPreferences;
-            const preferredSymbolIds = preferences.map(pref => pref.symbolId);
+            const preferredSymbolIds = preferences.map((pref) => pref.symbolId);
             const isPreferredSymbol = preferredSymbolIds.includes(symbolId);
 
             // Create symbol allocation record
@@ -333,7 +334,7 @@ export async function POST(
             await db.nominationStatusHistory.create({
               data: {
                 nominationId,
-                fromStatus: result.application?.status || "UNDER_SCRUTINY",
+                fromStatus: result.nomination?.status || "UNDER_SCRUTINY",
                 toStatus: "CONTESTING",
                 changedBy: session.user.id,
                 ipAddress: "api",
@@ -346,29 +347,34 @@ export async function POST(
               success: true,
               message: `Nomination accepted and symbol "${symbol.name}" allocated successfully${isPreferredSymbol ? " from preferences" : ""}`,
               data: {
-                ...result.data,
+                nomination: result.nomination,
                 symbolAllocation: allocation,
               },
             });
-
           } catch (allocationError: unknown) {
             console.error("Symbol allocation error:", allocationError);
-            
+
             // If allocation fails, still return the scrutiny result
             // but with allocation error details
             return NextResponse.json({
               success: true,
               message: "Nomination accepted but symbol allocation failed",
               data: {
-                ...(result as { success: boolean; data?: any; error?: string }).data,
-                allocationError: allocationError instanceof Error ? allocationError.message : "Unknown allocation error",
+                nomination: result.nomination,
+                allocationError:
+                  allocationError instanceof Error
+                    ? allocationError.message
+                    : "Unknown allocation error",
               },
             });
           }
         }
       } else {
         return NextResponse.json(
-          { success: false, error: "Currently only RO can perform scrutiny via this flow" },
+          {
+            success: false,
+            error: "Currently only RO can perform scrutiny via this flow",
+          },
           { status: 403 },
         );
       }
@@ -412,10 +418,16 @@ export async function POST(
   } catch (error: unknown) {
     console.error("Error processing scrutiny:", error);
     if (error instanceof Error && error.message === "UNAUTHORIZED") {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
     }
     if (error instanceof Error && error.message === "FORBIDDEN") {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 },
+      );
     }
     return NextResponse.json(
       { success: false, error: "Failed to process scrutiny" },
@@ -445,7 +457,12 @@ export async function GET(
           },
         },
         ward: {
-          select: { id: true, wardNo: true, wardName: true, reservationType: true },
+          select: {
+            id: true,
+            wardNo: true,
+            wardName: true,
+            reservationType: true,
+          },
         },
         politicalParty: {
           select: { name: true, abbreviation: true },
@@ -510,10 +527,16 @@ export async function GET(
     });
   } catch (error: unknown) {
     if (error instanceof Error && error.message === "UNAUTHORIZED") {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
     }
     if (error instanceof Error && error.message === "FORBIDDEN") {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 },
+      );
     }
     console.error("Error processing scrutiny request:", error);
     return NextResponse.json(
