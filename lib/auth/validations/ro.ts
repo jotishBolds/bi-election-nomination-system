@@ -22,6 +22,7 @@ export const roScrutinySchema = z.discriminatedUnion("action", [
     decision: z.enum(["ACCEPTED", "REJECTED"], {
       message: "Decision must be ACCEPTED or REJECTED",
     }),
+    symbolId: z.string().uuid("Invalid symbol ID").optional(),
     otp: z
       .string()
       .length(6, "OTP must be exactly 6 digits")

@@ -204,7 +204,7 @@ export async function POST(
 
     // Handle COMPLETE action
     if (data.action === "COMPLETE") {
-      const { decision, otp } = data;
+      const { decision, symbolId, otp } = data;
 
       // Call the service with OTP verification if RO
       let result;
@@ -216,6 +216,156 @@ export async function POST(
           ipAddress: ip,
           otp,
         });
+
+        // If decision is ACCEPTED and symbolId is provided, allocate symbol
+        if (decision === "ACCEPTED" && symbolId && result.success) {
+          try {
+            // Get nomination details for symbol allocation
+            const nomination = await db.nominationApplication.findUnique({
+              where: { id: nominationId },
+              include: {
+                ward: true,
+                symbolPreferences: {
+                  include: { symbol: true },
+                  orderBy: { preferenceOrder: 'asc' },
+                },
+              },
+            });
+
+            if (!nomination) {
+              return NextResponse.json(
+                { success: false, error: "Nomination not found" },
+                { status: 404 },
+              );
+            }
+
+            // Get active election config
+            const electionConfig = await db.electionConfig.findFirst({
+              where: { isActive: true },
+            });
+
+            if (!electionConfig) {
+              return NextResponse.json(
+                { success: false, error: "No active election found" },
+                { status: 400 },
+              );
+            }
+
+            // Verify symbol exists
+            const symbol = await db.electionSymbol.findUnique({
+              where: { id: symbolId },
+            });
+
+            if (!symbol) {
+              return NextResponse.json(
+                { success: false, error: "Symbol not found" },
+                { status: 404 },
+              );
+            }
+
+            // Check if symbol is already allocated in the same ward for this election
+            const existingAllocation = await db.symbolAllocation.findFirst({
+              where: {
+                symbolId,
+                wardId: nomination.wardId,
+                electionId: electionConfig.id,
+              },
+            });
+
+            if (existingAllocation) {
+              return NextResponse.json(
+                {
+                  success: false,
+                  error: "This symbol is already allocated to another candidate in this ward",
+                },
+                { status: 409 },
+              );
+            }
+
+            // Get applicant's symbol preferences
+            const preferences = nomination.symbolPreferences;
+            const preferredSymbolIds = preferences.map(pref => pref.symbolId);
+            const isPreferredSymbol = preferredSymbolIds.includes(symbolId);
+
+            // Create symbol allocation record
+            const allocation = await db.symbolAllocation.create({
+              data: {
+                symbolId,
+                wardId: nomination.wardId,
+                electionId: electionConfig.id,
+                allocatedBy: session.user.id,
+                allocatedTo: nominationId,
+                allocatedAt: new Date(),
+              },
+              include: {
+                symbol: true,
+                ward: true,
+              },
+            });
+
+            // Update nomination with allocated symbol and status
+            await db.nominationApplication.update({
+              where: { id: nominationId },
+              data: {
+                allocatedSymbolId: symbolId,
+                status: "CONTESTING",
+              },
+            });
+
+            // Log symbol allocation
+            await db.auditLog.create({
+              data: {
+                userId: session.user.id,
+                action: "UPDATE",
+                entityType: "NominationApplication",
+                entityId: nominationId,
+                newValues: {
+                  symbolId,
+                  symbolName: symbol.name,
+                  wardId: nomination.wardId,
+                  allocationType: "SYMBOL_ALLOCATED",
+                },
+                ipAddress: "api",
+              },
+            });
+
+            // Log status change
+            await db.nominationStatusHistory.create({
+              data: {
+                nominationId,
+                fromStatus: result.application?.status || "UNDER_SCRUTINY",
+                toStatus: "CONTESTING",
+                changedBy: session.user.id,
+                ipAddress: "api",
+                remarks: `Symbol "${symbol.name}" allocated by RO${isPreferredSymbol ? " (from preferences)" : " (manual selection)"}`,
+              },
+            });
+
+            // Return enhanced response with allocation details
+            return NextResponse.json({
+              success: true,
+              message: `Nomination accepted and symbol "${symbol.name}" allocated successfully${isPreferredSymbol ? " from preferences" : ""}`,
+              data: {
+                ...result.data,
+                symbolAllocation: allocation,
+              },
+            });
+
+          } catch (allocationError: unknown) {
+            console.error("Symbol allocation error:", allocationError);
+            
+            // If allocation fails, still return the scrutiny result
+            // but with allocation error details
+            return NextResponse.json({
+              success: true,
+              message: "Nomination accepted but symbol allocation failed",
+              data: {
+                ...(result as { success: boolean; data?: any; error?: string }).data,
+                allocationError: allocationError instanceof Error ? allocationError.message : "Unknown allocation error",
+              },
+            });
+          }
+        }
       } else {
         return NextResponse.json(
           { success: false, error: "Currently only RO can perform scrutiny via this flow" },

@@ -261,11 +261,11 @@ export async function validateActionAllowed(
           return { allowed: false, reason: "Nomination period is not active" };
         }
         break;
-      case "scrutiny":
-        if (!electionStatus.canScrutinize) {
-          return { allowed: false, reason: "Scrutiny period is not active" };
-        }
-        break;
+      // case "scrutiny":
+      //   if (!electionStatus.canScrutinize) {
+      //     return { allowed: false, reason: "Scrutiny period is not active" };
+      //   }
+      //   break;
       case "withdrawal":
         if (!electionStatus.canWithdraw) {
           return { allowed: false, reason: "Withdrawal period is not active" };
