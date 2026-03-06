@@ -19,8 +19,11 @@ export interface Form18Data {
   ulbName?: string;
   districtName?: string;
   politicalPartyName?: string;
+  politicalPartyAbbreviation?: string;
   partySymbolUrl?: string;
   symbolName?: string;
+  symbolPreference2?: string;
+  symbolPreference3?: string;
   proposerName?: string;
   proposerSerialNo?: string;
   proposerPartNo?: string;
@@ -34,17 +37,40 @@ const getCategoryLabel = (category: string): string => {
     general: "General",
     SC: "Scheduled Caste",
     sc: "Scheduled Caste",
+    ST: "Scheduled Tribe",
     ST_BL: "Scheduled Tribe (BL)",
     st_bl: "Scheduled Tribe (BL)",
     ST_LT: "Scheduled Tribe (LT)",
     st_lt: "Scheduled Tribe (LT)",
+    OBC: "OBC",
     OBC_CENTRAL: "OBC (Central List)",
     obc_central: "OBC (Central List)",
     OBC_STATE: "OBC (State List)",
     obc_state: "OBC (State List)",
   };
-  return labels[category] || category;
+  return labels[category] || category?.replace(/_/g, " ") || "General";
 };
+
+/**
+ * Wait for all images in a container to load (for PDF rendering)
+ */
+function waitForImages(container: HTMLElement): Promise<void> {
+  const images = container.querySelectorAll("img");
+  if (images.length === 0) return Promise.resolve();
+  return Promise.all(
+    Array.from(images).map(
+      (img) =>
+        new Promise<void>((resolve) => {
+          if (img.complete && img.naturalHeight > 0) {
+            resolve();
+          } else {
+            img.onload = () => resolve();
+            img.onerror = () => resolve();
+          }
+        }),
+    ),
+  ).then(() => {});
+}
 
 /**
  * Generate FORM-18 HTML content for PDF generation.
@@ -67,10 +93,43 @@ export function generateForm18HTML(data: Form18Data): string {
   const wardName = data.wardName
     ? `Ward ${data.wardNo || ""} - ${data.wardName}`
     : "";
+
+  // Party display: show name + abbreviation if available
   const partyName = data.politicalPartyName || "Independent";
-  const symbolSection = data.partySymbolUrl
-    ? `<img src="${data.partySymbolUrl}" alt="${data.symbolName || partyName}" style="width:50px;height:50px;object-fit:contain;border:1px solid #ddd;background:white;padding:4px;border-radius:4px;margin-right:12px;vertical-align:middle;" />`
-    : "";
+  const partyDisplay = data.politicalPartyAbbreviation
+    ? `${partyName} (${data.politicalPartyAbbreviation})`
+    : partyName;
+
+  // Resolve symbol info
+  const symbolName1 = data.symbolName || partyName;
+  const symbolName2 = data.symbolPreference2 || "___";
+  const symbolName3 = data.symbolPreference3 || "___";
+
+  // Build symbol section with image + all 3 preferences
+  let symbolBlock: string;
+  if (data.partySymbolUrl) {
+    symbolBlock = `
+      <div style="display:flex;align-items:center;gap:16px;margin:12px 0;padding:14px;background:#f5f5f5;border-radius:6px;border:1px solid #e5e5e5;">
+        <img
+          src="${data.partySymbolUrl}"
+          alt="${symbolName1}"
+          crossorigin="anonymous"
+          style="width:56px;height:56px;object-fit:contain;border:1px solid #ddd;background:white;padding:4px;border-radius:6px;"
+        />
+        <div>
+          <p style="margin:3px 0;">(i)&nbsp;&nbsp; <span style="font-weight:600;">${symbolName1}</span></p>
+          <p style="margin:3px 0;">(ii)&nbsp; <span style="font-weight:600;">${symbolName2}</span></p>
+          <p style="margin:3px 0;">(iii) <span style="font-weight:600;">${symbolName3}</span></p>
+        </div>
+      </div>`;
+  } else {
+    symbolBlock = `
+      <div style="margin:12px 0;padding:14px;background:#f5f5f5;border-radius:6px;border:1px solid #e5e5e5;">
+        <p style="margin:3px 0;">(i)&nbsp;&nbsp; <span style="font-weight:600;">${symbolName1}</span></p>
+        <p style="margin:3px 0;">(ii)&nbsp; <span style="font-weight:600;">${symbolName2}</span></p>
+        <p style="margin:3px 0;">(iii) <span style="font-weight:600;">${symbolName3}</span></p>
+      </div>`;
+  }
 
   const categoryLabel = getCategoryLabel(data.category);
   const isReserved =
@@ -142,15 +201,10 @@ export function generateForm18HTML(data: Form18Data): string {
         <p style="font-weight:500;margin-bottom:16px;">I, the above-mentioned candidate, assent to this nomination and hereby declare:-</p>
         <div style="margin-left:20px;">
           <p style="margin:10px 0;">(a) that I have completed <span style="border-bottom:1px solid #000;padding:0 8px;font-weight:500;display:inline-block;min-width:40px;">${data.age || "18"}</span> years of age.</p>
-          <p style="margin:10px 0;">(b) that I am set up at this election by <span style="border-bottom:1px solid #000;padding:0 8px;font-weight:500;display:inline-block;min-width:180px;">${partyName}</span> Political Party.</p>
+          <p style="margin:10px 0;">(b) that I am set up at this election by <span style="border-bottom:1px solid #000;padding:0 8px;font-weight:500;display:inline-block;min-width:200px;">${partyDisplay}</span> Political Party.</p>
           <p style="margin:10px 0;">(c) that the symbols I have chosen are, in order of preference:</p>
           <div style="margin-left:30px;">
-            <div style="display:flex;align-items:center;gap:16px;margin:12px 0;padding:12px;background:#f5f5f5;border-radius:6px;">
-              ${symbolSection}
-              <div>
-                <p style="margin:2px 0;">(i) <span style="font-weight:600;">${data.symbolName || partyName}</span></p>
-              </div>
-            </div>
+            ${symbolBlock}
           </div>
           <p style="margin:10px 0;">(d) that my name and my *father's / husband's name have been correctly spelt out above;</p>
           <p style="margin:10px 0;">(e) that to the best of my knowledge and belief, I am qualified and not also disqualified for being chosen to fill the seat in the <span style="border-bottom:1px solid #000;padding:0 8px;font-weight:500;display:inline-block;min-width:200px;">${ulbName}</span> Municipality.</p>
@@ -183,36 +237,108 @@ export function generateForm18HTML(data: Form18Data): string {
 }
 
 /**
- * Map API nomination response to Form18Data
+ * Map API nomination response to Form18Data.
+ * Handles both /api/nominations and /api/ro/applications response shapes.
  */
 export function mapNominationToForm18(nom: any): Form18Data {
+  // Sort symbol preferences by preferenceOrder
+  const symPrefs = (nom.symbolPreferences || []).sort(
+    (a: any, b: any) => (a.preferenceOrder || 0) - (b.preferenceOrder || 0),
+  );
+
+  // Resolve primary symbol: allocatedSymbol > first preference > party symbol
+  const allocatedSymbol = nom.allocatedSymbol;
+  const firstPref = symPrefs[0]?.symbol;
+  const secondPref = symPrefs[1]?.symbol;
+  const thirdPref = symPrefs[2]?.symbol;
+
+  // Symbol image path: try allocated, then first pref, then party
+  const symbolImagePath =
+    allocatedSymbol?.imagePath ||
+    firstPref?.imagePath ||
+    nom.politicalParty?.symbol?.imagePath ||
+    nom.politicalParty?.symbolImagePath ||
+    null;
+
+  // Symbol name: try allocated, then first pref, then party symbol name
+  const symbolName =
+    allocatedSymbol?.name ||
+    firstPref?.name ||
+    nom.politicalParty?.symbol?.name ||
+    nom.symbolName ||
+    undefined;
+
+  // Proposer: handle various field name patterns from different APIs
+  const proposer = nom.proposers?.[0];
+  const proposerName =
+    proposer?.name || proposer?.proposerName || nom.proposerName || undefined;
+  const proposerSerialNo =
+    proposer?.voterSerialNo ||
+    proposer?.serialNo ||
+    proposer?.electoralSerialNo ||
+    proposer?.electoralRollSerialNo ||
+    nom.proposerSerialNo ||
+    undefined;
+  const proposerPartNo =
+    proposer?.voterPartNo ||
+    proposer?.partNo ||
+    proposer?.electoralPartNo ||
+    proposer?.electoralRollPartNo ||
+    nom.proposerPartNo ||
+    undefined;
+
+  // Voter serial/part: handle direct fields or nested voterRecord
+  const voterSerialNo =
+    nom.voterSerialNo ||
+    nom.serialNo ||
+    nom.electoralSerialNo ||
+    nom.applicantProfile?.voterRecord?.serialNo ||
+    undefined;
+  const voterPartNo =
+    nom.voterPartNo ||
+    nom.partNo ||
+    nom.electoralPartNo ||
+    nom.applicantProfile?.voterRecord?.partNo ||
+    undefined;
+
+  // Build symbol URL - handle various path formats
+  let partySymbolUrl: string | undefined;
+  if (symbolImagePath) {
+    if (symbolImagePath.startsWith("http") || symbolImagePath.startsWith("/")) {
+      partySymbolUrl = symbolImagePath;
+    } else {
+      partySymbolUrl = `/election-symbols/${symbolImagePath}`;
+    }
+  }
+
   return {
-    applicationNo: nom.applicationNo,
-    candidateName: nom.candidateName || "",
-    fatherHusbandName: nom.fatherHusbandName || "",
-    address: nom.address || "",
+    applicationNo: nom.applicationNo || nom.applicationNumber,
+    candidateName: nom.candidateName || nom.name || "",
+    fatherHusbandName: nom.fatherHusbandName || nom.fatherOrHusbandName || "",
+    address: nom.address || nom.fullPostalAddress || "",
     dateOfBirth: nom.dateOfBirth,
     age: nom.age,
     gender: nom.gender,
     category: nom.category || "GENERAL",
     casteTribeName: nom.casteTribeName,
-    voterSerialNo: nom.voterSerialNo,
-    voterPartNo: nom.voterPartNo,
+    voterSerialNo,
+    voterPartNo,
     wardName: nom.ward?.wardName,
     wardNo: nom.ward?.wardNo,
     ulbName: nom.ward?.ulb?.name || nom.ulb?.name,
-    districtName: nom.ward?.ulb?.district?.name,
+    districtName: nom.ward?.ulb?.district?.name || nom.ulb?.district?.name,
     politicalPartyName:
       nom.politicalParty?.name ||
       (nom.isIndependent ? "Independent" : undefined),
-    partySymbolUrl: nom.politicalParty?.symbol?.imagePath
-      ? `/election-symbols/${nom.politicalParty.symbol.imagePath}`
-      : undefined,
-    symbolName: nom.politicalParty?.symbol?.name,
-    proposerName: nom.proposers?.[0]?.name,
-    proposerSerialNo: nom.proposers?.[0]?.voterSerialNo,
-    proposerPartNo: nom.proposers?.[0]?.voterPartNo,
-    submittedAt: nom.submittedAt,
+    politicalPartyAbbreviation: nom.politicalParty?.abbreviation,
+    partySymbolUrl,
+    symbolName,
+    symbolPreference2: secondPref?.name || undefined,
+    symbolPreference3: thirdPref?.name || undefined,
+    proposerName,
+    proposerSerialNo,
+    proposerPartNo,
+    submittedAt: nom.submittedAt || nom.createdAt,
     status: nom.status,
   };
 }
@@ -220,27 +346,51 @@ export function mapNominationToForm18(nom: any): Form18Data {
 /**
  * Download FORM-18 PDF for a nomination.
  * Fetches data from API, generates HTML, renders to PDF.
+ *
+ * @param nominationId - The nomination ID
+ * @param options.apiBasePath - API base path (default: "/api/nominations")
+ *   Use "/api/ro/applications" for RO panel.
  */
-export async function downloadForm18PDF(nominationId: string): Promise<void> {
-  const response = await fetch(`/api/nominations/${nominationId}`);
-  const result = await response.json();
+export async function downloadForm18PDF(
+  nominationId: string,
+  options?: { apiBasePath?: string },
+): Promise<void> {
+  const basePath = options?.apiBasePath || "/api/nominations";
+  const response = await fetch(`${basePath}/${nominationId}`);
 
-  if (!result.success || !result.nomination) {
-    throw new Error("Failed to fetch nomination data");
+  if (!response.ok) {
+    throw new Error(`Failed to fetch nomination: ${response.status}`);
   }
 
-  const nom = result.nomination;
+  const result = await response.json();
+
+  if (!result.success) {
+    throw new Error(result.error || "Failed to fetch nomination data");
+  }
+
+  // Handle both response shapes: result.nomination or result.data
+  const nom = result.nomination || result.data;
+  if (!nom) {
+    throw new Error("Nomination data is empty");
+  }
+
   const formData = mapNominationToForm18(nom);
   const html = generateForm18HTML(formData);
 
   const { default: html2PDF } = await import("jspdf-html2canvas");
 
   const container = document.createElement("div");
-  container.style.width = "794px";
-  container.style.position = "absolute";
-  container.style.left = "-9999px";
+  container.style.cssText =
+    "width:794px;position:fixed;left:-9999px;top:0;z-index:-1;background:#fff;";
   container.innerHTML = html;
   document.body.appendChild(container);
+
+  // Wait for symbol images to load before rendering
+  await waitForImages(container);
+  await new Promise((r) => setTimeout(r, 250));
+
+  const candidateName = formData.candidateName || "Nomination";
+  const appNo = formData.applicationNo || nominationId;
 
   try {
     await html2PDF(container, {
@@ -266,7 +416,7 @@ export async function downloadForm18PDF(nominationId: string): Promise<void> {
         left: 40,
       },
       autoResize: true,
-      output: `FORM-18_${nom.applicationNo || "Nomination"}.pdf`,
+      output: `FORM-18_${candidateName.replace(/\s+/g, "_")}_${appNo}.pdf`,
     });
   } finally {
     document.body.removeChild(container);
@@ -279,15 +429,26 @@ export async function downloadForm18PDF(nominationId: string): Promise<void> {
  */
 export async function getForm18PreviewHTML(
   nominationId: string,
+  options?: { apiBasePath?: string },
 ): Promise<string> {
-  const response = await fetch(`/api/nominations/${nominationId}`);
-  const result = await response.json();
+  const basePath = options?.apiBasePath || "/api/nominations";
+  const response = await fetch(`${basePath}/${nominationId}`);
 
-  if (!result.success || !result.nomination) {
-    throw new Error("Failed to fetch nomination data");
+  if (!response.ok) {
+    throw new Error(`Failed to fetch nomination: ${response.status}`);
   }
 
-  const nom = result.nomination;
+  const result = await response.json();
+
+  if (!result.success) {
+    throw new Error(result.error || "Failed to fetch nomination data");
+  }
+
+  const nom = result.nomination || result.data;
+  if (!nom) {
+    throw new Error("Nomination data is empty");
+  }
+
   const formData = mapNominationToForm18(nom);
   return generateForm18HTML(formData);
 }
