@@ -28,7 +28,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   InputOTP,
   InputOTPGroup,
@@ -55,15 +54,96 @@ import {
   CheckCheck,
   Send,
   Loader2,
-  Folder,
   ChevronRight,
   Home,
   ArrowLeft,
   Building2,
   MousePointerClick,
+  Hash,
+  UserCheck,
+  Shield,
+  SlidersHorizontal,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { downloadForm18PDF } from "@/lib/form18-template";
+
+/* ───────────────────────────────────────────────
+   Realistic Folder SVG Icon
+   ─────────────────────────────────────────────── */
+const FolderIcon = ({
+  className,
+  variant = "yellow",
+}: {
+  className?: string;
+  variant?: "yellow" | "blue" | "green";
+}) => {
+  const themes = {
+    yellow: {
+      back: "#C9930F",
+      tab: "#B07E0A",
+      front: "#F2C94C",
+      frontDark: "#E0B42E",
+      edge: "#FADA7A",
+      line: "#D4A825",
+    },
+    blue: {
+      back: "#2B5FB8",
+      tab: "#1E4D9E",
+      front: "#5E9BF0",
+      frontDark: "#4A86DB",
+      edge: "#8FBDF7",
+      line: "#3A73CC",
+    },
+    green: {
+      back: "#1B8A4A",
+      tab: "#14703B",
+      front: "#44CD79",
+      frontDark: "#33B566",
+      edge: "#7ADDA5",
+      line: "#28A45C",
+    },
+  };
+  const t = themes[variant];
+
+  return (
+    <svg
+      viewBox="0 0 120 96"
+      fill="none"
+      className={className}
+      aria-hidden="true"
+    >
+      <ellipse cx="60" cy="92" rx="50" ry="4" fill="black" opacity="0.06" />
+      <path
+        d="M8 18C8 13.5817 11.5817 10 16 10H36.6863C39.338 10 41.8808 11.054 43.7549 12.929L48.2451 17.419C50.1192 19.294 52.662 20.348 55.3137 20.348H104C108.418 20.348 112 23.93 112 28.348V78C112 82.4183 108.418 86 104 86H16C11.5817 86 8 82.4183 8 78V18Z"
+        fill={t.back}
+      />
+      <path
+        d="M10 16C10 12.134 13.134 9 17 9H35.1C37.42 9 39.63 10 41.22 11.73L46 17H10V16Z"
+        fill={t.tab}
+      />
+      <path
+        d="M4 34C4 29.5817 7.58172 26 12 26H108C112.418 26 116 29.5817 116 34V78C116 82.4183 112.418 86 108 86H12C7.58172 86 4 82.4183 4 78V34Z"
+        fill={t.front}
+      />
+      <path
+        d="M4 34C4 29.5817 7.58172 26 12 26H108C112.418 26 116 29.5817 116 34V38H4V34Z"
+        fill={t.edge}
+        opacity="0.55"
+      />
+      <line
+        x1="4"
+        y1="38"
+        x2="116"
+        y2="38"
+        stroke={t.line}
+        strokeWidth="0.75"
+        opacity="0.25"
+      />
+    </svg>
+  );
+};
+
+/* ───────── Types & helpers ───────── */
 
 interface WardData {
   id: string;
@@ -145,6 +225,14 @@ interface Nomination {
     name: string;
     imagePath?: string;
   };
+  symbolPreferences?: Array<{
+    preferenceOrder: number;
+    symbol: {
+      id: string;
+      name: string;
+      imagePath?: string;
+    };
+  }>;
   documents?: Array<{
     id: string;
     type: string;
@@ -172,6 +260,10 @@ const LEVEL_NUM: Record<NavLevel, number> = {
   ward: 2,
   applications: 3,
 };
+
+/* ═══════════════════════════════════════════════
+   Main Component
+   ═══════════════════════════════════════════════ */
 
 export function ApplicationsListPanel() {
   const [nominations, setNominations] = useState<Nomination[]>([]);
@@ -208,6 +300,8 @@ export function ApplicationsListPanel() {
   const [isReceiving, setIsReceiving] = useState(false);
   const [receiveOtpSent, setReceiveOtpSent] = useState(false);
 
+  /* ───────── Computed data ───────── */
+
   const ulbGroups = useMemo(() => {
     const groups: Record<string, ULBGroup> = {};
     wards.forEach((ward) => {
@@ -235,6 +329,8 @@ export function ApplicationsListPanel() {
   useEffect(() => {
     ulbGroupsRef.current = ulbGroups;
   }, [ulbGroups]);
+
+  /* ───────── History / popstate ───────── */
 
   const historyInitialized = useRef(false);
   useEffect(() => {
@@ -308,7 +404,7 @@ export function ApplicationsListPanel() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  //Double Click/Tap
+  /* ───────── Double-click / tap ───────── */
 
   const handleFolderDoubleClick = useCallback(
     (folderId: string, callback: () => void) => {
@@ -345,7 +441,7 @@ export function ApplicationsListPanel() {
     };
   }, []);
 
-  //Data Fetching
+  /* ───────── Data fetching ───────── */
 
   const fetchWards = async () => {
     try {
@@ -383,7 +479,7 @@ export function ApplicationsListPanel() {
     fetchNominations();
   }, [fetchNominations]);
 
-  //More Computed Data
+  /* ───────── More computed data ───────── */
 
   const ulbNominationCounts = useMemo(() => {
     const wardToUlb: Record<string, string> = {};
@@ -412,7 +508,13 @@ export function ApplicationsListPanel() {
       filtered = filtered.filter((n) => n.ward.id === selectedWardNav.id);
     }
     if (statusFilter && statusFilter !== "all") {
-      filtered = filtered.filter((n) => n.status === statusFilter);
+      if (statusFilter === "PENDING") {
+        filtered = filtered.filter(
+          (n) => n.status === "SUBMITTED" || n.status === "RECEIVED",
+        );
+      } else {
+        filtered = filtered.filter((n) => n.status === statusFilter);
+      }
     }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -461,7 +563,7 @@ export function ApplicationsListPanel() {
     return items;
   }, [navLevel, selectedUlb, selectedWardNav]);
 
-  //Navigation
+  /* ───────── Navigation helpers ───────── */
 
   const navigateToUlb = (ulb: ULBGroup) => {
     setSelectedUlb(ulb);
@@ -515,90 +617,103 @@ export function ApplicationsListPanel() {
     }
   };
 
-  //tatus Badge
+  /* ───────── Status badge ───────── */
 
   const getStatusBadge = (status: string) => {
     const config: Record<
       string,
-      { bg: string; text: string; icon: React.ReactNode }
+      { bg: string; text: string; border: string; dot: string }
     > = {
       DRAFT: {
-        bg: "bg-slate-100",
-        text: "text-slate-700",
-        icon: <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3" />,
+        bg: "bg-slate-50",
+        text: "text-slate-600",
+        border: "border-slate-200",
+        dot: "bg-slate-400",
       },
       SUBMITTED: {
-        bg: "bg-blue-100",
+        bg: "bg-blue-50",
         text: "text-blue-700",
-        icon: <FileText className="h-2.5 w-2.5 sm:h-3 sm:w-3" />,
+        border: "border-blue-200",
+        dot: "bg-blue-500",
       },
       RECEIVED: {
-        bg: "bg-cyan-100",
+        bg: "bg-cyan-50",
         text: "text-cyan-700",
-        icon: <CheckCircle className="h-2.5 w-2.5 sm:h-3 sm:w-3" />,
+        border: "border-cyan-200",
+        dot: "bg-cyan-500",
       },
       UNDER_SCRUTINY: {
-        bg: "bg-amber-100",
+        bg: "bg-amber-50",
         text: "text-amber-700",
-        icon: <Eye className="h-2.5 w-2.5 sm:h-3 sm:w-3" />,
+        border: "border-amber-200",
+        dot: "bg-amber-500",
       },
       APPROVED: {
-        bg: "bg-green-100",
-        text: "text-green-700",
-        icon: <CheckCircle className="h-2.5 w-2.5 sm:h-3 sm:w-3" />,
+        bg: "bg-emerald-50",
+        text: "text-emerald-700",
+        border: "border-emerald-200",
+        dot: "bg-emerald-500",
       },
       ACCEPTED: {
-        bg: "bg-green-100",
-        text: "text-green-700",
-        icon: <CheckCircle className="h-2.5 w-2.5 sm:h-3 sm:w-3" />,
+        bg: "bg-emerald-50",
+        text: "text-emerald-700",
+        border: "border-emerald-200",
+        dot: "bg-emerald-500",
       },
       CONTESTING: {
-        bg: "bg-purple-100",
+        bg: "bg-purple-50",
         text: "text-purple-700",
-        icon: <FileCheck className="h-2.5 w-2.5 sm:h-3 sm:w-3" />,
+        border: "border-purple-200",
+        dot: "bg-purple-500",
       },
       REJECTED: {
-        bg: "bg-red-100",
+        bg: "bg-red-50",
         text: "text-red-700",
-        icon: <XCircle className="h-2.5 w-2.5 sm:h-3 sm:w-3" />,
+        border: "border-red-200",
+        dot: "bg-red-500",
       },
       WITHDRAWN: {
-        bg: "bg-gray-100",
-        text: "text-gray-700",
-        icon: <Ban className="h-2.5 w-2.5 sm:h-3 sm:w-3" />,
+        bg: "bg-gray-50",
+        text: "text-gray-600",
+        border: "border-gray-200",
+        dot: "bg-gray-400",
       },
       VALID: {
-        bg: "bg-emerald-100",
+        bg: "bg-emerald-50",
         text: "text-emerald-700",
-        icon: <FileCheck className="h-2.5 w-2.5 sm:h-3 sm:w-3" />,
+        border: "border-emerald-200",
+        dot: "bg-emerald-500",
       },
     };
     const c = config[status] || config.DRAFT;
     return (
-      <Badge
-        className={`${c.bg} ${c.text} gap-0.5 sm:gap-1 text-[9px] sm:text-[10px] md:text-xs px-1.5 sm:px-2 py-0 sm:py-0.5`}
+      <span
+        className={`inline-flex items-center gap-1 sm:gap-1.5 ${c.bg} ${c.text} border ${c.border} text-[9px] sm:text-[10px] md:text-xs px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full font-medium`}
       >
-        {c.icon}
-        <span className="hidden xs:inline sm:inline">
-          {status.replace("_", " ")}
+        <span
+          className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${c.dot} shrink-0`}
+        />
+        <span className="hidden sm:inline">{status.replace(/_/g, " ")}</span>
+        <span className="sm:hidden">
+          {status === "UNDER_SCRUTINY" ? "Scrutiny" : status.replace(/_/g, " ")}
         </span>
-        <span className="xs:hidden sm:hidden">
-          {status.replace("_", " ").slice(0, 4)}
-        </span>
-      </Badge>
+      </span>
     );
   };
 
-  //Actions
+  /* ───────── Actions ───────── */
 
   const handleViewNomination = (nomination: Nomination) => {
     setSelectedNomination(nomination);
     setIsViewDialogOpen(true);
   };
 
+  // Download PDF using the RO API endpoint
   const handleDownloadForm = async (nominationId: string) => {
     try {
-      await downloadForm18PDF(nominationId);
+      await downloadForm18PDF(nominationId, {
+        apiBasePath: "/api/ro/applications",
+      });
     } catch (err) {
       console.error("Failed to download form:", err);
     }
@@ -700,7 +815,99 @@ export function ApplicationsListPanel() {
     }
   };
 
-  // Loading
+  /* ───────── Timeline helper ───────── */
+  const getTimelineSteps = (nom: Nomination) => {
+    const reached = (statuses: string[]) => statuses.includes(nom.status);
+    const pastReceived = reached([
+      "RECEIVED",
+      "UNDER_SCRUTINY",
+      "APPROVED",
+      "ACCEPTED",
+      "VALID",
+      "REJECTED",
+      "CONTESTING",
+    ]);
+    const pastScrutiny = reached([
+      "UNDER_SCRUTINY",
+      "APPROVED",
+      "ACCEPTED",
+      "VALID",
+      "REJECTED",
+      "CONTESTING",
+    ]);
+    const decided = reached([
+      "APPROVED",
+      "ACCEPTED",
+      "VALID",
+      "REJECTED",
+      "CONTESTING",
+    ]);
+
+    return [
+      {
+        label: "Submitted",
+        done: true,
+        date: nom.submittedAt,
+        color: "bg-blue-500",
+        ring: "ring-blue-200",
+      },
+      {
+        label: "Received by RO",
+        done: pastReceived,
+        date: null,
+        color: "bg-cyan-500",
+        ring: "ring-cyan-200",
+      },
+      {
+        label: "Under Scrutiny",
+        done: pastScrutiny,
+        date: nom.scrutinyAt || null,
+        color: "bg-amber-500",
+        ring: "ring-amber-200",
+      },
+      {
+        label:
+          nom.status === "REJECTED"
+            ? "Rejected"
+            : nom.status === "WITHDRAWN"
+              ? "Withdrawn"
+              : decided
+                ? "Approved"
+                : "Awaiting Decision",
+        done: decided || nom.status === "WITHDRAWN",
+        date: null,
+        color:
+          nom.status === "REJECTED"
+            ? "bg-red-500"
+            : nom.status === "WITHDRAWN"
+              ? "bg-gray-400"
+              : "bg-emerald-500",
+        ring:
+          nom.status === "REJECTED"
+            ? "ring-red-200"
+            : nom.status === "WITHDRAWN"
+              ? "ring-gray-200"
+              : "ring-emerald-200",
+      },
+    ];
+  };
+
+  /* ───────── Resolve display symbol for view dialog ───────── */
+  const getDisplaySymbol = (nom: Nomination) => {
+    if (nom.allocatedSymbol) return nom.allocatedSymbol;
+    const sorted = (nom.symbolPreferences || []).sort(
+      (a, b) => a.preferenceOrder - b.preferenceOrder,
+    );
+    if (sorted.length > 0) {
+      return {
+        name: sorted[0].symbol.name,
+        imagePath: sorted[0].symbol.imagePath,
+      };
+    }
+    return null;
+  };
+
+  /* ───────── Loading skeleton ───────── */
 
   if (isLoading && nominations.length === 0 && wards.length === 0) {
     return (
@@ -720,8 +927,13 @@ export function ApplicationsListPanel() {
     );
   }
 
+  /* ═══════════════════════════════════════════════
+     Render
+     ═══════════════════════════════════════════════ */
+
   return (
     <div className="space-y-2.5 sm:space-y-3 md:space-y-5 p-2 sm:p-3 md:p-6 w-full max-w-full overflow-x-hidden">
+      {/* ── Header ── */}
       <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3">
         {navLevel !== "root" && (
           <Button
@@ -739,7 +951,7 @@ export function ApplicationsListPanel() {
             {navLevel === "ulb" && selectedUlb?.name}
             {navLevel === "ward" &&
               `Ward ${selectedWardNav?.wardNo} – ${selectedWardNav?.wardName}`}
-            {navLevel === "applications" && "Application List"}
+            {navLevel === "applications" && "Applications"}
           </h1>
           <p className="text-[9px] sm:text-[10px] md:text-sm text-slate-500 mt-0.5 truncate">
             {navLevel === "root" &&
@@ -749,7 +961,7 @@ export function ApplicationsListPanel() {
             {navLevel === "ward" &&
               `${selectedUlb?.name} · ${(selectedWardNav?.reservationType || "N/A").replace(/_/g, " ")}`}
             {navLevel === "applications" &&
-              `Ward ${selectedWardNav?.wardNo} – ${selectedWardNav?.wardName}`}
+              `Ward ${selectedWardNav?.wardNo} – ${selectedWardNav?.wardName} · ${selectedUlb?.name}`}
           </p>
         </div>
         <Button
@@ -768,6 +980,7 @@ export function ApplicationsListPanel() {
         </Button>
       </div>
 
+      {/* ── Breadcrumbs ── */}
       {navLevel !== "root" && (
         <nav className="flex items-center gap-0.5 text-[9px] sm:text-[10px] md:text-sm overflow-x-auto pb-1 scrollbar-none -mx-1 px-1">
           {breadcrumbs.map((item, idx) => {
@@ -808,6 +1021,9 @@ export function ApplicationsListPanel() {
         </nav>
       )}
 
+      {/* ════════════════════════════════════════════
+          ROOT LEVEL
+          ════════════════════════════════════════════ */}
       {navLevel === "root" && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-2 md:gap-3">
@@ -875,29 +1091,23 @@ export function ApplicationsListPanel() {
                 <Card
                   key={ulb.id}
                   className={`cursor-pointer select-none touch-manipulation transition-all duration-200 group rounded-xl
-                    ${
-                      isTapped
-                        ? "border-2 border-amber-400 shadow-lg shadow-amber-100 scale-[1.03]"
-                        : "border-2 border-transparent hover:border-amber-300 hover:shadow-lg"
-                    }`}
+                    ${isTapped ? "ring-2 ring-amber-400 shadow-lg shadow-amber-100/60 scale-[1.03]" : "ring-1 ring-transparent hover:ring-slate-200 hover:shadow-md"}`}
                   onClick={() =>
                     handleFolderDoubleClick(`ulb-${ulb.id}`, () =>
                       navigateToUlb(ulb),
                     )
                   }
                 >
-                  <CardContent className="p-2 sm:p-3 md:p-5 flex flex-col items-center text-center gap-1 sm:gap-1.5 md:gap-2.5">
+                  <CardContent className="p-2.5 sm:p-3 md:p-5 flex flex-col items-center text-center gap-1 sm:gap-1.5 md:gap-2">
                     <div
-                      className={`relative w-9 h-9 sm:w-11 sm:h-11 md:w-16 md:h-16 rounded-xl flex items-center justify-center transition-colors
-                      ${isTapped ? "bg-amber-200" : "bg-amber-100 group-hover:bg-amber-200"}`}
+                      className={`relative transition-transform duration-200 ${isTapped ? "scale-110" : "group-hover:scale-105"}`}
                     >
-                      <Folder
-                        className="h-5 w-5 sm:h-6 sm:w-6 md:h-9 md:w-9 text-amber-600"
-                        fill="currentColor"
-                        fillOpacity={0.15}
+                      <FolderIcon
+                        className="w-12 sm:w-14 md:w-20 drop-shadow-[0_2px_4px_rgba(0,0,0,0.10)]"
+                        variant="yellow"
                       />
                       {count > 0 && (
-                        <span className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 bg-blue-600 text-white text-[7px] sm:text-[8px] md:text-[10px] font-bold rounded-full min-w-[14px] sm:min-w-[16px] md:min-w-[20px] h-3.5 sm:h-4 md:h-5 flex items-center justify-center px-0.5">
+                        <span className="absolute -top-1.5 -right-2 sm:-top-2 sm:-right-2.5 bg-blue-600 text-white text-[7px] sm:text-[8px] md:text-[10px] font-bold rounded-full min-w-[16px] sm:min-w-[18px] md:min-w-[22px] h-4 sm:h-[18px] md:h-[22px] flex items-center justify-center px-1 shadow-sm">
                           {count}
                         </span>
                       )}
@@ -924,7 +1134,10 @@ export function ApplicationsListPanel() {
           {ulbGroups.length === 0 && !isLoading && (
             <Card className="border-0 shadow-sm rounded-xl">
               <CardContent className="py-8 sm:py-12 md:py-16 flex flex-col items-center gap-2 sm:gap-3">
-                <Folder className="h-8 w-8 sm:h-10 sm:w-10 md:h-14 md:w-14 text-slate-300" />
+                <FolderIcon
+                  className="w-16 sm:w-20 md:w-28 opacity-30"
+                  variant="yellow"
+                />
                 <p className="text-xs sm:text-sm text-slate-500">
                   No municipal bodies found
                 </p>
@@ -934,7 +1147,9 @@ export function ApplicationsListPanel() {
         </>
       )}
 
-      {/*ULB LEVEL*/}
+      {/* ════════════════════════════════════════════
+          ULB LEVEL
+          ════════════════════════════════════════════ */}
       {navLevel === "ulb" && selectedUlb && (
         <>
           <Card className="border-0 shadow-sm bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl">
@@ -946,10 +1161,7 @@ export function ApplicationsListPanel() {
                 <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
                   {[
                     { label: "Code", value: selectedUlb.code },
-                    {
-                      label: "Type",
-                      value: formatUlbType(selectedUlb.type),
-                    },
+                    { label: "Type", value: formatUlbType(selectedUlb.type) },
                     { label: "District", value: selectedUlb.districtName },
                     {
                       label: "Applications",
@@ -987,29 +1199,23 @@ export function ApplicationsListPanel() {
                   <Card
                     key={ward.id}
                     className={`cursor-pointer select-none touch-manipulation transition-all duration-200 group rounded-xl
-                      ${
-                        isTapped
-                          ? "border-2 border-indigo-400 shadow-lg shadow-indigo-100 scale-[1.03]"
-                          : "border-2 border-transparent hover:border-indigo-300 hover:shadow-lg"
-                      }`}
+                      ${isTapped ? "ring-2 ring-blue-400 shadow-lg shadow-blue-100/60 scale-[1.03]" : "ring-1 ring-transparent hover:ring-slate-200 hover:shadow-md"}`}
                     onClick={() =>
                       handleFolderDoubleClick(`ward-${ward.id}`, () =>
                         navigateToWard(ward),
                       )
                     }
                   >
-                    <CardContent className="p-2 sm:p-3 md:p-5 flex flex-col items-center text-center gap-1 sm:gap-1.5 md:gap-2.5">
+                    <CardContent className="p-2.5 sm:p-3 md:p-5 flex flex-col items-center text-center gap-1 sm:gap-1.5 md:gap-2">
                       <div
-                        className={`relative w-9 h-9 sm:w-11 sm:h-11 md:w-16 md:h-16 rounded-xl flex items-center justify-center transition-colors
-                        ${isTapped ? "bg-indigo-200" : "bg-indigo-100 group-hover:bg-indigo-200"}`}
+                        className={`relative transition-transform duration-200 ${isTapped ? "scale-110" : "group-hover:scale-105"}`}
                       >
-                        <Folder
-                          className="h-5 w-5 sm:h-6 sm:w-6 md:h-9 md:w-9 text-indigo-600"
-                          fill="currentColor"
-                          fillOpacity={0.15}
+                        <FolderIcon
+                          className="w-12 sm:w-14 md:w-20 drop-shadow-[0_2px_4px_rgba(0,0,0,0.10)]"
+                          variant="blue"
                         />
                         {count > 0 && (
-                          <span className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 bg-indigo-600 text-white text-[7px] sm:text-[8px] md:text-[10px] font-bold rounded-full min-w-[14px] sm:min-w-[16px] md:min-w-[20px] h-3.5 sm:h-4 md:h-5 flex items-center justify-center px-0.5">
+                          <span className="absolute -top-1.5 -right-2 sm:-top-2 sm:-right-2.5 bg-indigo-600 text-white text-[7px] sm:text-[8px] md:text-[10px] font-bold rounded-full min-w-[16px] sm:min-w-[18px] md:min-w-[22px] h-4 sm:h-[18px] md:h-[22px] flex items-center justify-center px-1 shadow-sm">
                             {count}
                           </span>
                         )}
@@ -1031,7 +1237,7 @@ export function ApplicationsListPanel() {
                         )}
                       </div>
                       {isTapped && (
-                        <p className="text-[7px] sm:text-[8px] md:text-[10px] text-indigo-600 font-medium animate-pulse">
+                        <p className="text-[7px] sm:text-[8px] md:text-[10px] text-blue-600 font-medium animate-pulse">
                           Tap again to open
                         </p>
                       )}
@@ -1044,7 +1250,9 @@ export function ApplicationsListPanel() {
         </>
       )}
 
-      {/*WARD LEVEL*/}
+      {/* ════════════════════════════════════════════
+          WARD LEVEL
+          ════════════════════════════════════════════ */}
       {navLevel === "ward" && selectedWardNav && selectedUlb && (
         <>
           <Card className="border-0 shadow-sm bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl">
@@ -1112,11 +1320,7 @@ export function ApplicationsListPanel() {
                 return (
                   <Card
                     className={`cursor-pointer select-none touch-manipulation transition-all duration-200 group rounded-xl
-                      ${
-                        isTapped
-                          ? "border-2 border-emerald-400 shadow-lg shadow-emerald-100 scale-[1.03]"
-                          : "border-2 border-transparent hover:border-emerald-300 hover:shadow-lg"
-                      }`}
+                      ${isTapped ? "ring-2 ring-emerald-400 shadow-lg shadow-emerald-100/60 scale-[1.03]" : "ring-1 ring-transparent hover:ring-slate-200 hover:shadow-md"}`}
                     onClick={() =>
                       handleFolderDoubleClick(
                         "applications",
@@ -1124,15 +1328,17 @@ export function ApplicationsListPanel() {
                       )
                     }
                   >
-                    <CardContent className="p-2 sm:p-3 md:p-5 flex flex-col items-center text-center gap-1 sm:gap-1.5 md:gap-2.5">
+                    <CardContent className="p-2.5 sm:p-3 md:p-5 flex flex-col items-center text-center gap-1 sm:gap-1.5 md:gap-2">
                       <div
-                        className={`relative w-9 h-9 sm:w-11 sm:h-11 md:w-16 md:h-16 rounded-xl flex items-center justify-center transition-colors
-                        ${isTapped ? "bg-emerald-200" : "bg-emerald-100 group-hover:bg-emerald-200"}`}
+                        className={`relative transition-transform duration-200 ${isTapped ? "scale-110" : "group-hover:scale-105"}`}
                       >
-                        <FileText className="h-5 w-5 sm:h-6 sm:w-6 md:h-9 md:w-9 text-emerald-600" />
+                        <FolderIcon
+                          className="w-12 sm:w-14 md:w-20 drop-shadow-[0_2px_4px_rgba(0,0,0,0.10)]"
+                          variant="green"
+                        />
                         {(wardNominationCounts[selectedWardNav.id] || 0) >
                           0 && (
-                          <span className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 bg-emerald-600 text-white text-[7px] sm:text-[8px] md:text-[10px] font-bold rounded-full min-w-[14px] sm:min-w-[16px] md:min-w-[20px] h-3.5 sm:h-4 md:h-5 flex items-center justify-center px-0.5">
+                          <span className="absolute -top-1.5 -right-2 sm:-top-2 sm:-right-2.5 bg-emerald-600 text-white text-[7px] sm:text-[8px] md:text-[10px] font-bold rounded-full min-w-[16px] sm:min-w-[18px] md:min-w-[22px] h-4 sm:h-[18px] md:h-[22px] flex items-center justify-center px-1 shadow-sm">
                             {wardNominationCounts[selectedWardNav.id] || 0}
                           </span>
                         )}
@@ -1159,462 +1365,616 @@ export function ApplicationsListPanel() {
         </>
       )}
 
+      {/* ════════════════════════════════════════════════════════════════
+          APPLICATIONS LEVEL
+          ════════════════════════════════════════════════════════════════ */}
       {navLevel === "applications" && selectedWardNav && (
-        <>
-          <Card className="border-0 shadow-sm rounded-xl">
-            <CardContent className="p-2 sm:p-2.5 md:p-4">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2 md:gap-3">
-                <div className="relative flex-1 min-w-0">
-                  <Search className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-slate-400" />
-                  <Input
-                    placeholder="Search app no., name, phone…"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-7 sm:pl-8 md:pl-9 h-7 sm:h-8 md:h-10 text-[10px] sm:text-xs md:text-sm"
-                  />
-                </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full sm:w-36 md:w-44 h-7 sm:h-8 md:h-10 text-[10px] sm:text-xs md:text-sm">
-                    <SelectValue placeholder="All Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="SUBMITTED">Submitted</SelectItem>
-                    <SelectItem value="RECEIVED">Received</SelectItem>
-                    <SelectItem value="UNDER_SCRUTINY">
-                      Under Scrutiny
-                    </SelectItem>
-                    <SelectItem value="APPROVED">Approved</SelectItem>
-                    <SelectItem value="REJECTED">Rejected</SelectItem>
-                    <SelectItem value="WITHDRAWN">Withdrawn</SelectItem>
-                    <SelectItem value="VALID">Valid</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-3 md:grid-cols-5 gap-1 sm:gap-1.5 md:gap-4">
+        <div className="space-y-3 sm:space-y-4 md:space-y-5">
+          {/* ── Overview Cards – 2-col mobile ── */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 sm:gap-2.5 md:gap-3">
             {[
               {
-                bg: "bg-blue-50",
-                icon: FileText,
-                iconColor: "text-blue-600",
+                label: "Total",
                 value: nominations.filter(
                   (n) => n.ward.id === selectedWardNav.id,
                 ).length,
-                label: "Total",
+                icon: FileText,
+                color: "text-slate-600",
+                bg: "bg-slate-100",
+                ring: "ring-slate-300",
+                iconBg: "bg-slate-200",
+                active: statusFilter === "all",
+                filter: "all",
               },
               {
-                bg: "bg-amber-50",
-                icon: Clock,
-                iconColor: "text-amber-600",
+                label: "Pending",
                 value:
                   (statusStats["SUBMITTED"] || 0) +
                   (statusStats["RECEIVED"] || 0),
-                label: "Pending",
+                icon: Clock,
+                color: "text-amber-600",
+                bg: "bg-amber-50",
+                ring: "ring-amber-300",
+                iconBg: "bg-amber-100",
+                active: statusFilter === "PENDING",
+                filter: "PENDING",
               },
               {
-                bg: "bg-purple-50",
-                icon: Eye,
-                iconColor: "text-purple-600",
-                value: statusStats["UNDER_SCRUTINY"] || 0,
                 label: "Scrutiny",
+                value: statusStats["UNDER_SCRUTINY"] || 0,
+                icon: Eye,
+                color: "text-violet-600",
+                bg: "bg-violet-50",
+                ring: "ring-violet-300",
+                iconBg: "bg-violet-100",
+                active: statusFilter === "UNDER_SCRUTINY",
+                filter: "UNDER_SCRUTINY",
               },
-            ].map((stat, i) => (
-              <Card
+              {
+                label: "Approved",
+                value:
+                  (statusStats["APPROVED"] || 0) + (statusStats["VALID"] || 0),
+                icon: CheckCircle,
+                color: "text-emerald-600",
+                bg: "bg-emerald-50",
+                ring: "ring-emerald-300",
+                iconBg: "bg-emerald-100",
+                active: statusFilter === "APPROVED",
+                filter: "APPROVED",
+              },
+              {
+                label: "Rejected",
+                value: statusStats["REJECTED"] || 0,
+                icon: XCircle,
+                color: "text-red-500",
+                bg: "bg-red-50",
+                ring: "ring-red-300",
+                iconBg: "bg-red-100",
+                active: statusFilter === "REJECTED",
+                filter: "REJECTED",
+              },
+            ].map((s, i, arr) => (
+              <button
                 key={i}
-                className={`${stat.bg} border-0 shadow-sm rounded-xl`}
+                onClick={() => setStatusFilter(s.filter)}
+                className={`relative rounded-2xl p-3 sm:p-3.5 md:p-4 text-left transition-all duration-200
+                  ${i === arr.length - 1 ? "col-span-2 md:col-span-1" : ""}
+                  ${s.active ? `${s.bg} ring-2 ${s.ring} shadow-md` : `bg-white ring-1 ring-slate-100 hover:ring-slate-200 hover:shadow-sm active:scale-[0.97]`}`}
               >
-                <CardContent className="p-1.5 sm:p-2 md:p-4">
-                  <stat.icon
-                    className={`h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-5 md:w-5 ${stat.iconColor}`}
+                <div className="flex items-center gap-2.5 sm:gap-3 md:block">
+                  <div
+                    className={`w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-xl ${s.iconBg} flex items-center justify-center shrink-0 md:mb-2`}
+                  >
+                    <s.icon className={`h-4 w-4 md:h-5 md:w-5 ${s.color}`} />
+                  </div>
+                  <div className="flex-1 md:flex-none">
+                    <p className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-800 leading-none">
+                      {s.value}
+                    </p>
+                    <p className="text-[9px] sm:text-[10px] md:text-xs text-slate-400 mt-0.5 font-medium">
+                      {s.label}
+                    </p>
+                  </div>
+                </div>
+                {s.active && (
+                  <div
+                    className={`absolute bottom-1 left-1/2 -translate-x-1/2 w-6 h-1 rounded-full ${s.color.replace("text-", "bg-")} opacity-40`}
                   />
-                  <p className="text-sm sm:text-base md:text-2xl font-bold text-slate-800 mt-0.5 sm:mt-1">
-                    {stat.value}
-                  </p>
-                  <p className="text-[7px] sm:text-[8px] md:text-xs text-slate-500">
-                    {stat.label}
-                  </p>
-                </CardContent>
-              </Card>
+                )}
+              </button>
             ))}
-            <Card className="bg-emerald-50 border-0 shadow-sm rounded-xl hidden md:block">
-              <CardContent className="p-4">
-                <CheckCircle className="h-5 w-5 text-emerald-600" />
-                <p className="text-2xl font-bold text-slate-800 mt-1">
-                  {(statusStats["APPROVED"] || 0) + (statusStats["VALID"] || 0)}
-                </p>
-                <p className="text-xs text-slate-500">Approved</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-red-50 border-0 shadow-sm rounded-xl hidden md:block">
-              <CardContent className="p-4">
-                <XCircle className="h-5 w-5 text-red-600" />
-                <p className="text-2xl font-bold text-slate-800 mt-1">
-                  {statusStats["REJECTED"] || 0}
-                </p>
-                <p className="text-xs text-slate-500">Rejected</p>
-              </CardContent>
-            </Card>
           </div>
 
-          <Card className="border-0 shadow-sm rounded-xl hidden md:block">
-            <CardContent className="p-0">
-              {error ? (
-                <div className="flex flex-col items-center justify-center py-12 gap-4">
-                  <AlertTriangle className="h-12 w-12 text-amber-500" />
-                  <p className="text-slate-600">{error}</p>
-                  <Button onClick={fetchNominations} variant="outline">
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Retry
-                  </Button>
+          {/* ── Search & Filter ── */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 md:gap-3">
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+              <Input
+                placeholder="Search name, app no, or phone…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 h-10 text-sm bg-white rounded-xl border-slate-200 focus-visible:ring-slate-300"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-[150px] md:w-[180px] h-10 text-sm rounded-xl border-slate-200">
+                <div className="flex items-center gap-1.5">
+                  <SlidersHorizontal className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                  <SelectValue placeholder="All Status" />
                 </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="whitespace-nowrap text-xs">
-                          Application No.
-                        </TableHead>
-                        <TableHead className="text-xs">Candidate</TableHead>
-                        <TableHead className="text-xs">Party</TableHead>
-                        <TableHead className="text-xs">Status</TableHead>
-                        <TableHead className="text-xs">Submitted</TableHead>
-                        <TableHead className="w-[130px]"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {currentNominations.length === 0 ? (
-                        <TableRow>
-                          <TableCell
-                            colSpan={6}
-                            className="text-center py-8 text-slate-500 text-sm"
-                          >
-                            No applications found
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        currentNominations.map((n) => (
-                          <TableRow key={n.id}>
-                            <TableCell>
-                              <span className="font-mono text-xs font-medium text-slate-800">
-                                {n.applicationNo}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                                  <User className="h-3.5 w-3.5 text-blue-600" />
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="font-medium text-sm text-slate-800 truncate">
-                                    {n.candidateName}
-                                  </p>
-                                  <p className="text-[11px] text-slate-400">
-                                    {n.applicantProfile?.user?.phone || ""}
-                                  </p>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {n.politicalParty ? (
-                                <Badge variant="outline" className="text-xs">
-                                  {n.politicalParty.abbreviation}
-                                </Badge>
-                              ) : (
-                                <span className="text-xs text-slate-400">
-                                  Independent
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell>{getStatusBadge(n.status)}</TableCell>
-                            <TableCell className="text-xs text-slate-500 whitespace-nowrap">
-                              {new Date(n.submittedAt).toLocaleDateString()}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  onClick={() => handleViewNomination(n)}
-                                >
-                                  <Eye className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  onClick={() => handleDownloadForm(n.id)}
-                                >
-                                  <Download className="h-3.5 w-3.5" />
-                                </Button>
-                                {n.status === "SUBMITTED" && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
-                                    onClick={() =>
-                                      handleStatusAction(n.id, "RECEIVE")
-                                    }
-                                    disabled={isActionLoading === n.id}
-                                  >
-                                    {isActionLoading === n.id ? (
-                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                    ) : (
-                                      <CheckCheck className="h-3.5 w-3.5" />
-                                    )}
-                                  </Button>
-                                )}
-                                {n.status === "RECEIVED" && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                    onClick={() =>
-                                      handleStatusAction(n.id, "SCRUTINY")
-                                    }
-                                    disabled={isActionLoading === n.id}
-                                  >
-                                    {isActionLoading === n.id ? (
-                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                    ) : (
-                                      <Send className="h-3.5 w-3.5" />
-                                    )}
-                                  </Button>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="PENDING">Pending</SelectItem>
+                <SelectItem value="SUBMITTED">Submitted</SelectItem>
+                <SelectItem value="RECEIVED">Received</SelectItem>
+                <SelectItem value="UNDER_SCRUTINY">Under Scrutiny</SelectItem>
+                <SelectItem value="APPROVED">Approved</SelectItem>
+                <SelectItem value="REJECTED">Rejected</SelectItem>
+                <SelectItem value="WITHDRAWN">Withdrawn</SelectItem>
+                <SelectItem value="VALID">Valid</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-          <div className="md:hidden space-y-1.5 sm:space-y-2">
-            {error ? (
-              <Card className="border-0 shadow-sm rounded-xl">
-                <CardContent className="py-6 sm:py-8 flex flex-col items-center gap-2">
-                  <AlertTriangle className="h-6 w-6 sm:h-8 sm:w-8 text-amber-500" />
-                  <p className="text-slate-600 text-[10px] sm:text-xs">
-                    {error}
-                  </p>
-                  <Button
-                    onClick={fetchNominations}
-                    variant="outline"
-                    size="sm"
-                    className="h-6 sm:h-7 text-[10px] sm:text-xs"
-                  >
-                    <RefreshCw className="h-3 w-3 mr-1" />
-                    Retry
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : currentNominations.length === 0 ? (
-              <Card className="border-0 shadow-sm rounded-xl">
-                <CardContent className="py-6 sm:py-8 text-center text-slate-500 text-[10px] sm:text-xs">
-                  No applications found
-                </CardContent>
-              </Card>
-            ) : (
-              currentNominations.map((n) => (
-                <Card key={n.id} className="border shadow-sm rounded-xl">
-                  <CardContent className="p-2 sm:p-2.5 space-y-1.5 sm:space-y-2">
-                    <div className="flex items-center justify-between gap-1.5">
-                      <span className="font-mono text-[9px] sm:text-[10px] font-medium text-slate-700 truncate">
-                        {n.applicationNo}
-                      </span>
-                      {getStatusBadge(n.status)}
-                    </div>
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                      <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                        <User className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-blue-600" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-[10px] sm:text-xs text-slate-800 truncate">
-                          {n.candidateName}
-                        </p>
-                        <p className="text-[8px] sm:text-[9px] text-slate-400">
-                          {n.applicantProfile?.user?.phone || "N/A"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between text-[8px] sm:text-[9px] text-slate-500">
-                      <span>
-                        {n.politicalParty
-                          ? n.politicalParty.abbreviation
-                          : "Independent"}
-                      </span>
-                      <span>
-                        {new Date(n.submittedAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 sm:gap-1.5 pt-1.5 sm:pt-2 border-t">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 h-6 sm:h-7 text-[9px] sm:text-[10px]"
-                        onClick={() => handleViewNomination(n)}
-                      >
-                        <Eye className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
-                        View
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-6 w-6 sm:h-7 sm:w-7 p-0"
-                        onClick={() => handleDownloadForm(n.id)}
-                      >
-                        <Download className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                      </Button>
-                      {n.status === "SUBMITTED" && (
-                        <Button
-                          size="sm"
-                          className="flex-1 h-6 sm:h-7 text-[9px] sm:text-[10px] bg-green-600 hover:bg-green-700 text-white"
-                          onClick={() => handleStatusAction(n.id, "RECEIVE")}
-                          disabled={isActionLoading === n.id}
-                        >
-                          {isActionLoading === n.id ? (
-                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                          ) : (
-                            <>
-                              <CheckCheck className="h-2.5 w-2.5 mr-0.5" />
-                              Receive
-                            </>
-                          )}
-                        </Button>
-                      )}
-                      {n.status === "RECEIVED" && (
-                        <Button
-                          size="sm"
-                          className="flex-1 h-6 sm:h-7 text-[9px] sm:text-[10px] bg-blue-600 hover:bg-blue-700 text-white"
-                          onClick={() => handleStatusAction(n.id, "SCRUTINY")}
-                          disabled={isActionLoading === n.id}
-                        >
-                          {isActionLoading === n.id ? (
-                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                          ) : (
-                            <>
-                              <Send className="h-2.5 w-2.5 mr-0.5" />
-                              Scrutiny
-                            </>
-                          )}
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
+          {/* ── Results count ── */}
+          <div className="flex items-center justify-between px-0.5">
+            <p className="text-[10px] sm:text-xs text-slate-400">
+              Showing{" "}
+              <span className="font-semibold text-slate-600">
+                {currentNominations.length}
+              </span>{" "}
+              of{" "}
+              {
+                nominations.filter((n) => n.ward.id === selectedWardNav.id)
+                  .length
+              }{" "}
+              applications
+            </p>
+            {(searchQuery || statusFilter !== "all") && (
+              <button
+                onClick={() => {
+                  setSearchQuery("");
+                  setStatusFilter("all");
+                }}
+                className="text-[10px] sm:text-xs text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Clear filters
+              </button>
             )}
           </div>
-        </>
-      )}
 
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto w-[94vw] rounded-xl p-2.5 sm:p-4 md:p-6">
-          <DialogHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-2">
-              <div>
-                <DialogTitle className="text-xs sm:text-sm md:text-lg">
-                  Application Details
-                </DialogTitle>
-                <DialogDescription className="text-[9px] sm:text-[10px] md:text-sm">
-                  App No: {selectedNomination?.applicationNo}
-                </DialogDescription>
+          {/* ── Error ── */}
+          {error && (
+            <div className="flex flex-col items-center justify-center py-10 gap-3">
+              <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center">
+                <AlertTriangle className="h-7 w-7 text-amber-500" />
               </div>
+              <p className="text-sm font-medium text-slate-700">
+                Something went wrong
+              </p>
+              <p className="text-xs text-slate-400">{error}</p>
               <Button
+                onClick={fetchNominations}
                 variant="outline"
                 size="sm"
-                className="w-fit text-[9px] sm:text-[10px] md:text-sm h-6 sm:h-7 md:h-8"
-                onClick={() =>
-                  selectedNomination &&
-                  handleDownloadForm(selectedNomination.id)
-                }
+                className="text-xs rounded-lg"
               >
-                <Download className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4 mr-1" />
-                PDF
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                Retry
               </Button>
             </div>
-          </DialogHeader>
-          {selectedNomination && (
-            <Tabs defaultValue="candidate" className="mt-2 sm:mt-3 md:mt-4">
-              <TabsList className="grid w-full grid-cols-4 h-7 sm:h-8 md:h-10">
-                <TabsTrigger
-                  value="candidate"
-                  className="text-[8px] sm:text-[10px] md:text-sm px-0.5"
-                >
-                  Candidate
-                </TabsTrigger>
-                <TabsTrigger
-                  value="ward"
-                  className="text-[8px] sm:text-[10px] md:text-sm px-0.5"
-                >
-                  Ward
-                </TabsTrigger>
-                <TabsTrigger
-                  value="documents"
-                  className="text-[8px] sm:text-[10px] md:text-sm px-0.5"
-                >
-                  Docs
-                </TabsTrigger>
-                <TabsTrigger
-                  value="status"
-                  className="text-[8px] sm:text-[10px] md:text-sm px-0.5"
-                >
-                  Status
-                </TabsTrigger>
-              </TabsList>
+          )}
 
-              <TabsContent
-                value="candidate"
-                className="space-y-2 sm:space-y-3 md:space-y-4 mt-2 sm:mt-3"
-              >
-                <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
-                  <div className="w-9 h-9 sm:w-12 sm:h-12 md:w-16 md:h-16 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                    <User className="h-4 w-4 sm:h-6 sm:w-6 md:h-8 md:w-8 text-blue-600" />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-xs sm:text-sm md:text-lg font-semibold truncate">
-                      {selectedNomination.candidateName}
-                    </h3>
-                    {selectedNomination.dateOfBirth && (
-                      <p className="text-[9px] sm:text-[10px] md:text-sm text-slate-500">
-                        DOB:{" "}
-                        {new Date(
-                          selectedNomination.dateOfBirth,
-                        ).toLocaleDateString()}
+          {/* ── Empty ── */}
+          {!error && currentNominations.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center">
+                <FileText className="h-8 w-8 text-slate-300" />
+              </div>
+              <p className="text-sm font-medium text-slate-600">
+                No applications found
+              </p>
+              <p className="text-xs text-slate-400">
+                {searchQuery || statusFilter !== "all"
+                  ? "Try adjusting your search or filters"
+                  : "No nominations have been filed for this ward yet"}
+              </p>
+            </div>
+          )}
+
+          {/* ── Desktop Table ── */}
+          {!error && currentNominations.length > 0 && (
+            <div className="hidden md:block bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
+                    <TableHead className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider pl-5">
+                      Candidate
+                    </TableHead>
+                    <TableHead className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                      Application
+                    </TableHead>
+                    <TableHead className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                      Party
+                    </TableHead>
+                    <TableHead className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                      Status
+                    </TableHead>
+                    <TableHead className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                      Submitted
+                    </TableHead>
+                    <TableHead className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider text-right pr-5">
+                      Actions
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {currentNominations.map((n, idx) => (
+                    <TableRow
+                      key={n.id}
+                      className={`group transition-colors hover:bg-slate-50/60 ${idx !== currentNominations.length - 1 ? "border-b border-slate-100" : ""}`}
+                    >
+                      <TableCell className="pl-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center shrink-0 ring-2 ring-white shadow-sm">
+                            <span className="text-sm font-bold text-blue-700">
+                              {(n.candidateName || "?").charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-sm text-slate-800 truncate">
+                              {n.candidateName}
+                            </p>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Phone className="h-3 w-3 text-slate-300" />
+                              <span className="text-[11px] text-slate-400">
+                                {n.applicantProfile?.user?.phone || "N/A"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3.5">
+                        <div className="flex items-center gap-1.5">
+                          <Hash className="h-3 w-3 text-slate-300" />
+                          <span className="font-mono text-xs text-slate-600">
+                            {n.applicationNo}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3.5">
+                        {n.politicalParty ? (
+                          <div className="flex items-center gap-1.5">
+                            <Shield className="h-3 w-3 text-slate-400" />
+                            <span className="text-xs font-medium text-slate-600">
+                              {n.politicalParty.abbreviation}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">
+                            Independent
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-3.5">
+                        {getStatusBadge(n.status)}
+                      </TableCell>
+                      <TableCell className="py-3.5">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="h-3 w-3 text-slate-300" />
+                          <span className="text-xs text-slate-500">
+                            {new Date(n.submittedAt).toLocaleDateString(
+                              "en-IN",
+                              {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              },
+                            )}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="pr-5 py-3.5">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2.5 text-xs text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg"
+                            onClick={() => handleViewNomination(n)}
+                          >
+                            <Eye className="h-3.5 w-3.5 mr-1" />
+                            View
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
+                            onClick={() => handleDownloadForm(n.id)}
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </Button>
+                          {n.status === "SUBMITTED" && (
+                            <Button
+                              size="sm"
+                              className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm shadow-emerald-200"
+                              onClick={() =>
+                                handleStatusAction(n.id, "RECEIVE")
+                              }
+                              disabled={isActionLoading === n.id}
+                            >
+                              {isActionLoading === n.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <>
+                                  <CheckCheck className="h-3.5 w-3.5 mr-1" />
+                                  Receive
+                                </>
+                              )}
+                            </Button>
+                          )}
+                          {n.status === "RECEIVED" && (
+                            <Button
+                              size="sm"
+                              className="h-8 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm shadow-blue-200"
+                              onClick={() =>
+                                handleStatusAction(n.id, "SCRUTINY")
+                              }
+                              disabled={isActionLoading === n.id}
+                            >
+                              {isActionLoading === n.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <>
+                                  <Send className="h-3.5 w-3.5 mr-1" />
+                                  Scrutiny
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {/* ── Mobile Cards ── */}
+          {!error && currentNominations.length > 0 && (
+            <div className="md:hidden space-y-2.5">
+              {currentNominations.map((n) => (
+                <div
+                  key={n.id}
+                  className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden"
+                >
+                  <div className="flex items-start gap-3 p-3.5 sm:p-4">
+                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center shrink-0 ring-2 ring-white shadow-sm">
+                      <span className="text-base sm:text-lg font-bold text-blue-700">
+                        {(n.candidateName || "?").charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-[13px] sm:text-sm text-slate-800 truncate leading-tight">
+                        {n.candidateName}
                       </p>
+                      <div className="flex items-center gap-1 mt-1">
+                        <Hash className="h-2.5 w-2.5 text-slate-300" />
+                        <span className="font-mono text-[10px] sm:text-[11px] text-slate-500">
+                          {n.applicationNo}
+                        </span>
+                      </div>
+                      <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1 mt-1.5">
+                        {getStatusBadge(n.status)}
+                        <span className="text-[10px] sm:text-[11px] text-slate-400">
+                          {n.politicalParty
+                            ? n.politicalParty.abbreviation
+                            : "Independent"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="px-3.5 sm:px-4 pb-2 flex items-center gap-4">
+                    <div className="flex items-center gap-1.5">
+                      <Phone className="h-3 w-3 text-slate-300" />
+                      <span className="text-[10px] sm:text-[11px] text-slate-500">
+                        {n.applicantProfile?.user?.phone || "N/A"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="h-3 w-3 text-slate-300" />
+                      <span className="text-[10px] sm:text-[11px] text-slate-500">
+                        {new Date(n.submittedAt).toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="border-t border-slate-100 bg-slate-50/60 px-2.5 sm:px-3 py-2 sm:py-2.5 flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="flex-1 h-9 text-[11px] sm:text-xs text-slate-600 hover:text-slate-800 hover:bg-white rounded-xl font-medium"
+                      onClick={() => handleViewNomination(n)}
+                    >
+                      <Eye className="h-3.5 w-3.5 mr-1.5" />
+                      View Details
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 text-slate-400 hover:text-slate-600 hover:bg-white rounded-xl shrink-0"
+                      onClick={() => handleDownloadForm(n.id)}
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                    </Button>
+                    {n.status === "SUBMITTED" && (
+                      <Button
+                        size="sm"
+                        className="flex-1 h-9 text-[11px] sm:text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm font-medium"
+                        onClick={() => handleStatusAction(n.id, "RECEIVE")}
+                        disabled={isActionLoading === n.id}
+                      >
+                        {isActionLoading === n.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <>
+                            <CheckCheck className="h-3.5 w-3.5 mr-1" />
+                            Receive
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    {n.status === "RECEIVED" && (
+                      <Button
+                        size="sm"
+                        className="flex-1 h-9 text-[11px] sm:text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm font-medium"
+                        onClick={() => handleStatusAction(n.id, "SCRUTINY")}
+                        disabled={isActionLoading === n.id}
+                      >
+                        {isActionLoading === n.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <>
+                            <Send className="h-3.5 w-3.5 mr-1" />
+                            Scrutiny
+                          </>
+                        )}
+                      </Button>
                     )}
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 md:gap-4 pt-2 sm:pt-3 border-t">
-                  <div className="flex items-center gap-1.5 sm:gap-2">
-                    <Phone className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-slate-400 shrink-0" />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════
+          VIEW DIALOG
+          ════════════════════════════════════════════ */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="sm:max-w-[640px] max-h-[92vh] overflow-y-auto w-[96vw] rounded-2xl p-0 gap-0">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Application Details</DialogTitle>
+            <DialogDescription>
+              Viewing nomination {selectedNomination?.applicationNo}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedNomination && (
+            <div className="divide-y divide-slate-100">
+              {/* ── Hero ── */}
+              <div className="relative bg-gradient-to-br from-slate-50 via-blue-50/50 to-indigo-50 p-4 sm:p-5 md:p-6 pt-10 sm:pt-5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="absolute top-2.5 right-12 sm:top-4 sm:right-14 h-7 sm:h-8 text-[9px] sm:text-xs rounded-lg bg-white/80 backdrop-blur-sm hover:bg-white shadow-sm z-10"
+                  onClick={() => handleDownloadForm(selectedNomination.id)}
+                >
+                  <Download className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
+                  PDF
+                </Button>
+
+                <div className="flex items-start gap-3 sm:gap-4 pr-20 sm:pr-28">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-200/50">
+                    <span className="text-lg sm:text-xl md:text-2xl font-bold text-white">
+                      {(selectedNomination.candidateName || "?")
+                        .charAt(0)
+                        .toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <h3 className="text-sm sm:text-base md:text-lg font-bold text-slate-800 truncate leading-tight">
+                      {selectedNomination.candidateName}
+                    </h3>
+                    {selectedNomination.fatherHusbandName && (
+                      <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 truncate">
+                        S/o, D/o, W/o{" "}
+                        <span className="font-medium text-slate-600">
+                          {selectedNomination.fatherHusbandName}
+                        </span>
+                      </p>
+                    )}
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <Hash className="h-3 w-3 text-slate-400" />
+                      <span className="font-mono text-[10px] sm:text-xs text-slate-500">
+                        {selectedNomination.applicationNo}
+                      </span>
+                    </div>
+                    <div className="mt-2">
+                      {getStatusBadge(selectedNomination.status)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Personal Info ── */}
+              <div className="p-4 sm:p-5 md:p-6">
+                <h4 className="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">
+                  Personal Information
+                </h4>
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                  <div className="flex items-center gap-2.5 bg-slate-50 rounded-xl p-2.5 sm:p-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                      <Phone className="h-3.5 w-3.5 text-blue-600" />
+                    </div>
                     <div className="min-w-0">
-                      <p className="text-[8px] sm:text-[10px] md:text-xs text-slate-500">
+                      <p className="text-[8px] sm:text-[9px] text-slate-400 uppercase tracking-wider font-medium">
                         Phone
                       </p>
-                      <p className="font-medium text-[10px] sm:text-xs md:text-base">
+                      <p className="text-[11px] sm:text-xs font-semibold text-slate-700 truncate">
                         {selectedNomination.applicantProfile?.user?.phone ||
                           "N/A"}
                       </p>
                     </div>
                   </div>
+                  <div className="flex items-center gap-2.5 bg-slate-50 rounded-xl p-2.5 sm:p-3">
+                    <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
+                      <Calendar className="h-3.5 w-3.5 text-purple-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[8px] sm:text-[9px] text-slate-400 uppercase tracking-wider font-medium">
+                        {selectedNomination.dateOfBirth ? "DOB" : "Age"}
+                      </p>
+                      <p className="text-[11px] sm:text-xs font-semibold text-slate-700">
+                        {selectedNomination.dateOfBirth
+                          ? new Date(
+                              selectedNomination.dateOfBirth,
+                            ).toLocaleDateString("en-IN", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : selectedNomination.age
+                            ? `${selectedNomination.age} years`
+                            : "N/A"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2.5 bg-slate-50 rounded-xl p-2.5 sm:p-3">
+                    <div className="w-8 h-8 rounded-lg bg-pink-100 flex items-center justify-center shrink-0">
+                      <User className="h-3.5 w-3.5 text-pink-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[8px] sm:text-[9px] text-slate-400 uppercase tracking-wider font-medium">
+                        Gender
+                      </p>
+                      <p className="text-[11px] sm:text-xs font-semibold text-slate-700">
+                        {selectedNomination.gender
+                          ? selectedNomination.gender.charAt(0) +
+                            selectedNomination.gender.slice(1).toLowerCase()
+                          : "N/A"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2.5 bg-slate-50 rounded-xl p-2.5 sm:p-3">
+                    <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+                      <UserCheck className="h-3.5 w-3.5 text-amber-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[8px] sm:text-[9px] text-slate-400 uppercase tracking-wider font-medium">
+                        Category
+                      </p>
+                      <p className="text-[11px] sm:text-xs font-semibold text-slate-700">
+                        {selectedNomination.category?.replace(/_/g, " ") ||
+                          "N/A"}
+                      </p>
+                    </div>
+                  </div>
                   {selectedNomination.applicantProfile?.user?.email && (
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                      <Mail className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-slate-400 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[8px] sm:text-[10px] md:text-xs text-slate-500">
+                    <div className="col-span-2 flex items-center gap-2.5 bg-slate-50 rounded-xl p-2.5 sm:p-3">
+                      <div className="w-8 h-8 rounded-lg bg-cyan-100 flex items-center justify-center shrink-0">
+                        <Mail className="h-3.5 w-3.5 text-cyan-600" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[8px] sm:text-[9px] text-slate-400 uppercase tracking-wider font-medium">
                           Email
                         </p>
-                        <p className="font-medium text-[10px] sm:text-xs md:text-base truncate">
+                        <p className="text-[11px] sm:text-xs font-semibold text-slate-700 truncate">
                           {selectedNomination.applicantProfile.user.email}
                         </p>
                       </div>
@@ -1622,78 +1982,171 @@ export function ApplicationsListPanel() {
                   )}
                 </div>
                 {selectedNomination.address && (
-                  <div className="flex items-start gap-1.5 sm:gap-2 pt-2 sm:pt-3 border-t">
-                    <Building className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-slate-400 mt-0.5 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-[8px] sm:text-[10px] md:text-xs text-slate-500">
+                  <div className="mt-3 flex items-start gap-2.5 bg-slate-50 rounded-xl p-2.5 sm:p-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
+                      <MapPin className="h-3.5 w-3.5 text-emerald-600" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[8px] sm:text-[9px] text-slate-400 uppercase tracking-wider font-medium">
                         Address
                       </p>
-                      <p className="text-[10px] sm:text-xs md:text-sm">
+                      <p className="text-[11px] sm:text-xs text-slate-700 leading-relaxed mt-0.5">
                         {selectedNomination.address}
                       </p>
                     </div>
                   </div>
                 )}
-                <div className="pt-2 sm:pt-3 border-t">
-                  <p className="text-[9px] sm:text-[10px] md:text-sm text-slate-500">
-                    Political Affiliation
-                  </p>
-                  <p className="font-medium text-[10px] sm:text-xs md:text-base">
-                    {selectedNomination.politicalParty?.name ||
-                      "Independent Candidate"}
-                  </p>
-                </div>
-              </TabsContent>
+              </div>
 
-              <TabsContent
-                value="ward"
-                className="space-y-2 sm:space-y-3 md:space-y-4 mt-2 sm:mt-3"
-              >
-                <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
-                    <MapPin className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-indigo-600" />
+              {/* ── Election Details ── */}
+              <div className="p-4 sm:p-5 md:p-6">
+                <h4 className="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">
+                  Election Details
+                </h4>
+                <div className="bg-gradient-to-br from-indigo-50/70 to-purple-50/70 rounded-2xl border border-indigo-100/60 overflow-hidden">
+                  {/* Ward */}
+                  <div className="flex items-center gap-3 p-3.5 sm:p-4">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0">
+                      <MapPin className="h-5 w-5 text-indigo-600" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[9px] sm:text-[10px] text-indigo-400 uppercase tracking-wider font-medium">
+                        Ward
+                      </p>
+                      <p className="text-xs sm:text-sm font-semibold text-slate-800">
+                        Ward {selectedNomination.ward.wardNo} –{" "}
+                        {selectedNomination.ward.wardName}
+                      </p>
+                      {selectedNomination.ward.reservationType && (
+                        <Badge
+                          variant="outline"
+                          className="mt-1 text-[8px] sm:text-[10px] h-5 border-indigo-200 text-indigo-600 bg-white/50"
+                        >
+                          {selectedNomination.ward.reservationType.replace(
+                            /_/g,
+                            " ",
+                          )}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-xs sm:text-sm md:text-base">
-                      Ward {selectedNomination.ward.wardNo}
-                    </h3>
-                    <p className="text-[9px] sm:text-xs md:text-sm text-slate-500">
-                      {selectedNomination.ward.wardName}
-                    </p>
+                  <div className="mx-4 border-t border-indigo-100/80" />
+                  {/* Party */}
+                  <div className="flex items-center gap-3 p-3.5 sm:p-4">
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${selectedNomination.politicalParty ? "bg-violet-100" : "bg-gray-100"}`}
+                    >
+                      <Shield
+                        className={`h-5 w-5 ${selectedNomination.politicalParty ? "text-violet-600" : "text-gray-400"}`}
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[9px] sm:text-[10px] text-indigo-400 uppercase tracking-wider font-medium">
+                        Political Party
+                      </p>
+                      {selectedNomination.politicalParty ? (
+                        <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                          <p className="text-xs sm:text-sm font-semibold text-slate-800">
+                            {selectedNomination.politicalParty.name}
+                          </p>
+                          <Badge className="text-[8px] sm:text-[10px] h-5 bg-violet-100 text-violet-700 border-0 hover:bg-violet-100">
+                            {selectedNomination.politicalParty.abbreviation}
+                          </Badge>
+                        </div>
+                      ) : (
+                        <p className="text-xs sm:text-sm font-semibold text-slate-600 mt-0.5">
+                          Independent Candidate
+                        </p>
+                      )}
+                    </div>
                   </div>
+                  {/* Symbol */}
+                  {(() => {
+                    const sym = getDisplaySymbol(selectedNomination);
+                    if (!sym) return null;
+                    return (
+                      <>
+                        <div className="mx-4 border-t border-indigo-100/80" />
+                        <div className="flex items-center gap-3 p-3.5 sm:p-4">
+                          <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0 overflow-hidden">
+                            {sym.imagePath ? (
+                              <img
+                                src={sym.imagePath}
+                                alt={sym.name}
+                                className="w-7 h-7 object-contain"
+                              />
+                            ) : (
+                              <FileCheck className="h-5 w-5 text-amber-600" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[9px] sm:text-[10px] text-indigo-400 uppercase tracking-wider font-medium">
+                              Election Symbol
+                            </p>
+                            <p className="text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
+                              {sym.name}
+                            </p>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                  {/* ULB */}
+                  {selectedNomination.ward.ulb && (
+                    <>
+                      <div className="mx-4 border-t border-indigo-100/80" />
+                      <div className="flex items-center gap-3 p-3.5 sm:p-4">
+                        <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+                          <Building2 className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[9px] sm:text-[10px] text-indigo-400 uppercase tracking-wider font-medium">
+                            Municipal Body
+                          </p>
+                          <p className="text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
+                            {selectedNomination.ward.ulb.name}
+                          </p>
+                          {selectedNomination.ward.ulb.district?.name && (
+                            <p className="text-[10px] sm:text-xs text-slate-500">
+                              {selectedNomination.ward.ulb.district.name}{" "}
+                              District
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
-                <div className="pt-2 sm:pt-3 border-t">
-                  <p className="text-[9px] sm:text-xs md:text-sm text-slate-500">
-                    Reservation Status
-                  </p>
-                  <Badge className="mt-1 text-[9px] sm:text-[10px] md:text-xs">
-                    {(selectedNomination.ward.reservationType || "N/A").replace(
-                      /-/g,
-                      " ",
+              </div>
+
+              {/* ── Documents ── */}
+              <div className="p-4 sm:p-5 md:p-6">
+                <h4 className="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">
+                  Documents
+                  {selectedNomination.documents &&
+                    selectedNomination.documents.length > 0 && (
+                      <span className="ml-1.5 text-slate-300">
+                        ({selectedNomination.documents.length})
+                      </span>
                     )}
-                  </Badge>
-                </div>
-              </TabsContent>
-
-              <TabsContent
-                value="documents"
-                className="space-y-2 sm:space-y-3 mt-2 sm:mt-3"
-              >
+                </h4>
                 {selectedNomination.documents &&
                 selectedNomination.documents.length > 0 ? (
-                  <div className="space-y-1 sm:space-y-1.5 md:space-y-2">
+                  <div className="space-y-2">
                     {selectedNomination.documents.map((doc) => (
                       <div
                         key={doc.id}
-                        className="flex items-center justify-between p-1.5 sm:p-2 md:p-3 bg-slate-50 rounded-lg gap-1.5 sm:gap-2"
+                        className="flex items-center justify-between bg-slate-50 rounded-xl p-2.5 sm:p-3 gap-2"
                       >
-                        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
-                          <FileText className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-slate-400 shrink-0" />
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                            <FileText className="h-3.5 w-3.5 text-blue-600" />
+                          </div>
                           <div className="min-w-0">
-                            <p className="text-[9px] sm:text-[10px] md:text-sm font-medium truncate">
+                            <p className="text-[11px] sm:text-xs font-medium text-slate-700 truncate">
                               {doc.type.replace(/_/g, " ")}
                             </p>
-                            <p className="text-[8px] sm:text-[9px] md:text-xs text-slate-400 truncate">
+                            <p className="text-[9px] sm:text-[10px] text-slate-400 truncate">
                               {doc.originalName || doc.fileName}
                             </p>
                           </div>
@@ -1707,89 +2160,128 @@ export function ApplicationsListPanel() {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-5 sm:h-6 md:h-8 text-[8px] sm:text-[10px] md:text-xs shrink-0 px-1.5 sm:px-2"
+                              className="h-7 sm:h-8 text-[10px] sm:text-xs shrink-0 rounded-lg"
                             >
-                              <Eye className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5" />
+                              <Eye className="h-3 w-3 mr-1" />
                               View
                             </Button>
                           </a>
                         ) : (
-                          <Button
+                          <Badge
                             variant="outline"
-                            size="sm"
-                            disabled
-                            className="h-5 sm:h-6 md:h-8 text-[8px] sm:text-[10px] md:text-xs shrink-0 px-1.5"
+                            className="text-[9px] sm:text-[10px] text-slate-400 shrink-0"
                           >
                             No File
-                          </Button>
+                          </Badge>
                         )}
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-5 sm:py-6 md:py-8 text-slate-400 text-[10px] sm:text-xs md:text-sm">
-                    No documents uploaded
+                  <div className="flex flex-col items-center py-6 sm:py-8 bg-slate-50 rounded-xl">
+                    <FileText className="h-8 w-8 text-slate-200 mb-2" />
+                    <p className="text-[11px] sm:text-xs text-slate-400">
+                      No documents uploaded
+                    </p>
                   </div>
                 )}
-              </TabsContent>
+              </div>
 
-              <TabsContent
-                value="status"
-                className="space-y-2 sm:space-y-3 md:space-y-4 mt-2 sm:mt-3"
-              >
-                <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
-                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 text-slate-400 shrink-0" />
-                  <div>
-                    <p className="text-[9px] sm:text-[10px] md:text-sm text-slate-500">
-                      Submitted On
-                    </p>
-                    <p className="font-medium text-[10px] sm:text-xs md:text-base">
-                      {new Date(
-                        selectedNomination.submittedAt,
-                      ).toLocaleString()}
-                    </p>
+              {/* ── Timeline ── */}
+              <div className="p-4 sm:p-5 md:p-6">
+                <h4 className="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">
+                  Status Timeline
+                </h4>
+                <div className="relative">
+                  <div className="absolute left-[15px] sm:left-[17px] top-3 bottom-3 w-0.5 bg-slate-100 rounded-full" />
+                  <div className="space-y-5">
+                    {getTimelineSteps(selectedNomination).map((step, i) => (
+                      <div
+                        key={i}
+                        className="relative flex items-start gap-3.5"
+                      >
+                        <div
+                          className={`relative z-10 w-[30px] sm:w-[34px] h-[30px] sm:h-[34px] rounded-full flex items-center justify-center shrink-0 transition-all ${step.done ? `${step.color} ring-4 ${step.ring} shadow-sm` : "bg-white border-2 border-slate-200 ring-4 ring-white"}`}
+                        >
+                          {step.done ? (
+                            <div className="w-2.5 h-2.5 rounded-full bg-white" />
+                          ) : (
+                            <div className="w-2 h-2 rounded-full bg-slate-200" />
+                          )}
+                        </div>
+                        <div className="pt-1 sm:pt-1.5 min-w-0 flex-1">
+                          <p
+                            className={`text-xs sm:text-sm font-semibold leading-tight ${step.done ? "text-slate-800" : "text-slate-400"}`}
+                          >
+                            {step.label}
+                          </p>
+                          {step.date ? (
+                            <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">
+                              {new Date(step.date).toLocaleDateString("en-IN", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </p>
+                          ) : step.done ? (
+                            <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">
+                              Completed
+                            </p>
+                          ) : (
+                            <p className="text-[10px] sm:text-[11px] text-slate-300 mt-0.5 italic">
+                              Pending
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <div className="pt-2 sm:pt-3 border-t">
-                  <p className="text-[9px] sm:text-[10px] md:text-sm text-slate-500 mb-1.5">
-                    Current Status
-                  </p>
-                  {getStatusBadge(selectedNomination.status)}
-                </div>
-                {selectedNomination.paymentStatus && (
-                  <div className="pt-2 sm:pt-3 border-t">
-                    <p className="text-[9px] sm:text-[10px] md:text-sm text-slate-500">
-                      Payment
-                    </p>
-                    <Badge
-                      variant="outline"
-                      className="mt-1 text-[9px] sm:text-[10px] md:text-xs"
-                    >
-                      {selectedNomination.paymentStatus}
-                    </Badge>
-                  </div>
-                )}
-                {selectedNomination.scrutinyAt && (
-                  <div className="pt-2 sm:pt-3 border-t">
-                    <p className="text-[9px] sm:text-[10px] md:text-sm text-slate-500">
-                      Scrutiny Date
-                    </p>
-                    <p className="font-medium text-[10px] sm:text-xs md:text-sm">
-                      {new Date(selectedNomination.scrutinyAt).toLocaleString()}
-                    </p>
+                {(selectedNomination.paymentStatus ||
+                  selectedNomination.scrutinyRemarks) && (
+                  <div className="mt-5 pt-4 border-t border-slate-100 space-y-3">
+                    {selectedNomination.paymentStatus && (
+                      <div className="flex items-center justify-between bg-slate-50 rounded-xl p-3">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-slate-400" />
+                          <span className="text-xs text-slate-600 font-medium">
+                            Payment Status
+                          </span>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] sm:text-xs"
+                        >
+                          {selectedNomination.paymentStatus}
+                        </Badge>
+                      </div>
+                    )}
                     {selectedNomination.scrutinyRemarks && (
-                      <p className="text-[9px] sm:text-[10px] md:text-sm text-slate-500 mt-1">
-                        Remarks: {selectedNomination.scrutinyRemarks}
-                      </p>
+                      <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                          <span className="text-[10px] sm:text-xs font-semibold text-amber-700">
+                            Scrutiny Remarks
+                          </span>
+                        </div>
+                        <p className="text-[11px] sm:text-xs text-amber-800 leading-relaxed">
+                          {selectedNomination.scrutinyRemarks}
+                        </p>
+                      </div>
                     )}
                   </div>
                 )}
-              </TabsContent>
-            </Tabs>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
 
+      {/* ════════════════════════════════════════════
+          Receive Dialog
+          ════════════════════════════════════════════ */}
       <Dialog open={isReceiveDialogOpen} onOpenChange={setIsReceiveDialogOpen}>
         <DialogContent className="sm:max-w-md w-[94vw] rounded-xl p-2.5 sm:p-4 md:p-6">
           <DialogHeader>
