@@ -199,6 +199,77 @@ export async function GET(request: NextRequest) {
     // RESPONSE
     // =====================================
 
+    // Group contesting candidates by ward if no specific wardId provided
+    if (!wardId) {
+      // Group contesting candidates by ward
+      const wardGroups = new Map<string, any[]>();
+      contestingList.forEach((candidate) => {
+        const wardId = candidate.wardId;
+        if (!wardGroups.has(wardId)) {
+          wardGroups.set(wardId, []);
+        }
+        wardGroups.get(wardId)!.push(candidate);
+      });
+
+      // Build ward-wise response
+      const wards = Array.from(wardGroups.entries()).map(
+        ([wardId, wardCandidates]) => {
+          const firstCandidate = wardCandidates[0];
+          return {
+            wardId,
+            wardNo: firstCandidate.ward?.wardNo,
+            wardName: firstCandidate.ward?.wardName,
+            ulbName: firstCandidate.ward?.ulb?.name,
+            districtName: firstCandidate.ward?.ulb?.district?.name,
+            totalContestingCandidates: wardCandidates.length,
+            nominations: wardCandidates.map((n) => ({
+              applicationNo: n.applicationNo,
+              candidateName: n.candidateName,
+              fatherHusbandName: n.fatherHusbandName,
+              age: n.age,
+              gender: n.gender,
+              category: n.category,
+              address: n.address,
+
+              districtName: n.ward?.ulb?.district?.name,
+              ulbName: n.ward?.ulb?.name,
+              wardNo: n.ward?.wardNo,
+              wardName: n.ward?.wardName,
+
+              partyName: n.politicalParty?.name || "Independent",
+              allocatedSymbol: n.allocatedSymbol?.name || null,
+
+              submittedAt: n.submittedAt,
+            })),
+          };
+        },
+      );
+
+      // Sort wards by wardNo for consistent PDF page order
+      wards.sort((a, b) => (a.wardNo || 0) - (b.wardNo || 0));
+
+      // Return ward-grouped response
+      return NextResponse.json({
+        success: true,
+        data: {
+          election: {
+            id: election.id,
+            name: election.name,
+            year: election.year,
+          },
+          reportType: "CUMULATIVE",
+          filtersApplied: {
+            wardId,
+            ulbId,
+            districtId: effectiveDistrictId,
+          },
+          totalContestingCandidates: contestingList.length,
+          wards,
+        },
+      });
+    }
+
+    // Return existing flat response for backward compatibility
     return NextResponse.json({
       success: true,
       data: {

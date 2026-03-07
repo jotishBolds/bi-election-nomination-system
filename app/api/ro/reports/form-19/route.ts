@@ -247,6 +247,84 @@ export async function GET(request: NextRequest) {
     // RESPONSE
     // =====================================
 
+    // Group nominations by ward if no specific wardId provided
+    if (!wardId) {
+      // Group nominations by ward
+      const wardGroups = new Map<string, any[]>();
+      nominations.forEach((nomination) => {
+        const wardId = nomination.wardId;
+        if (!wardGroups.has(wardId)) {
+          wardGroups.set(wardId, []);
+        }
+        wardGroups.get(wardId)!.push(nomination);
+      });
+
+      // Build ward-wise response
+      const wards = Array.from(wardGroups.entries()).map(
+        ([wardId, wardNominations]) => {
+          const firstNomination = wardNominations[0];
+          return {
+            wardId,
+            wardNo: firstNomination.ward?.wardNo,
+            wardName: firstNomination.ward?.wardName,
+            ulbName: firstNomination.ward?.ulb?.name,
+            districtName: firstNomination.ward?.ulb?.district?.name,
+            totalSubmissions: wardNominations.length,
+            nominations: wardNominations.map((n) => ({
+              applicationNo: n.applicationNo,
+              candidateName: n.candidateName,
+              fatherHusbandName: n.fatherHusbandName,
+              age: n.age,
+              address: n.address,
+              category: n.category,
+              gender: n.gender,
+
+              districtName: n.ward?.ulb?.district?.name,
+              ulbName: n.ward?.ulb?.name,
+              wardNo: n.ward?.wardNo,
+              wardName: n.ward?.wardName,
+
+              partyName: n.politicalParty?.name || "Independent",
+              submittedAt: n.submittedAt,
+
+              candidateElectoralRollNo: `${n.voterPartNo}/${n.voterSerialNo}`,
+
+              proposers: n.proposers.map((p) => ({
+                proposerName: p.name,
+                proposerElectoralRollNo: `${p.voterPartNo}/${p.voterSerialNo}`,
+              })),
+            })),
+          };
+        },
+      );
+
+      // Sort wards by wardNo for consistent PDF page order
+      wards.sort((a, b) => (a.wardNo || 0) - (b.wardNo || 0));
+
+      // Return ward-grouped response
+      return NextResponse.json({
+        success: true,
+        data: {
+          election: {
+            id: election.id,
+            name: election.name,
+            year: election.year,
+            dailyStartTime: election.dailyStartTime,
+            dailyEndTime: election.dailyEndTime,
+          },
+          reportType: dayNumber ? "DAY_WISE" : "CUMULATIVE",
+          filtersApplied: {
+            wardId,
+            ulbId,
+            districtId,
+          },
+          totalSubmissions: nominations.length,
+          wards,
+        },
+      });
+    }
+
+    // Return existing flat response for backward compatibility
     return NextResponse.json({
       success: true,
       data: {
