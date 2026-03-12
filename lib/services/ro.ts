@@ -40,6 +40,13 @@ interface WithdrawalInput {
   otpVerified: boolean;
 }
 
+interface UnopposedCandidateInput {
+  nominationId: string;
+  roUserId: string;
+  ipAddress: string;
+  otpVerified: boolean;
+}
+
 // NOTE: validateROJurisdiction has been replaced by hasAccessToWard()
 // from @/lib/services/ro-jurisdiction. All callers below use that directly.
 
@@ -282,7 +289,9 @@ export async function sendROOTP(
         ? "Nomination Receipt"
         : actionType === "SCRUTINY"
           ? "Nomination Scrutiny"
-          : "Nomination Withdrawal";
+          : actionType === "WITHDRAWAL"
+            ? "Nomination Withdrawal"
+            : "Unopposed Candidate Declaration";
 
     // Send notification to RO
     await sendNotification(
@@ -499,6 +508,50 @@ export async function processWithdrawalWithROOTP(
   } catch (error) {
     console.error("processWithdrawalWithROOTP error:", error);
     return { success: false, error: "Failed to verify and process withdrawal" };
+  }
+}
+
+/**
+ * Verifies RO OTP and marks candidate as ELECTED_UNOPPOSED
+ */
+export async function declareUnopposedCandidateWithROOTP(
+  nominationId: string,
+  otp: string,
+  roUserId: string,
+  ipAddress: string,
+): Promise<{ success: boolean; nomination?: any; error?: string }> {
+  try {
+    // Get RO details
+    const roUser = await db.user.findUnique({
+      where: { id: roUserId },
+      select: { phone: true },
+    });
+
+    if (!roUser || !roUser.phone) {
+      return { success: false, error: "RO user not found or phone missing" };
+    }
+
+    const verification = await verifyROOTP(
+      roUser.phone.trim(),
+      otp,
+      roUserId,
+      OTPType.UNCONTESTED_CANDIDATE,
+    );
+
+    if (!verification.success) {
+      return { success: false, error: verification.error };
+    }
+
+    // Call existing declaration logic
+    return declareUnopposedCandidate({
+      nominationId,
+      roUserId,
+      ipAddress,
+      otpVerified: true,
+    });
+  } catch (error) {
+    console.error("declareUnopposedCandidateWithROOTP error:", error);
+    return { success: false, error: "Failed to verify and process unopposed declaration" };
   }
 }
 
@@ -725,6 +778,106 @@ export async function processWithdrawal(
   } catch (error) {
     console.error("Process withdrawal error:", error);
     return { success: false, error: "Failed to process withdrawal" };
+  }
+}
+
+// Declare candidate as ELECTED_UNOPPOSED
+export async function declareUnopposedCandidate(
+  input: UnopposedCandidateInput,
+): Promise<{ success: boolean; nomination?: any; error?: string }> {
+  try {
+    // Get nomination with full details
+    const nomination = await db.nominationApplication.findUnique({
+      where: { id: input.nominationId },
+      include: {
+        applicantProfile: {
+          include: {
+            user: true,
+          },
+        },
+        ward: true,
+      },
+    });
+
+    if (!nomination) {
+      return { success: false, error: "Nomination not found" };
+    }
+
+    // Validate allowed status transitions
+    if (nomination.status !== NominationStatus.ACCEPTED && nomination.status !== NominationStatus.CONTESTING) {
+      return {
+        success: false,
+        error: "Only candidates with status ACCEPTED or CONTESTING can be declared elected unopposed",
+      };
+    }
+
+    // Validate RO jurisdiction
+    const hasJurisdiction = await hasAccessToWard(
+      input.roUserId,
+      nomination.wardId,
+    );
+    if (!hasJurisdiction) {
+      return {
+        success: false,
+        error: "You don't have jurisdiction for this ward",
+      };
+    }
+
+    if (!input.otpVerified) {
+      return { success: false, error: "RO OTP verification required" };
+    }
+
+    // Update nomination in transaction
+    const result = await db.$transaction(async (tx) => {
+      // Update nomination status
+      const updatedNomination = await tx.nominationApplication.update({
+        where: { id: input.nominationId },
+        data: {
+          status: NominationStatus.ELECTED_UNOPPOSED,
+        },
+      });
+
+      // Create status history
+      await tx.nominationStatusHistory.create({
+        data: {
+          nominationId: nomination.id,
+          fromStatus: nomination.status,
+          toStatus: NominationStatus.ELECTED_UNOPPOSED,
+          changedBy: input.roUserId,
+          ipAddress: input.ipAddress,
+          remarks: "Declared elected unopposed",
+        },
+      });
+
+      // Audit log
+      await tx.auditLog.create({
+        data: {
+          userId: input.roUserId,
+          action: AuditAction.UPDATE,
+          entityType: "NominationApplication",
+          entityId: nomination.id,
+          oldValues: { status: nomination.status },
+          newValues: { status: NominationStatus.ELECTED_UNOPPOSED },
+          ipAddress: input.ipAddress,
+        },
+      });
+
+      return updatedNomination;
+    });
+
+    // Send notification to candidate
+    const user = nomination.applicantProfile.user;
+    await sendNotification(
+      user.phone,
+      user.email,
+      "Declared Elected Unopposed",
+      `Congratulations! Your nomination (${nomination.applicationNo}) has been declared elected unopposed.`,
+    );
+
+    return { success: true, nomination: result };
+  } catch (error) {
+    console.error("Declare unopposed candidate error:", error);
+    return { success: false, error: "Failed to declare candidate elected unopposed" };
   }
 }
 
