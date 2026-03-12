@@ -177,16 +177,23 @@ export async function PATCH(request: NextRequest) {
     // Convert date strings to Date objects if present
     const parsedData = { ...updateData };
     const dateFields = [
+      "notificationDate",
       "nominationStartDate",
       "nominationEndDate",
       "scrutinyDate",
       "withdrawalStartDate",
       "withdrawalEndDate",
+      "symbolAllotmentDate",
+      "pollDate",
+      "countingDate",
+      "resultDate",
     ];
 
     for (const field of dateFields) {
       if (parsedData[field]) {
         parsedData[field] = new Date(parsedData[field]);
+      } else if (parsedData[field] === null) {
+        parsedData[field] = null;
       }
     }
 

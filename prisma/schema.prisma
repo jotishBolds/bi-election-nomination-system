@@ -802,6 +802,7 @@ model VoterRollEntry {
   relationType  String   @db.VarChar(20) // Father, Husband
   relationName  String   @db.VarChar(200)
   postalAddress String   @db.Text
+  gender        Gender?
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

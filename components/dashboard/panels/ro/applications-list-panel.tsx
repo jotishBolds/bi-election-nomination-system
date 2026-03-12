@@ -1912,29 +1912,7 @@ export function ApplicationsListPanel() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2.5 bg-slate-50 rounded-xl p-2.5 sm:p-3">
-                    <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
-                      <Calendar className="h-3.5 w-3.5 text-purple-600" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[8px] sm:text-[9px] text-slate-400 uppercase tracking-wider font-medium">
-                        {selectedNomination.dateOfBirth ? "DOB" : "Age"}
-                      </p>
-                      <p className="text-[11px] sm:text-xs font-semibold text-slate-700">
-                        {selectedNomination.dateOfBirth
-                          ? new Date(
-                              selectedNomination.dateOfBirth,
-                            ).toLocaleDateString("en-IN", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })
-                          : selectedNomination.age
-                            ? `${selectedNomination.age} years`
-                            : "N/A"}
-                      </p>
-                    </div>
-                  </div>
+
                   <div className="flex items-center gap-2.5 bg-slate-50 rounded-xl p-2.5 sm:p-3">
                     <div className="w-8 h-8 rounded-lg bg-pink-100 flex items-center justify-center shrink-0">
                       <User className="h-3.5 w-3.5 text-pink-600" />

@@ -93,6 +93,7 @@ interface VoterRollEntry {
   relationType: string;
   relationName: string;
   postalAddress: string;
+  gender?: string | null;
 }
 
 const schema = z
@@ -516,6 +517,11 @@ export function StepBasicInfo({
       addressProofUrl: addressProofUrl,
       epicNumber:
         selectedVoter?.epicNumber || epicSearch || formData.epicNumber || "",
+      gender: (selectedVoter?.gender || formData.gender || "") as
+        | "MALE"
+        | "FEMALE"
+        | "OTHER"
+        | "",
     });
     onNext();
   };

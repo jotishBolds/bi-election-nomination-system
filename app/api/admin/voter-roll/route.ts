@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { z } from "zod";
 import { requireRoles, requireSuperAdmin } from "@/lib/auth/auth-guard";
-import { Role } from "@prisma/client";
+import { Role, Gender } from "@prisma/client";
 
 const createVoterRollSchema = z.object({
   voters: z.array(
@@ -12,6 +12,7 @@ const createVoterRollSchema = z.object({
       relation_type: z.string().min(1).max(20),
       relation_name: z.string().min(1).max(200),
       postal_address: z.string().min(1),
+      gender: z.nativeEnum(Gender).nullable().optional(),
     }),
   ),
 });
@@ -85,6 +86,7 @@ export async function POST(request: NextRequest) {
           relationType: voter.relation_type,
           relationName: voter.relation_name,
           postalAddress: voter.postal_address,
+          gender: voter.gender ?? undefined,
           isActive: true,
         },
         create: {
@@ -93,6 +95,7 @@ export async function POST(request: NextRequest) {
           relationType: voter.relation_type,
           relationName: voter.relation_name,
           postalAddress: voter.postal_address,
+          gender: voter.gender ?? undefined,
         },
       });
       results.push(entry);

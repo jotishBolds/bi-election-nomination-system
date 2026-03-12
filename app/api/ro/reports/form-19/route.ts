@@ -289,7 +289,7 @@ export async function GET(request: NextRequest) {
 
               candidateElectoralRollNo: `${n.voterPartNo}/${n.voterSerialNo}`,
 
-              proposers: n.proposers.map((p) => ({
+              proposers: n.proposers.map((p: any) => ({
                 proposerName: p.name,
                 proposerElectoralRollNo: `${p.voterPartNo}/${p.voterSerialNo}`,
               })),
@@ -361,7 +361,7 @@ export async function GET(request: NextRequest) {
 
           candidateElectoralRollNo: `${n.voterPartNo}/${n.voterSerialNo}`,
 
-          proposers: n.proposers.map((p) => ({
+          proposers: n.proposers.map((p: any) => ({
             proposerName: p.name,
             proposerElectoralRollNo: `${p.voterPartNo}/${p.voterSerialNo}`,
           })),

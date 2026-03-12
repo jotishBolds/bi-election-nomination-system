@@ -3,7 +3,13 @@ import { z } from "zod";
 // Schema for POST /api/ro/applications/[id]/send-otp
 export const sendROOTPSchema = z.object({
   action: z
-    .enum(["RECEIPT_CONFIRMATION", "SCRUTINY", "WITHDRAWAL", "DATA_CORRECTION", "UNCONTESTED_CANDIDATE"])
+    .enum([
+      "RECEIPT_CONFIRMATION",
+      "SCRUTINY",
+      "WITHDRAWAL",
+      "DATA_CORRECTION",
+      "UNCONTESTED_CANDIDATE",
+    ])
     .default("RECEIPT_CONFIRMATION"),
 });
 

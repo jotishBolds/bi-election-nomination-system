@@ -114,7 +114,7 @@ export async function createNominationDraft(
         fatherHusbandName: input.fatherHusbandName,
         dateOfBirth: input.dateOfBirth || null,
         age: input.age || null,
-        gender: input.gender || Gender.MALE,
+        gender: input.gender || null,
         category: input.category,
         casteTribeName: input.casteTribeName,
         address: input.address,

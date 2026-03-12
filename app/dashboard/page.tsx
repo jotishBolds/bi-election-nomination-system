@@ -38,6 +38,7 @@ import {
   ContestPanel,
   UncontestPanel,
   ROReportsPanel,
+  FormReportsPanel,
 } from "@/components/dashboard/panels/ro";
 
 // Candidate Panels
@@ -160,6 +161,8 @@ function DashboardContent() {
           return <UncontestPanel />;
         case "reports":
           return <ROReportsPanel />;
+        case "form-reports":
+          return <FormReportsPanel />;
         default:
           return <ROPanel />;
       }

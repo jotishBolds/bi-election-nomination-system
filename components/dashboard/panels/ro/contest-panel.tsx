@@ -40,7 +40,21 @@ import {
   Printer,
   FileText,
   MapPin,
+  Loader2,
+  ShieldCheck,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface Candidate {
@@ -109,6 +123,35 @@ export function ContestPanel() {
     null,
   );
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [isFinalizing, setIsFinalizing] = useState(false);
+
+  const handleFinalizeContesting = async () => {
+    setIsFinalizing(true);
+    try {
+      const response = await fetch(
+        "/api/ro/election/finalize-contesting-candidates",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        },
+      );
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success(
+          `${result.data.updatedCount} candidate(s) finalized as contesting`,
+        );
+        fetchCandidates();
+      } else {
+        toast.error(result.error || "Failed to finalize candidates");
+      }
+    } catch {
+      toast.error("Failed to connect to server");
+    } finally {
+      setIsFinalizing(false);
+    }
+  };
 
   const fetchWards = async () => {
     try {
@@ -229,6 +272,47 @@ export function ContestPanel() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="default"
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                <ShieldCheck className="h-4 w-4 mr-2" />
+                Finalize Contesting
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  Finalize Contesting Candidates?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will change all <strong>ACCEPTED</strong> nominations to{" "}
+                  <strong>CONTESTING</strong> status. This action should only be
+                  performed after the withdrawal period has ended. This cannot
+                  be undone easily.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleFinalizeContesting}
+                  disabled={isFinalizing}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                >
+                  {isFinalizing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Finalizing...
+                    </>
+                  ) : (
+                    "Confirm Finalize"
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Button variant="outline" onClick={handlePrint}>
             <Printer className="h-4 w-4 mr-2" />
             Print

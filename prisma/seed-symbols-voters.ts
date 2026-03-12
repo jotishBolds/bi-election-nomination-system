@@ -19,6 +19,7 @@ const voterData = [
     relation_type: "Father",
     relation_name: "Ramesh Kumar",
     postal_address: "Village Tadong, Gangtok, East Sikkim, 737102",
+    gender: "MALE" as const,
   },
   {
     epic_number: "WIZ0063891",
@@ -26,6 +27,7 @@ const voterData = [
     relation_type: "Husband",
     relation_name: "Amit Kumar",
     postal_address: "Lower Syari, Gangtok, East Sikkim, 737101",
+    gender: "FEMALE" as const,
   },
   {
     epic_number: "WIZ0063909",
@@ -33,6 +35,7 @@ const voterData = [
     relation_type: "Father",
     relation_name: "Mahesh Sharma",
     postal_address: "Singtam Bazar, East Sikkim, 737134",
+    gender: "MALE" as const,
   },
   {
     epic_number: "WIZ0063925",
@@ -40,6 +43,7 @@ const voterData = [
     relation_type: "Husband",
     relation_name: "Rahul Sharma",
     postal_address: "Singtam Bazar, East Sikkim, 737134",
+    gender: "FEMALE" as const,
   },
   {
     epic_number: "GZS0060012",
@@ -47,6 +51,7 @@ const voterData = [
     relation_type: "Father",
     relation_name: "Lhakpa Bhutia",
     postal_address: "Rumtek, East Sikkim, 737135",
+    gender: "MALE" as const,
   },
   {
     epic_number: "NMX0090746",
@@ -54,6 +59,7 @@ const voterData = [
     relation_type: "Father",
     relation_name: "Dawa Lepcha",
     postal_address: "Rangpo, East Sikkim, 737132",
+    gender: "MALE" as const,
   },
   {
     epic_number: "WIZ0038893",
@@ -61,6 +67,7 @@ const voterData = [
     relation_type: "Father",
     relation_name: "Suresh Verma",
     postal_address: "Majitar, East Sikkim, 737136",
+    gender: "MALE" as const,
   },
   {
     epic_number: "WIZ0064017",
@@ -68,6 +75,7 @@ const voterData = [
     relation_type: "Husband",
     relation_name: "Rakesh Verma",
     postal_address: "Majitar, East Sikkim, 737136",
+    gender: "FEMALE" as const,
   },
   {
     epic_number: "GZS0060148",
@@ -75,6 +83,7 @@ const voterData = [
     relation_type: "Father",
     relation_name: "Pema Tshering",
     postal_address: "Namchi, South Sikkim, 737126",
+    gender: "MALE" as const,
   },
   {
     epic_number: "NMX0090813",
@@ -82,6 +91,7 @@ const voterData = [
     relation_type: "Father",
     relation_name: "Bir Bahadur Rai",
     postal_address: "Jorethang, South Sikkim, 737121",
+    gender: "FEMALE" as const,
   },
 ];
 
@@ -95,6 +105,7 @@ async function seedVoterRoll() {
         relationType: v.relation_type,
         relationName: v.relation_name,
         postalAddress: v.postal_address,
+        gender: v.gender,
       },
       create: {
         epicNumber: v.epic_number,
@@ -102,6 +113,7 @@ async function seedVoterRoll() {
         relationType: v.relation_type,
         relationName: v.relation_name,
         postalAddress: v.postal_address,
+        gender: v.gender,
       },
     });
   }

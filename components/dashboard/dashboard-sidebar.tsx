@@ -120,6 +120,13 @@ const ROLE_NAV_CONFIG: Record<UserRole, NavGroup[]> = {
           iconColor: "text-indigo-600",
           iconBgColor: "bg-indigo-100",
         },
+        {
+          title: "Form Reports",
+          icon: ScrollText,
+          href: "/dashboard?tab=form-reports",
+          iconColor: "text-teal-600",
+          iconBgColor: "bg-teal-100",
+        },
       ],
     },
     {

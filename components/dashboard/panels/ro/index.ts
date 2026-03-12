@@ -4,3 +4,4 @@ export { WithdrawPanel } from "./withdraw-panel";
 export { ContestPanel } from "./contest-panel";
 export { UncontestPanel } from "./uncontest-panel";
 export { ROReportsPanel } from "./reports-panel";
+export { FormReportsPanel } from "./form-reports-panel";
