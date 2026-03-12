@@ -30,7 +30,7 @@ const DOC_TYPE_MAP: Record<string, DocumentType> = {
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
-    if (!session?.user) {
+    if (!session?.user || !["CANDIDATE", "RO", "SES", "SUPER_ADMIN"].includes(session.user.role)) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
         { status: 401 },

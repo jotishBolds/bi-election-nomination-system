@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth/next-auth";
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
-    if (!session) {
+    if (!session?.user || !["CANDIDATE", "RO", "SES", "SUPER_ADMIN"].includes(session.user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -16,10 +16,21 @@ export async function POST(request: NextRequest) {
     const nominationId = formData.get("nominationId") as string;
     const file = formData.get("proof") as File;
 
-    if (!brNumber || !nominationId || !file) {
+    // For RO users, nominationId can be "pending" (offline nominations)
+    const isROUser = ["RO", "SES", "SUPER_ADMIN"].includes(session.user.role);
+    
+    if (!brNumber || !file) {
       return NextResponse.json(
-        { error: "BR number, nomination ID, and proof image are required" },
-        { status: 400 },
+        { error: "BR number and proof image are required" }, 
+        { status: 400 }
+      );
+    }
+    
+    // For candidate users, nominationId is required
+    if (!isROUser && !nominationId) {
+      return NextResponse.json(
+        { error: "Nomination ID is required" }, 
+        { status: 400 }
       );
     }
 
@@ -43,14 +54,14 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const { url, publicId } = await uploadToCloudinary(buffer, "br-payments");
 
-    // Only create DB record if nominationId is a valid UUID
-    const isValidUUID =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        nominationId,
-      );
+    // Only create DB record if nominationId is a valid UUID (for candidates)
+    // RO users will get the upload result and nomination will be linked later
+    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      nominationId || ""
+    );
 
     let brPayment = null;
-    if (isValidUUID) {
+    if (isValidUUID && !isROUser) {
       brPayment = await db.bRPayment.create({
         data: {
           nominationId,
@@ -70,6 +81,7 @@ export async function POST(request: NextRequest) {
           publicId,
           brNumber,
           brPayment,
+          isROUpload: isROUser, // Flag to indicate this is an RO upload
         },
       },
       { status: 201 },

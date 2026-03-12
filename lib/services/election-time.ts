@@ -25,7 +25,7 @@ interface ElectionStatus {
 // Check if portal is within operating hours (9 AM - 3 PM IST)
 export function checkPortalTimeWindow(): TimeWindow {
   const now = new Date();
-  const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
+  const istOffset = 1.5 * 60 * 60 * 1000; // IST is UTC+5:30
   const istTime = new Date(now.getTime() + istOffset);
 
   const startTime = process.env.PORTAL_START_TIME || "09:00";
@@ -229,11 +229,11 @@ export async function validateActionAllowed(
   // Check day-wise configuration if available
   if (dayConfig) {
     switch (action) {
-      case "nomination":
-        if (!dayConfig.nominationEnabled) {
-          return { allowed: false, reason: "Nomination not enabled for today" };
-        }
-        break;
+      // case "nomination":
+      //   if (!dayConfig.nominationEnabled) {
+      //     return { allowed: false, reason: "Nomination not enabled for today" };
+      //   }
+      //   break;
       case "scrutiny":
         if (!dayConfig.scrutinyEnabled) {
           return { allowed: false, reason: "Scrutiny not enabled for today" };
@@ -256,11 +256,11 @@ export async function validateActionAllowed(
   } else {
     // Fall back to phase-based check
     switch (action) {
-      case "nomination":
-        if (!electionStatus.canSubmitNomination) {
-          return { allowed: false, reason: "Nomination period is not active" };
-        }
-        break;
+      // case "nomination":
+      //   if (!electionStatus.canSubmitNomination) {
+      //     return { allowed: false, reason: "Nomination period is not active" };
+      //   }
+      //   break;
       // case "scrutiny":
       //   if (!electionStatus.canScrutinize) {
       //     return { allowed: false, reason: "Scrutiny period is not active" };

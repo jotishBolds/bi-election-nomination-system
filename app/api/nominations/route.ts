@@ -2,14 +2,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/next-auth";
 import { getClientIP } from "@/lib/auth/server-utils";
-import {
-  createNominationDraft,
-  getCandidateNominations,
-  canSubmitMoreNominations,
-} from "@/lib/services/nomination";
+import { createNominationDraft, getCandidateNominations, canSubmitMoreNominations } from "@/lib/services/nomination";
 import { db } from "@/lib/db";
 import { z } from "zod";
 import { Category, Gender, DocumentType } from "@prisma/client";
+import { deleteFromCloudinary } from "@/lib/cloudinary";
 
 // Schema for direct API calls with flat fields
 const createNominationSchema = z.object({
@@ -123,6 +120,19 @@ export async function GET(request: NextRequest) {
 
 // POST - Create new nomination draft
 export async function POST(request: NextRequest) {
+  // Track uploaded files for cleanup on failure
+  const uploadedFiles: string[] = [];
+  
+  const cleanupFiles = async () => {
+    for (const publicId of uploadedFiles) {
+      try {
+        await deleteFromCloudinary(publicId);
+      } catch (error) {
+        console.error("Failed to cleanup file:", publicId, error);
+      }
+    }
+  };
+
   try {
     const session = await auth();
 
@@ -264,6 +274,32 @@ export async function POST(request: NextRequest) {
     const nominationId = result.nomination?.id;
     const rawFormData = body.formData || body;
 
+    // Extract and track uploaded file publicIds for potential cleanup
+    const trackUploadedFile = (url: string | null | undefined) => {
+      if (url && typeof url === "string" && url.includes("cloudinary")) {
+        // Extract publicId from Cloudinary URL
+        const parts = url.split("/");
+        const filename = parts[parts.length - 1];
+        const publicId = filename.split(".")[0];
+        if (publicId && !uploadedFiles.includes(publicId)) {
+          uploadedFiles.push(publicId);
+        }
+      }
+    };
+
+    // Track document URLs
+    const docTypes: { key: string; type: DocumentType }[] = [
+      { key: "casteCertificateUrl", type: DocumentType.CASTE_CERTIFICATE },
+      { key: "affidavitUrl", type: DocumentType.AFFIDAVIT },
+      { key: "addressProofUrl", type: DocumentType.RESIDENCE_PROOF },
+    ];
+    for (const dt of docTypes) {
+      trackUploadedFile(rawFormData?.[dt.key]);
+    }
+
+    // Track BR payment URL
+    trackUploadedFile(rawFormData?.brProofUrl || body.brProofUrl);
+
     // Save documents linked to this nomination (Cloudinary URLs)
     if (nominationId) {
       const docTypes: { key: string; type: DocumentType }[] = [
@@ -346,6 +382,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Create nomination error:", error);
+    
+    // Clean up uploaded files on failure
+    await cleanupFiles();
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
