@@ -2,7 +2,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { cacheGet, cacheSet } from "@/lib/memory-store";
-import { ElectionPhase } from "@prisma/client";
+import { ElectionPhase, ElectionConfig } from "@prisma/client";
 
 interface TimeWindow {
   isOpen: boolean;
@@ -71,6 +71,58 @@ export async function getActiveElectionConfig() {
   const config = await db.electionConfig.findFirst({
     where: { isActive: true },
     orderBy: { createdAt: "desc" },
+  });
+
+  if (config) {
+    // Cache for 5 minutes
+    await cacheSet(cacheKey, JSON.stringify(config), 300);
+  }
+
+  return config;
+}
+
+// NEW: Get all active elections
+export async function getActiveElections(): Promise<ElectionConfig[]> {
+  // Try cache first
+  const cacheKey = "elections_active_all";
+  const cached = await cacheGet(cacheKey);
+
+  if (cached) {
+    return JSON.parse(cached);
+  }
+
+  // Fetch from database
+  const configs = await db.electionConfig.findMany({
+    where: { 
+      AND: [
+        { isActive: true },
+        { status: 'ACTIVE' }
+      ]
+    },
+    orderBy: { createdAt: "desc" }
+  });
+
+  if (configs.length > 0) {
+    // Cache for 5 minutes
+    await cacheSet(cacheKey, JSON.stringify(configs), 300);
+  }
+
+  return configs;
+}
+
+// NEW: Get specific election by ID
+export async function getElectionById(id: string): Promise<ElectionConfig | null> {
+  // Try cache first
+  const cacheKey = `election_${id}`;
+  const cached = await cacheGet(cacheKey);
+
+  if (cached) {
+    return JSON.parse(cached);
+  }
+
+  // Fetch from database
+  const config = await db.electionConfig.findUnique({
+    where: { id }
   });
 
   if (config) {
@@ -187,8 +239,17 @@ function generateStatusMessage(
   }
 }
 
+// Helper function to calculate days until nomination end
+function calculateDaysUntilEnd(endDate: Date): number | null {
+  if (!endDate) return null;
+  const now = new Date();
+  const diffTime = endDate.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays > 0 ? diffDays : null;
+}
+
 // Check day-wise module availability
-export async function getDayModuleConfig(date: Date = new Date()) {
+export async function getDayModuleConfig(date: Date = new Date(), electionId?: string): Promise<DayModuleConfig | null> {
   const config = await getActiveElectionConfig();
   if (!config) return null;
 
@@ -208,32 +269,112 @@ export async function getDayModuleConfig(date: Date = new Date()) {
 // Validate if action is allowed based on phase and time
 export async function validateActionAllowed(
   action: "nomination" | "scrutiny" | "withdrawal" | "offline_entry",
-): Promise<{ allowed: boolean; reason: string }> {
-  const electionStatus = await getElectionStatus();
+  electionId?: string
+): Promise<{ allowed: boolean; reason: string; electionId?: string }> {
+  
+  // If specific election provided, validate that election
+  if (electionId) {
+    const election = await getElectionById(electionId);
+    if (!election || !election.isActive || election.status !== 'ACTIVE') {
+      return { 
+        allowed: false, 
+        reason: "Election is not active or does not exist",
+        electionId 
+      };
+    }
+    
+    // Use specific election for status check
+    const electionStatus = {
+      isActive: election.isActive,
+      currentPhase: election.currentPhase,
+      canSubmitNomination: election.currentPhase === 'NOMINATION',
+      canWithdraw: election.currentPhase === 'WITHDRAWAL',
+      canScrutinize: election.currentPhase === 'SCRUTINY',
+      daysUntilNominationEnd: calculateDaysUntilEnd(election.nominationEndDate),
+      message: generateStatusMessage(election.currentPhase, checkPortalTimeWindow(), election)
+    };
+    
+    const timeWindow = checkPortalTimeWindow();
+    const dayConfig = await getDayModuleConfig(new Date(), election.id);
+    
+    // Check time window first (except for scrutiny which might have different hours)
+    if (action !== "scrutiny" && !timeWindow.isOpen) {
+      return {
+        allowed: false,
+        reason: `Portal is closed. Operating hours: ${timeWindow.opensAt} - ${timeWindow.closesAt} IST`,
+        electionId
+      };
+    }
+    
+    // Check day-wise configuration if available
+    if (dayConfig) {
+      switch (action) {
+        case "nomination":
+          if (!dayConfig.nominationEnabled) {
+            return { allowed: false, reason: "Nomination not enabled for today", electionId };
+          }
+          break;
+        case "scrutiny":
+          if (!dayConfig.scrutinyEnabled) {
+            return { allowed: false, reason: "Scrutiny not enabled for today", electionId };
+          }
+          break;
+        case "withdrawal":
+          if (!dayConfig.withdrawalEnabled) {
+            return { allowed: false, reason: "Withdrawal not enabled for today", electionId };
+          }
+          break;
+        case "offline_entry":
+          if (!dayConfig.offlineEntryEnabled) {
+            return { allowed: false, reason: "Offline entry not enabled for today", electionId };
+          }
+          break;
+      }
+    }
+    
+    return { allowed: true, reason: "Action allowed", electionId };
+  }
+  
+  // Otherwise use any active election (backward compatibility)
+  const elections = await getActiveElections();
+  if (elections.length === 0) {
+    return { 
+      allowed: false, 
+      reason: "No active elections available" 
+    };
+  }
+  
+  // Use first active election for status check
+  const election = elections[0];
+  const electionStatus = {
+    isActive: election.isActive,
+    currentPhase: election.currentPhase,
+    canSubmitNomination: election.currentPhase === 'NOMINATION',
+    canWithdraw: election.currentPhase === 'WITHDRAWAL',
+    canScrutinize: election.currentPhase === 'SCRUTINY',
+    daysUntilNominationEnd: calculateDaysUntilEnd(election.nominationEndDate),
+    message: generateStatusMessage(election.currentPhase, checkPortalTimeWindow(), election)
+  };
+  
   const timeWindow = checkPortalTimeWindow();
-  const dayConfig = await getDayModuleConfig();
-
+  const dayConfig = await getDayModuleConfig(new Date(), election.id);
+  
   // Check time window first (except for scrutiny which might have different hours)
   if (action !== "scrutiny" && !timeWindow.isOpen) {
     return {
       allowed: false,
-      reason: `Portal is closed. Operating hours: ${timeWindow.opensAt} - ${timeWindow.closesAt} IST`,
+      reason: `Portal is closed. Operating hours: ${timeWindow.opensAt} - ${timeWindow.closesAt} IST`
     };
-  }
-
-  // Check election phase
-  if (!electionStatus.isActive) {
-    return { allowed: false, reason: "No active election" };
   }
 
   // Check day-wise configuration if available
   if (dayConfig) {
     switch (action) {
-      // case "nomination":
-      //   if (!dayConfig.nominationEnabled) {
-      //     return { allowed: false, reason: "Nomination not enabled for today" };
-      //   }
-      //   break;
+      case "nomination":
+        if (!dayConfig.nominationEnabled) {
+          return { allowed: false, reason: "Nomination not enabled for today" };
+        }
+        break;
       case "scrutiny":
         if (!dayConfig.scrutinyEnabled) {
           return { allowed: false, reason: "Scrutiny not enabled for today" };
@@ -246,21 +387,13 @@ export async function validateActionAllowed(
         break;
       case "offline_entry":
         if (!dayConfig.offlineEntryEnabled) {
-          return {
-            allowed: false,
-            reason: "Offline entry not enabled for today",
-          };
+          return { allowed: false, reason: "Offline entry not enabled for today" };
         }
         break;
     }
   } else {
     // Fall back to phase-based check
     switch (action) {
-      // case "nomination":
-      //   if (!electionStatus.canSubmitNomination) {
-      //     return { allowed: false, reason: "Nomination period is not active" };
-      //   }
-      //   break;
       // case "scrutiny":
       //   if (!electionStatus.canScrutinize) {
       //     return { allowed: false, reason: "Scrutiny period is not active" };

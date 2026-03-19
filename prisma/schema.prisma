@@ -9,74 +9,33 @@ datasource db {
 }
 
 model State {
-  id        String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code      String             @unique @db.VarChar(10)
-  name      String             @db.VarChar(100)
-  isActive  Boolean            @default(true)
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  id        String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code      String     @unique @db.VarChar(10)
+  name      String     @db.VarChar(100)
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
   districts District[]
-  users     UserJurisdiction[]
 
   @@map("states")
 }
 
 model District {
-  id        String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code      String             @unique @db.VarChar(20)
-  name      String             @db.VarChar(100)
-  stateId   String             @db.Uuid
-  isActive  Boolean            @default(true)
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
-  state     State              @relation(fields: [stateId], references: [id])
-  ulbs      ULB[]
-  users     UserJurisdiction[]
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code         String        @unique @db.VarChar(20)
+  name         String        @db.VarChar(100)
+  stateId      String        @db.Uuid
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  state        State         @relation(fields: [stateId], references: [id])
+  ulbs         ULB[]
+  gpus         GPU[]
+  zptcs        ZPTC[]
+  voterRecords VoterRecord[]
 
   @@index([stateId])
   @@map("districts")
-}
-
-model ULB {
-  id           String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code         String                  @unique @db.VarChar(20)
-  name         String                  @db.VarChar(100)
-  type         ULBType?
-  districtId   String                  @db.Uuid
-  isActive     Boolean                 @default(true)
-  createdAt    DateTime                @default(now())
-  updatedAt    DateTime                @updatedAt
-  nominations  NominationApplication[]
-  district     District                @relation(fields: [districtId], references: [id])
-  users        UserJurisdiction[]
-  voterRecords VoterRecord[]
-  wards        Ward[]
-
-  @@index([districtId])
-  @@map("ulbs")
-}
-
-model Ward {
-  id                String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  wardNo            Int
-  wardName          String                  @db.VarChar(100)
-  ulbId             String                  @db.Uuid
-  constituencyId    String?                 @db.Uuid
-  reservationType   ReservationType?
-  isActive          Boolean                 @default(true)
-  createdAt         DateTime                @default(now())
-  updatedAt         DateTime                @updatedAt
-  nominations       NominationApplication[]
-  symbolAllocations SymbolAllocation[]
-  users             UserJurisdiction[]
-  voterRecords      VoterRecord[]
-  constituency      Constituency?           @relation(fields: [constituencyId], references: [id])
-  ulb               ULB                     @relation(fields: [ulbId], references: [id])
-
-  @@unique([ulbId, wardNo])
-  @@index([ulbId])
-  @@index([constituencyId])
-  @@map("wards")
 }
 
 model Constituency {
@@ -89,6 +48,89 @@ model Constituency {
   wards     Ward[]
 
   @@map("constituencies")
+}
+
+model ULB {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code         String        @unique @db.VarChar(20)
+  name         String        @db.VarChar(100)
+  type         ULBType?
+  districtId   String        @db.Uuid
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  district     District      @relation(fields: [districtId], references: [id])
+  voterRecords VoterRecord[]
+  wards        Ward[]
+
+  @@index([districtId])
+  @@map("ulbs")
+}
+
+model Ward {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  wardNo          Int
+  wardName        String           @db.VarChar(100)
+  ulbId           String           @db.Uuid
+  constituencyId  String?          @db.Uuid
+  reservationType ReservationType?
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  voterRecords    VoterRecord[]
+  constituency    Constituency?    @relation(fields: [constituencyId], references: [id])
+  ulb             ULB              @relation(fields: [ulbId], references: [id])
+  electionSeats   ElectionSeat[]
+
+  @@unique([ulbId, wardNo])
+  @@index([ulbId])
+  @@index([constituencyId])
+  @@map("wards")
+}
+
+model GPU {
+  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String @db.VarChar(200)
+  districtId String @db.Uuid
+
+  district     District        @relation(fields: [districtId], references: [id])
+  wards        PanchayatWard[]
+  voterRecords VoterRecord[]
+  createdAt    DateTime        @default(now())
+  // electionSeats ElectionSeat[]
+
+  @@index([districtId])
+}
+
+model PanchayatWard {
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  wardNo Int
+  name   String @db.VarChar(200)
+
+  gpuId String @db.Uuid
+  gpu   GPU    @relation(fields: [gpuId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  electionSeats ElectionSeat[]
+  voterRecords  VoterRecord[]
+
+  @@unique([gpuId, wardNo])
+  @@index([gpuId])
+}
+
+model ZPTC {
+  id   String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name String @db.VarChar(200)
+
+  districtId    String         @db.Uuid
+  district      District       @relation(fields: [districtId], references: [id])
+  electionSeats ElectionSeat[]
+  voterRecords  VoterRecord[]
+
+  createdAt DateTime @default(now())
+
+  @@index([districtId])
 }
 
 model User {
@@ -120,6 +162,16 @@ model User {
   totpSecret             TOTPSecret?
   jurisdictions          UserJurisdiction[]
   roles                  UserRole[]
+  symbolAllocationsBy    SymbolAllocation[]      @relation("SymbolAllocatedBy")
+  symbolAllocationsTo    SymbolAllocation[]      @relation("SymbolAllocatedTo")
+  jurisdictionsAssigned  UserJurisdiction[]      @relation("JurisdictionAssignedBy")
+  lockedElections        ElectionConfig[]        @relation("ElectionLockedBy")
+  uploadedVoterDBs       VoterDBVersion[]
+  generatedPDFs          GeneratedPDF[]
+  verifiedDocuments      Document[]
+  verifiedPayments       BRPayment[]
+  createdElections ElectionConfig[] @relation("ElectionCreatedBy")
+  revokedUserRoles       UserRole[]       @relation("UserRoleRevokedBy")
 
   @@index([email])
   @@index([phone])
@@ -136,31 +188,31 @@ model UserRole {
   revokedBy String?   @db.Uuid
   isActive  Boolean   @default(true)
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revokedByUser User?   @relation("UserRoleRevokedBy", fields: [revokedBy], references: [id])
 
-  @@unique([userId, role])
+  // @@unique([userId, role])
   @@index([userId])
   @@map("user_roles")
 }
 
 model UserJurisdiction {
-  id         String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId     String           @db.Uuid
-  type       JurisdictionType
-  stateId    String?          @db.Uuid
-  districtId String?          @db.Uuid
-  ulbId      String?          @db.Uuid
-  wardId     String?          @db.Uuid
-  assignedAt DateTime         @default(now())
-  assignedBy String?          @db.Uuid
-  isActive   Boolean          @default(true)
-  district   District?        @relation(fields: [districtId], references: [id])
-  state      State?           @relation(fields: [stateId], references: [id])
-  ulb        ULB?             @relation(fields: [ulbId], references: [id])
-  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ward       Ward?            @relation(fields: [wardId], references: [id])
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @db.Uuid
 
+  jurisdictionType JurisdictionType
+  jurisdictionId   String           @db.Uuid
+
+  // audit fields
+  assignedAt DateTime @default(now())
+  assignedBy String?  @db.Uuid
+  isActive   Boolean  @default(true)
+
+  user           User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedByUser User? @relation("JurisdictionAssignedBy", fields: [assignedBy], references: [id])
+
+  @@unique([userId, jurisdictionType, jurisdictionId])
   @@index([userId])
-  @@map("user_jurisdictions")
+  @@index([jurisdictionType, jurisdictionId])
 }
 
 model TOTPSecret {
@@ -216,45 +268,66 @@ model OTPLog {
 }
 
 model VoterRecord {
-  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  epicNo            String             @unique @db.VarChar(20)
-  name              String             @db.VarChar(200)
-  fatherHusbandName String             @db.VarChar(200)
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  epicNo            String   @unique @db.VarChar(20)
+  name              String   @db.VarChar(200)
+  fatherHusbandName String   @db.VarChar(200)
   gender            Gender
-  dateOfBirth       DateTime           @db.Date
+  dateOfBirth       DateTime @db.Date
   age               Int
-  address           String
-  partNo            String             @db.VarChar(10)
-  serialNo          String             @db.VarChar(10)
-  ulbId             String             @db.Uuid
-  wardId            String             @db.Uuid
-  photo             String?
-  isActive          Boolean            @default(true)
-  dbVersionId       String             @db.Uuid
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  profiles          ApplicantProfile[]
-  dbVersion         VoterDBVersion     @relation(fields: [dbVersionId], references: [id])
-  ulb               ULB                @relation(fields: [ulbId], references: [id])
-  ward              Ward               @relation(fields: [wardId], references: [id])
+  // address           String
+  address String @db.Text
+  partNo            String   @db.VarChar(10)
+  serialNo          String   @db.VarChar(10)
+
+  // hierarchy
+  districtId String  @db.Uuid
+  ulbId      String? @db.Uuid
+  wardId     String? @db.Uuid
+
+  gpuId           String? @db.Uuid
+  panchayatWardId String? @db.Uuid
+
+  zptcId String? @db.Uuid
+
+  // relations
+  district      District       @relation(fields: [districtId], references: [id])
+  ulb           ULB?           @relation(fields: [ulbId], references: [id])
+  ward          Ward?          @relation(fields: [wardId], references: [id])
+  gpu           GPU?           @relation(fields: [gpuId], references: [id])
+  panchayatWard PanchayatWard? @relation(fields: [panchayatWardId], references: [id])
+  zptc          ZPTC?          @relation(fields: [zptcId], references: [id])
+
+  photo       String?
+  isActive    Boolean            @default(true)
+  dbVersionId String             @db.Uuid
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  profiles    ApplicantProfile[]
+  dbVersion   VoterDBVersion     @relation(fields: [dbVersionId], references: [id])
 
   @@index([epicNo])
   @@index([ulbId])
   @@index([wardId])
+  @@index([districtId])
+  @@index([gpuId])
+  @@index([panchayatWardId])
+  @@index([zptcId])
   @@map("voter_records")
 }
 
 model VoterDBVersion {
-  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  version       String        @db.VarChar(50)
-  uploadedAt    DateTime      @default(now())
-  uploadedBy    String        @db.Uuid
-  recordCount   Int
-  fileHash      String        @db.VarChar(64)
-  isActive      Boolean       @default(true)
-  activatedAt   DateTime?
-  deactivatedAt DateTime?
-  voterRecords  VoterRecord[]
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  version        String        @db.VarChar(50)
+  uploadedAt     DateTime      @default(now())
+  uploadedBy     String        @db.Uuid
+  recordCount    Int
+  fileHash       String        @db.VarChar(64)
+  isActive       Boolean       @default(true)
+  activatedAt    DateTime?
+  deactivatedAt  DateTime?
+  uploadedByUser User          @relation(fields: [uploadedBy], references: [id])
+  voterRecords   VoterRecord[]
 
   @@map("voter_db_versions")
 }
@@ -290,64 +363,67 @@ model ApplicantProfile {
 }
 
 model NominationApplication {
-  id                    String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  applicationNo         String                    @unique @db.VarChar(30)
-  applicantProfileId    String                    @db.Uuid
-  ulbId                 String                    @db.Uuid
-  wardId                String                    @db.Uuid
-  submissionNumber      Int                       @default(1)
-  status                NominationStatus          @default(DRAFT)
-  candidateName         String                    @db.VarChar(200)
-  fatherHusbandName     String                    @db.VarChar(200)
-  dateOfBirth           DateTime?                 @db.Date
+  id                 String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  applicationNo      String @unique @db.VarChar(30)
+  applicantProfileId String @db.Uuid
+
+  electionId     String       @db.Uuid
+  electionSeatId String       @db.Uuid
+  electionSeat   ElectionSeat @relation(fields: [electionSeatId], references: [id])
+
+  submissionNumber      Int              @default(1)
+  status                NominationStatus @default(DRAFT)
+  candidateName         String           @db.VarChar(200)
+  fatherHusbandName     String           @db.VarChar(200)
+  dateOfBirth           DateTime?        @db.Date
   age                   Int?
   gender                Gender?
   category              Category
-  casteTribeName        String?                   @db.VarChar(100)
+  casteTribeName        String?          @db.VarChar(100)
   address               String
-  correspondingAddress   String?                   @db.Text
-  voterSerialNo         String                    @db.VarChar(10)
-  voterPartNo           String                    @db.VarChar(10)
-  politicalPartyId      String?                   @db.Uuid
-  isIndependent         Boolean                   @default(true)
+  correspondingAddress  String?          @db.Text
+  voterSerialNo         String           @db.VarChar(10)
+  voterPartNo           String           @db.VarChar(10)
+  politicalPartyId      String?          @db.Uuid
+  isIndependent         Boolean          @default(true)
   submittedAt           DateTime?
-  submittedIp           String?                   @db.VarChar(45)
-  createdBy             String                    @db.Uuid
+  submittedIp           String?          @db.VarChar(45)
+  createdBy             String           @db.Uuid
   receivedAt            DateTime?
-  receivedBy            String?                   @db.Uuid
-  receiptOtpVerified    Boolean                   @default(false)
+  receivedBy            String?          @db.Uuid
+  receiptOtpVerified    Boolean          @default(false)
   scrutinyDate          DateTime?
-  scrutinizedBy         String?                   @db.Uuid
+  scrutinizedBy         String?          @db.Uuid
   withdrawnAt           DateTime?
   withdrawalReason      String?
-  withdrawalApprovedBy  String?                   @db.Uuid
-  withdrawalOtpVerified Boolean                   @default(false)
-  allocatedSymbolId     String?                   @db.Uuid
-  createdAt             DateTime                  @default(now())
-  updatedAt             DateTime                  @updatedAt
-  electionId            String?                   @db.Uuid
+  withdrawalApprovedBy  String?          @db.Uuid
+  withdrawalOtpVerified Boolean          @default(false)
+  allocatedSymbolId     String?          @db.Uuid
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
   brPayments            BRPayment[]
   documents             Document[]
-  allocatedSymbol       ElectionSymbol?           @relation(fields: [allocatedSymbolId], references: [id])
-  applicantProfile      ApplicantProfile          @relation(fields: [applicantProfileId], references: [id])
-  creator               User                      @relation("CreatedBy", fields: [createdBy], references: [id])
-  election              ElectionConfig?           @relation(fields: [electionId], references: [id])
-  politicalParty        PoliticalParty?           @relation(fields: [politicalPartyId], references: [id])
-  receiver              User?                     @relation("ReceivedBy", fields: [receivedBy], references: [id])
-  scrutinizer           User?                     @relation("ScrutinizedBy", fields: [scrutinizedBy], references: [id])
-  ulb                   ULB                       @relation(fields: [ulbId], references: [id])
-  ward                  Ward                      @relation(fields: [wardId], references: [id])
-  withdrawalApprover    User?                     @relation("WithdrawalApprovedBy", fields: [withdrawalApprovedBy], references: [id])
-  statusHistory         NominationStatusHistory[]
-  proposers             Proposer[]
-  symbolPreferences     SymbolPreference[]
+  allocatedSymbol       ElectionSymbol?  @relation(fields: [allocatedSymbolId], references: [id])
+  applicantProfile      ApplicantProfile @relation(fields: [applicantProfileId], references: [id])
+  creator               User             @relation("CreatedBy", fields: [createdBy], references: [id])
+  election              ElectionConfig  @relation(fields: [electionId], references: [id])
+  politicalParty        PoliticalParty?  @relation(fields: [politicalPartyId], references: [id])
+  receiver              User?            @relation("ReceivedBy", fields: [receivedBy], references: [id])
+  scrutinizer           User?            @relation("ScrutinizedBy", fields: [scrutinizedBy], references: [id])
 
+  withdrawalApprover User?                     @relation("WithdrawalApprovedBy", fields: [withdrawalApprovedBy], references: [id])
+  statusHistory      NominationStatusHistory[]
+  proposers          Proposer[]
+  symbolPreferences  SymbolPreference[]
+  symbolAllocations  SymbolAllocation[]
+
+@@index([electionSeatId])
   @@index([applicantProfileId])
-  @@index([ulbId])
-  @@index([wardId])
+  // @@index([wardId])
   @@index([status])
   @@index([electionId])
   @@index([applicationNo])
+  @@unique([applicantProfileId, electionSeatId])
   @@map("nomination_applications")
 }
 
@@ -413,7 +489,7 @@ model ElectionSymbol {
   updatedAt         DateTime                @updatedAt
   allocations       NominationApplication[]
   parties           PoliticalParty[]
-  wardAllocations   SymbolAllocation[]
+  symbolAllocations SymbolAllocation[]
   symbolPreferences SymbolPreference[]
 
   @@map("election_symbols")
@@ -435,74 +511,98 @@ model SymbolPreference {
 }
 
 model SymbolAllocation {
-  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  wardId      String         @db.Uuid
-  symbolId    String         @db.Uuid
-  allocatedTo String?        @db.Uuid
-  electionId  String         @db.Uuid
-  allocatedAt DateTime       @default(now())
-  allocatedBy String         @db.Uuid
-  election    ElectionConfig @relation(fields: [electionId], references: [id])
-  symbol      ElectionSymbol @relation(fields: [symbolId], references: [id])
-  ward        Ward           @relation(fields: [wardId], references: [id])
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  @@unique([wardId, symbolId, electionId])
-  @@map("symbol_allocations")
+  electionId     String @db.Uuid
+  electionSeatId String @db.Uuid
+  nominationId   String @unique @db.Uuid
+  symbolId       String @db.Uuid
+
+  // audit fields
+  allocatedById String   @db.Uuid
+  allocatedToId String   @db.Uuid
+  allocatedAt   DateTime @default(now())
+
+  electionSeat ElectionSeat          @relation(fields: [electionSeatId], references: [id])
+  nomination   NominationApplication @relation(fields: [nominationId], references: [id])
+  symbol       ElectionSymbol        @relation(fields: [symbolId], references: [id])
+
+  election    ElectionConfig @relation(fields: [electionId], references: [id])
+  allocatedBy User           @relation("SymbolAllocatedBy", fields: [allocatedById], references: [id])
+  allocatedTo User           @relation("SymbolAllocatedTo", fields: [allocatedToId], references: [id])
+
+  @@unique([electionSeatId, symbolId])
+  @@index([electionId])
+  @@index([nominationId])
+  
 }
 
 model Document {
-  id            String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nominationId  String                @db.Uuid
-  type          DocumentType
-  fileName      String                @db.VarChar(255)
-  originalName  String                @db.VarChar(255)
-  mimeType      String                @db.VarChar(100)
-  fileSize      Int
-  storagePath   String                @db.VarChar(500)
-  checksum      String                @db.VarChar(64)
-  status        DocumentStatus        @default(PENDING)
-  verifiedBy    String?               @db.Uuid
-  verifiedAt    DateTime?
-  rejectionNote String?
-  uploadedAt    DateTime              @default(now())
-  nomination    NominationApplication @relation(fields: [nominationId], references: [id], onDelete: Cascade)
+  id             String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nominationId   String                @db.Uuid
+  type           DocumentType
+  fileName       String                @db.VarChar(255)
+  originalName   String                @db.VarChar(255)
+  mimeType       String                @db.VarChar(100)
+  fileSize       Int
+  storagePath    String                @db.VarChar(500)
+  checksum       String                @db.VarChar(64)
+  status         DocumentStatus        @default(PENDING)
+  verifiedBy     String?               @db.Uuid
+  verifiedAt     DateTime?
+  rejectionNote  String?
+  uploadedAt     DateTime              @default(now())
+  nomination     NominationApplication @relation(fields: [nominationId], references: [id], onDelete: Cascade)
+  verifiedByUser User?                 @relation(fields: [verifiedBy], references: [id])
 
   @@index([nominationId])
   @@map("documents")
 }
 
 model ElectionConfig {
-  id                         String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name                       String                  @db.VarChar(200)
-  year                       Int
-  type                       String                  @db.VarChar(50)
-  notificationDate           DateTime                @db.Date
-  nominationStartDate        DateTime                @db.Date
-  nominationEndDate          DateTime                @db.Date
-  scrutinyDate               DateTime                @db.Date
-  withdrawalStartDate        DateTime                @db.Date
-  withdrawalEndDate          DateTime                @db.Date
-  symbolAllotmentDate        DateTime?               @db.Date
-  pollDate                   DateTime?               @db.Date
-  countingDate               DateTime?               @db.Date
-  resultDate                 DateTime?               @db.Date
-  dailyStartTime             String                  @default("09:00") @db.VarChar(5)
-  dailyEndTime               String                  @default("15:00") @db.VarChar(5)
-  nominationFee              Decimal                 @db.Decimal(10, 2)
-  scStFeeDiscount            Decimal                 @default(0) @db.Decimal(5, 2)
-  maxNominationsPerCandidate Int                     @default(3)
-  maxProposersRequired       Int                     @default(1)
-  currentPhase               ElectionPhase           @default(PRE_NOTIFICATION)
-  isActive                   Boolean                 @default(true)
-  isLocked                   Boolean                 @default(false)
-  lockedAt                   DateTime?
-  lockedBy                   String?                 @db.Uuid
-  createdAt                  DateTime                @default(now())
-  updatedAt                  DateTime                @updatedAt
-  createdBy                  String                  @db.Uuid
-  nominations                NominationApplication[]
-  symbolAllocations          SymbolAllocation[]
+  id   String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name String @db.VarChar(200)
 
+  electionType ElectionType
+  scopeType    ElectionScopeType @default(FULL) // Added for multiple elections case 
+
+  // type                       String         @db.VarChar(50)
+  year                       Int
+  notificationDate           DateTime       @db.Date
+  nominationStartDate        DateTime       @db.Date
+  nominationEndDate          DateTime       @db.Date
+  scrutinyDate               DateTime       @db.Date
+  withdrawalStartDate        DateTime       @db.Date
+  withdrawalEndDate          DateTime       @db.Date
+  symbolAllotmentDate        DateTime?      @db.Date
+  pollDate                   DateTime?      @db.Date
+  countingDate               DateTime?      @db.Date
+  resultDate                 DateTime?      @db.Date
+  dailyStartTime             String         @default("09:00") @db.VarChar(5)
+  dailyEndTime               String         @default("15:00") @db.VarChar(5)
+  nominationFee              Decimal        @db.Decimal(10, 2)
+  scStFeeDiscount            Decimal        @default(0) @db.Decimal(5, 2)
+  maxNominationsPerCandidate Int            @default(3)
+  maxProposersRequired       Int            @default(1)
+  currentPhase               ElectionPhase  @default(PRE_NOTIFICATION)
+  isActive                   Boolean        @default(true)
+  status                     ElectionStatus @default(ACTIVE)
+  isLocked                   Boolean        @default(false)
+  lockedAt                   DateTime?
+  lockedBy                   String?        @db.Uuid
+  createdAt                  DateTime       @default(now())
+  updatedAt                  DateTime       @updatedAt
+  createdBy                  String         @db.Uuid
+  lockedByUser               User?          @relation("ElectionLockedBy", fields: [lockedBy], references: [id])
+  createdByUser User @relation("ElectionCreatedBy", fields: [createdBy], references: [id])
+
+  nominations       NominationApplication[]
+  symbolAllocations SymbolAllocation[]
+  dayModuleConfigs  DayModuleConfig[]
+  electionSeats     ElectionSeat[]
+
+  @@index([isActive])
+  @@index([status])
   @@map("election_configs")
 }
 
@@ -518,9 +618,37 @@ model DayModuleConfig {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  @@unique([electionId, dayNumber])
-  @@unique([electionId, date])
+  election ElectionConfig @relation(fields: [electionId], references: [id])
+
+  @@index([electionId])
   @@map("day_module_configs")
+}
+
+model ElectionSeat {
+  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  electionId String @db.Uuid
+
+  // Three possible seat types
+  wardId          String? @db.Uuid // Municipal
+  panchayatWardId String? @db.Uuid // Panchayat
+  zptcId          String? @db.Uuid // ZPTC
+
+  election ElectionConfig @relation(fields: [electionId], references: [id])
+
+  // Relations
+  ward          Ward?          @relation(fields: [wardId], references: [id])
+  panchayatWard PanchayatWard? @relation(fields: [panchayatWardId], references: [id])
+  zptc          ZPTC?          @relation(fields: [zptcId], references: [id])
+
+  nominations       NominationApplication[]
+  symbolAllocations SymbolAllocation[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([electionId, wardId])
+  @@unique([electionId, panchayatWardId])
+  @@unique([electionId, zptcId])
+  @@index([electionId])
 }
 
 model AuditLog {
@@ -565,17 +693,20 @@ model NotificationLog {
 }
 
 model GeneratedPDF {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  formType     String   @db.VarChar(20)
-  nominationId String?  @db.Uuid
-  wardId       String?  @db.Uuid
-  fileName     String   @db.VarChar(255)
-  storagePath  String   @db.VarChar(500)
-  fileSize     Int
-  checksum     String   @db.VarChar(64)
-  generatedBy  String   @db.Uuid
-  generatedAt  DateTime @default(now())
-  metadata     Json?
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  formType        String   @db.VarChar(20)
+  nominationId    String?  @db.Uuid
+  wardId          String?  @db.Uuid
+  panchayatWardId String?
+  zptcId          String?
+  fileName        String   @db.VarChar(255)
+  storagePath     String   @db.VarChar(500)
+  fileSize        Int
+  checksum        String   @db.VarChar(64)
+  generatedBy     String   @db.Uuid
+  generatedAt     DateTime @default(now())
+  metadata        Json?
+  generatedByUser User     @relation(fields: [generatedBy], references: [id])
 
   @@index([nominationId])
   @@index([wardId])
@@ -600,18 +731,19 @@ model VoterRollEntry {
 }
 
 model BRPayment {
-  id            String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nominationId  String                @db.Uuid
-  brNumber      String                @db.VarChar(100)
-  proofImageUrl String                @db.VarChar(500)
-  proofPublicId String?               @db.VarChar(255)
-  status        PaymentStatus         @default(PENDING)
-  verifiedBy    String?               @db.Uuid
-  verifiedAt    DateTime?
-  rejectionNote String?
-  submittedAt   DateTime              @default(now())
-  updatedAt     DateTime              @updatedAt
-  nomination    NominationApplication @relation(fields: [nominationId], references: [id], onDelete: Cascade)
+  id             String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nominationId   String                @db.Uuid
+  brNumber       String                @db.VarChar(100)
+  proofImageUrl  String                @db.VarChar(500)
+  proofPublicId  String?               @db.VarChar(255)
+  status         PaymentStatus         @default(PENDING)
+  verifiedBy     String?               @db.Uuid
+  verifiedAt     DateTime?
+  rejectionNote  String?
+  submittedAt    DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  nomination     NominationApplication @relation(fields: [nominationId], references: [id], onDelete: Cascade)
+  verifiedByUser User?                 @relation(fields: [verifiedBy], references: [id])
 
   @@index([nominationId])
   @@index([brNumber])
@@ -626,10 +758,12 @@ enum Role {
 }
 
 enum JurisdictionType {
-  STATE
   DISTRICT
   ULB
   WARD
+  GPU
+  PANCHAYAT_WARD
+  ZPTC
 }
 
 enum ULBType {
@@ -680,6 +814,14 @@ enum NominationStatus {
   WITHDRAWN
   CONTESTING
   ELECTED_UNOPPOSED
+}
+
+enum ElectionStatus {
+  ACTIVE
+  UPCOMING
+  COMPLETED
+  ARCHIVED
+  SUSPENDED
 }
 
 enum PaymentStatus {
@@ -785,4 +927,23 @@ enum NotificationStatus {
   SENT
   DELIVERED
   FAILED
+}
+
+// CHanges for New MUlti Election handling
+enum ElectionType {
+  PANCHAYAT
+  MUNICIPAL
+  ZPTC
+}
+
+enum ElectionScopeType {
+  FULL
+  PARTIAL
+  BY_ELECTION
+}
+
+enum ContestUnitType {
+  MUNICIPAL_WARD
+  PANCHAYAT_WARD
+  ZPTC
 }
