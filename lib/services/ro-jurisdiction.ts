@@ -22,9 +22,8 @@ export async function getROJurisdictions(
   const rows = await db.userJurisdiction.findMany({
     where: { userId, isActive: true },
     select: {
-      districtId: true,
-      ulbId: true,
-      wardId: true,
+      jurisdictionType: true,
+      jurisdictionId: true,
     },
   });
 
@@ -34,14 +33,14 @@ export async function getROJurisdictions(
 
   return {
     districtIds: rows
-      .filter((r) => r.districtId != null)
-      .map((r) => r.districtId as string),
+      .filter((r) => r.jurisdictionType === 'DISTRICT')
+      .map((r) => r.jurisdictionId),
     ulbIds: rows
-      .filter((r) => r.ulbId != null)
-      .map((r) => r.ulbId as string),
+      .filter((r) => r.jurisdictionType === 'ULB')
+      .map((r) => r.jurisdictionId),
     wardIds: rows
-      .filter((r) => r.wardId != null)
-      .map((r) => r.wardId as string),
+      .filter((r) => r.jurisdictionType === 'WARD')
+      .map((r) => r.jurisdictionId),
   };
 }
 

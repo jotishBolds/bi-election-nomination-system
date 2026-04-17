@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/next-auth";
 import { db } from "@/lib/db";
+import { loadJurisdictionDetails } from "@/lib/services/jurisdiction-helper";
 import type {
   AdminDashboardData,
   ElectionScheduleItem,
@@ -77,18 +78,22 @@ export async function GET(request: NextRequest) {
     }
 
     // Get recent users
-    const recentUsers = await db.user.findMany({
+    const usersWithoutJurisdictions = await db.user.findMany({
       take: 10,
       orderBy: { createdAt: "desc" },
       include: {
         roles: true,
-        jurisdictions: {
-          include: {
-            district: true,
-          },
-        },
+        jurisdictions: true, // No direct includes - will load separately
       },
     });
+
+    // Load jurisdiction details using helper
+    const recentUsers = await Promise.all(
+      usersWithoutJurisdictions.map(async (user) => ({
+        ...user,
+        jurisdictions: await loadJurisdictionDetails(user.jurisdictions),
+      }))
+    );
 
     // Get recent audit logs
     const recentAuditLogs = await db.auditLog.findMany({

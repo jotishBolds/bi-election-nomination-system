@@ -91,46 +91,59 @@ model Ward {
 model GPU {
   id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name       String @db.VarChar(200)
+  code       String @db.VarChar(50)
   districtId String @db.Uuid
+  isActive   Boolean @default(true)
 
   district     District        @relation(fields: [districtId], references: [id])
   wards        PanchayatWard[]
   voterRecords VoterRecord[]
   createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
   // electionSeats ElectionSeat[]
 
   @@index([districtId])
+  @@map("gpus")
 }
 
 model PanchayatWard {
-  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  wardNo Int
-  name   String @db.VarChar(200)
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  wardNo         Int
+  name           String           @db.VarChar(200)
+  reservationType ReservationType?
+  isActive       Boolean          @default(true)
 
   gpuId String @db.Uuid
   gpu   GPU    @relation(fields: [gpuId], references: [id])
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   electionSeats ElectionSeat[]
   voterRecords  VoterRecord[]
 
   @@unique([gpuId, wardNo])
   @@index([gpuId])
+  @@map("panchayat_wards")
 }
 
 model ZPTC {
-  id   String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name String @db.VarChar(200)
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String           @db.VarChar(200)
+  code           String           @db.VarChar(50)
+  districtId     String           @db.Uuid
+  reservationType ReservationType?
+  isActive       Boolean          @default(true)
 
-  districtId    String         @db.Uuid
   district      District       @relation(fields: [districtId], references: [id])
   electionSeats ElectionSeat[]
   voterRecords  VoterRecord[]
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([districtId])
+  @@map("zptcs")
 }
 
 model User {
@@ -170,8 +183,8 @@ model User {
   generatedPDFs          GeneratedPDF[]
   verifiedDocuments      Document[]
   verifiedPayments       BRPayment[]
-  createdElections ElectionConfig[] @relation("ElectionCreatedBy")
-  revokedUserRoles       UserRole[]       @relation("UserRoleRevokedBy")
+  createdElections       ElectionConfig[]        @relation("ElectionCreatedBy")
+  revokedUserRoles       UserRole[]              @relation("UserRoleRevokedBy")
 
   @@index([email])
   @@index([phone])
@@ -179,16 +192,16 @@ model User {
 }
 
 model UserRole {
-  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId    String    @db.Uuid
-  role      Role
-  grantedAt DateTime  @default(now())
-  grantedBy String?   @db.Uuid
-  revokedAt DateTime?
-  revokedBy String?   @db.Uuid
-  isActive  Boolean   @default(true)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  revokedByUser User?   @relation("UserRoleRevokedBy", fields: [revokedBy], references: [id])
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String    @db.Uuid
+  role          Role
+  grantedAt     DateTime  @default(now())
+  grantedBy     String?   @db.Uuid
+  revokedAt     DateTime?
+  revokedBy     String?   @db.Uuid
+  isActive      Boolean   @default(true)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revokedByUser User?     @relation("UserRoleRevokedBy", fields: [revokedBy], references: [id])
 
   // @@unique([userId, role])
   @@index([userId])
@@ -201,18 +214,22 @@ model UserJurisdiction {
 
   jurisdictionType JurisdictionType
   jurisdictionId   String           @db.Uuid
+  electionId       String?          @db.Uuid // Optional for system-wide permissions
 
   // audit fields
   assignedAt DateTime @default(now())
   assignedBy String?  @db.Uuid
   isActive   Boolean  @default(true)
 
-  user           User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  assignedByUser User? @relation("JurisdictionAssignedBy", fields: [assignedBy], references: [id])
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedByUser User?           @relation("JurisdictionAssignedBy", fields: [assignedBy], references: [id])
+  election       ElectionConfig? @relation(fields: [electionId], references: [id])
 
-  @@unique([userId, jurisdictionType, jurisdictionId])
+  @@unique([userId, jurisdictionType, jurisdictionId, electionId])
   @@index([userId])
   @@index([jurisdictionType, jurisdictionId])
+  @@index([electionId])
+  @@map("user_jurisdictions")
 }
 
 model TOTPSecret {
@@ -276,12 +293,12 @@ model VoterRecord {
   dateOfBirth       DateTime @db.Date
   age               Int
   // address           String
-  address String @db.Text
+  address           String   @db.Text
   partNo            String   @db.VarChar(10)
   serialNo          String   @db.VarChar(10)
 
   // hierarchy
-  districtId String  @db.Uuid
+  districtId String? @db.Uuid
   ulbId      String? @db.Uuid
   wardId     String? @db.Uuid
 
@@ -291,7 +308,7 @@ model VoterRecord {
   zptcId String? @db.Uuid
 
   // relations
-  district      District       @relation(fields: [districtId], references: [id])
+  district      District?      @relation(fields: [districtId], references: [id])
   ulb           ULB?           @relation(fields: [ulbId], references: [id])
   ward          Ward?          @relation(fields: [wardId], references: [id])
   gpu           GPU?           @relation(fields: [gpuId], references: [id])
@@ -320,13 +337,13 @@ model VoterDBVersion {
   id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   version        String        @db.VarChar(50)
   uploadedAt     DateTime      @default(now())
-  uploadedBy     String        @db.Uuid
+  uploadedBy     String?       @db.Uuid
   recordCount    Int
   fileHash       String        @db.VarChar(64)
   isActive       Boolean       @default(true)
   activatedAt    DateTime?
   deactivatedAt  DateTime?
-  uploadedByUser User          @relation(fields: [uploadedBy], references: [id])
+  uploadedByUser User?         @relation(fields: [uploadedBy], references: [id])
   voterRecords   VoterRecord[]
 
   @@map("voter_db_versions")
@@ -367,9 +384,9 @@ model NominationApplication {
   applicationNo      String @unique @db.VarChar(30)
   applicantProfileId String @db.Uuid
 
-  electionId     String       @db.Uuid
-  electionSeatId String       @db.Uuid
-  electionSeat   ElectionSeat @relation(fields: [electionSeatId], references: [id])
+  electionId     String?       @db.Uuid
+  electionSeatId String?       @db.Uuid
+  electionSeat   ElectionSeat? @relation(fields: [electionSeatId], references: [id])
 
   submissionNumber      Int              @default(1)
   status                NominationStatus @default(DRAFT)
@@ -406,7 +423,7 @@ model NominationApplication {
   allocatedSymbol       ElectionSymbol?  @relation(fields: [allocatedSymbolId], references: [id])
   applicantProfile      ApplicantProfile @relation(fields: [applicantProfileId], references: [id])
   creator               User             @relation("CreatedBy", fields: [createdBy], references: [id])
-  election              ElectionConfig  @relation(fields: [electionId], references: [id])
+  election              ElectionConfig?  @relation(fields: [electionId], references: [id])
   politicalParty        PoliticalParty?  @relation(fields: [politicalPartyId], references: [id])
   receiver              User?            @relation("ReceivedBy", fields: [receivedBy], references: [id])
   scrutinizer           User?            @relation("ScrutinizedBy", fields: [scrutinizedBy], references: [id])
@@ -417,13 +434,13 @@ model NominationApplication {
   symbolPreferences  SymbolPreference[]
   symbolAllocations  SymbolAllocation[]
 
-@@index([electionSeatId])
+  @@unique([applicantProfileId, electionSeatId])
+  @@index([electionSeatId])
   @@index([applicantProfileId])
   // @@index([wardId])
   @@index([status])
   @@index([electionId])
   @@index([applicationNo])
-  @@unique([applicantProfileId, electionSeatId])
   @@map("nomination_applications")
 }
 
@@ -534,7 +551,6 @@ model SymbolAllocation {
   @@unique([electionSeatId, symbolId])
   @@index([electionId])
   @@index([nominationId])
-  
 }
 
 model Document {
@@ -564,9 +580,7 @@ model ElectionConfig {
   name String @db.VarChar(200)
 
   electionType ElectionType
-  scopeType    ElectionScopeType @default(FULL) // Added for multiple elections case 
-
-  // type                       String         @db.VarChar(50)
+  scopeType    ElectionScopeType @default(FULL) // Added for multiple elections case
   year                       Int
   notificationDate           DateTime       @db.Date
   nominationStartDate        DateTime       @db.Date
@@ -581,7 +595,7 @@ model ElectionConfig {
   dailyStartTime             String         @default("09:00") @db.VarChar(5)
   dailyEndTime               String         @default("15:00") @db.VarChar(5)
   nominationFee              Decimal        @db.Decimal(10, 2)
-  scStFeeDiscount            Decimal        @default(0) @db.Decimal(5, 2)
+  scStFeeDiscount            Decimal        @default(0) @db.Decimal(10, 2)
   maxNominationsPerCandidate Int            @default(3)
   maxProposersRequired       Int            @default(1)
   currentPhase               ElectionPhase  @default(PRE_NOTIFICATION)
@@ -594,12 +608,13 @@ model ElectionConfig {
   updatedAt                  DateTime       @updatedAt
   createdBy                  String         @db.Uuid
   lockedByUser               User?          @relation("ElectionLockedBy", fields: [lockedBy], references: [id])
-  createdByUser User @relation("ElectionCreatedBy", fields: [createdBy], references: [id])
+  createdByUser              User           @relation("ElectionCreatedBy", fields: [createdBy], references: [id])
 
   nominations       NominationApplication[]
   symbolAllocations SymbolAllocation[]
   dayModuleConfigs  DayModuleConfig[]
   electionSeats     ElectionSeat[]
+  userJurisdictions UserJurisdiction[]
 
   @@index([isActive])
   @@index([status])
@@ -649,6 +664,7 @@ model ElectionSeat {
   @@unique([electionId, panchayatWardId])
   @@unique([electionId, zptcId])
   @@index([electionId])
+  @@map("election_seats")
 }
 
 model AuditLog {
@@ -758,6 +774,7 @@ enum Role {
 }
 
 enum JurisdictionType {
+  STATE
   DISTRICT
   ULB
   WARD

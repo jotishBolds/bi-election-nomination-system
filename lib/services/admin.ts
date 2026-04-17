@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { Role, ULBType, AuditAction, PaymentStatus } from "@prisma/client";
 import { hashPassword } from "@/lib/auth/server-utils";
+import { loadJurisdictionDetails } from "./jurisdiction-helper";
 import crypto from "crypto";
 
 // =====================
@@ -127,19 +128,12 @@ export async function getUsers(options: {
     ];
   }
 
-  const [users, total] = await Promise.all([
+  const [usersWithoutJurisdictions, total] = await Promise.all([
     db.user.findMany({
       where: whereClause,
       include: {
         roles: true,
-        jurisdictions: {
-          include: {
-            state: { select: { name: true } },
-            district: { select: { name: true } },
-            ulb: { select: { name: true } },
-            ward: { select: { wardName: true, wardNo: true } },
-          },
-        },
+        jurisdictions: true, // No direct includes - will load separately
       },
       skip: (page - 1) * limit,
       take: limit,
@@ -147,6 +141,14 @@ export async function getUsers(options: {
     }),
     db.user.count({ where: whereClause }),
   ]);
+
+  // Load jurisdiction details using helper
+  const users = await Promise.all(
+    usersWithoutJurisdictions.map(async (user) => ({
+      ...user,
+      jurisdictions: await loadJurisdictionDetails(user.jurisdictions),
+    }))
+  );
 
   return {
     success: true,

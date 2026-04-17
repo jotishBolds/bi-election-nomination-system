@@ -1,6 +1,7 @@
 // SEC (State Election Commission) Service
 import "server-only";
 import { db } from "@/lib/db";
+import { loadJurisdictionDetails } from "./jurisdiction-helper";
 import { Role, NominationStatus, ElectionPhase } from "@prisma/client";
 
 interface DashboardFilters {
@@ -18,19 +19,23 @@ export async function getSECDashboardStats(
   filters?: DashboardFilters,
 ) {
   // Verify user is SEC
-  const user = await db.user.findUnique({
+  const userWithoutJurisdictions = await db.user.findUnique({
     where: { id: userId },
     include: {
       roles: true,
-      jurisdictions: {
-        include: {
-          state: true,
-          district: true,
-          ulb: true,
-        },
-      },
+      jurisdictions: true, // No direct includes - will load separately
     },
   });
+
+  if (!userWithoutJurisdictions) {
+    throw new Error("User not found");
+  }
+
+  // Load jurisdiction details using helper
+  const user = {
+    ...userWithoutJurisdictions,
+    jurisdictions: await loadJurisdictionDetails(userWithoutJurisdictions.jurisdictions),
+  };
 
   if (!user || !user.roles.some((r) => r.role === Role.SES)) {
     throw new Error("User is not authorized as SEC");

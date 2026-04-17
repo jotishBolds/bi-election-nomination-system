@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/next-auth";
 import { db } from "@/lib/db";
+import { loadJurisdictionDetails } from "@/lib/services/jurisdiction-helper";
 import { NominationStatus } from "@prisma/client";
 import type { RODashboardData, ElectionScheduleItem } from "@/types/dashboard";
 
@@ -16,39 +17,26 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user with jurisdictions
-    const user = await db.user.findUnique({
+    const userWithoutJurisdictions = await db.user.findUnique({
       where: { id: session.user.id },
       include: {
         roles: true,
-        jurisdictions: {
-          include: {
-            district: true,
-            ulb: {
-              include: {
-                wards: true,
-                district: true,
-              },
-            },
-            ward: {
-              include: {
-                ulb: {
-                  include: {
-                    district: true,
-                  },
-                },
-              },
-            },
-          },
-        },
+        jurisdictions: true, // No direct includes - will load separately
       },
     });
 
-    if (!user) {
+    if (!userWithoutJurisdictions) {
       return NextResponse.json(
         { success: false, error: "User not found" },
         { status: 404 },
       );
     }
+
+    // Load jurisdiction details using helper
+    const user = {
+      ...userWithoutJurisdictions,
+      jurisdictions: await loadJurisdictionDetails(userWithoutJurisdictions.jurisdictions),
+    };
 
     // Verify RO role
     const isRO = user.roles.some((r) => r.role === "RO");
